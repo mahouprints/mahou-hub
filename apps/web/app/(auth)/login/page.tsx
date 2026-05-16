@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirect = searchParams.get('redirect') ?? '/calculadora';
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, senha }),
       });
       if (!res.ok) throw new Error('Credenciais inválidas');
-      router.push('/calculadora');
+      router.push(redirect);
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Erro inesperado');
     } finally {

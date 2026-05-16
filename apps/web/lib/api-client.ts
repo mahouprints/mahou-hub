@@ -2,6 +2,8 @@
  * Cliente HTTP do backend. Todas as chamadas vão para `/api/*`, que o Next
  * roteia via rewrite para `NEXT_PUBLIC_API_URL` (proxy server-side para evitar
  * mixed-cookies entre `hub.mahouprints.com` e `api.mahouprints.com`).
+ *
+ * Em 401 redireciona para /login automaticamente (sessão expirada/inexistente).
  */
 export async function apiFetch<T>(
   path: string,
@@ -17,6 +19,13 @@ export async function apiFetch<T>(
     },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
+
+  if (res.status === 401 && typeof window !== 'undefined') {
+    const atual = window.location.pathname + window.location.search;
+    window.location.href = `/login?redirect=${encodeURIComponent(atual)}`;
+    throw new Error('Sessão expirada');
+  }
+
   if (!res.ok) {
     const corpo = await res.text();
     throw new Error(`HTTP ${res.status}: ${corpo}`);
