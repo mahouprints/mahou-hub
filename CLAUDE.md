@@ -1,0 +1,68 @@
+# Mahou Hub — instruções para agentes
+
+Idioma: responda sempre em **pt-BR**. Commits, comentários e PRs em pt-BR.
+
+## Stack
+Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahouprints.com`). `apps/api` = NestJS + Prisma + PostgreSQL (VPS, domínio `api.mahouprints.com`). `packages/pricing` e `packages/contracts` são compartilhados entre front e back.
+
+## Code style
+- Funções de 4-20 linhas. Arquivos < 500 linhas. Uma responsabilidade por arquivo.
+- Máx. 2 níveis de indentação. Use early returns no lugar de `if` aninhado.
+- Nomes específicos: `calcularLiquidoShopee` em vez de `calcularPreco`. Se `grep` retorna >5 resultados pelo nome, está genérico demais.
+- Proibido: `data`, `info`, `handler`, `Manager`, `Helper` como sufixos vagos.
+- TypeScript strict em todo lugar. Nada de `any` sem comentário justificando.
+
+## Comentários
+- Explique **POR QUÊ**, não **O QUÊ**. O nome da função já diz o que ela faz.
+- Mantenha comentários que registram decisões (provenance, bug que motivou, restrição de negócio).
+- **Não remova comentários que outro agente escreveu** sem entender o motivo — eles guardam contexto que o código não tem.
+- Docstring em função pública: intent + 1 exemplo de uso.
+
+## Testes
+- Vitest para `packages/*` e `apps/api`. Playwright para fluxos críticos em `apps/web`.
+- Cobertura mínima: 90% em `packages/pricing` (núcleo financeiro), 70% no resto.
+- Todo teste roda com `pnpm test` sem setup manual. Banco de teste sobe via `docker compose -f infra/docker-compose.test.yml up -d`.
+- Toda função pública nova precisa de teste. Bug corrigido precisa de teste de regressão.
+
+## Dependências
+- Injete dependências (NestJS DI no backend; props/context no front). Nada de singleton global mutável.
+- Money: sempre centavos (`Int`). Nunca `number` de R$. Conversões só na borda (UI / serialização).
+- Validação na borda com Zod em `packages/contracts`. Tipos derivam do schema (`z.infer`).
+
+## Estrutura
+- Backend segue convenção NestJS: `src/modules/<dominio>/{controller,service,dto,module}.ts`.
+- Frontend segue App Router: `app/(grupo)/<rota>/page.tsx`, `components/` ao lado.
+- Caminhos previsíveis: se existe `Produto` no backend, existe `apps/web/app/(app)/produtos/` no front.
+- Migrations Prisma versionadas em `apps/api/prisma/migrations/`. Nunca editar migration aplicada.
+
+## Formatação
+- `prettier` + `eslint --fix` rodam em pre-commit (lefthook).
+- Imports ordenados, sem imports não usados.
+- `tsconfig` com `strict: true`, `noUncheckedIndexedAccess: true`.
+
+## Logging
+- Pino com saída JSON estruturada. Campos obrigatórios: `level`, `time`, `msg`, `requestId`.
+- Erro: incluir `err.message`, `err.stack`, valor esperado vs recebido. Nunca logar senha, JWT ou dado pessoal.
+- Mensagens de exceção devem dizer o valor recebido e a forma esperada.
+
+## Decisões de produto (não óbvias)
+- Valores monetários em centavos no banco e na API. Conversão pra reais só na renderização.
+- `Parametro` é singleton (id=1). Reescreva o registro existente em vez de criar novo.
+- Status de `JobProducao` muda só por endpoint específico (`PATCH /producao/:id/status`), nunca por `update` genérico.
+- `Filamento` nunca é deletado, só marcado `ativo=false` (referenciado por Produtos antigos).
+- `Calculadora` (`/calculadora`) é stateless e não toca o banco. `Simulador` opera sobre produtos já cadastrados.
+- Diferença Calculadora × Simulador: Calculadora valida viabilidade unitária de produto **hipotético**; Simulador projeta produção de produto **cadastrado**.
+
+## O que NÃO fazer
+- Não adicionar bibliotecas sem checar `package.json` — provavelmente já existe equivalente.
+- Não criar abstrações para "futuro" — três linhas duplicadas é melhor que abstração prematura.
+- Não usar `--no-verify` em commits. Se o hook falhou, conserte a causa.
+- Não criar documentação `.md` nova sem ser pedido explicitamente.
+- Não rodar `prisma migrate reset` em ambiente compartilhado sem confirmação.
+
+## Comandos úteis
+- `pnpm dev` — sobe web + api em modo dev.
+- `pnpm test` — roda todos os testes (Vitest + Playwright).
+- `pnpm lint` — ESLint + Prettier check.
+- `pnpm --filter api exec prisma migrate dev` — nova migration.
+- `pnpm --filter api exec prisma studio` — UI do banco.
