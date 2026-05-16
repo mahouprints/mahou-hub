@@ -25,6 +25,9 @@ export const FaixaShopeeSchema = z.object({
   fixaCpfAltoCentavos: z.number().int().nonnegative(),
 });
 
+export const FaixaShopeeCreateSchema = FaixaShopeeSchema.omit({ id: true });
+export const FaixaShopeeUpdateSchema = FaixaShopeeCreateSchema.partial();
+
 export const FaixaMercadoLivreSchema = z.object({
   id: z.string(),
   faixa: z.enum(['A', 'B', 'C', 'D', 'E']),
@@ -34,7 +37,14 @@ export const FaixaMercadoLivreSchema = z.object({
   comissaoCategoriaPct: z.number().nonnegative(),
 });
 
+export const FaixaMercadoLivreCreateSchema = FaixaMercadoLivreSchema.omit({ id: true });
+export const FaixaMercadoLivreUpdateSchema = FaixaMercadoLivreCreateSchema.partial();
+
 export type Parametro = z.infer<typeof ParametroSchema>;
 export type ParametroUpdate = z.infer<typeof ParametroUpdateSchema>;
 export type FaixaShopee = z.infer<typeof FaixaShopeeSchema>;
+export type FaixaShopeeCreate = z.infer<typeof FaixaShopeeCreateSchema>;
+export type FaixaShopeeUpdate = z.infer<typeof FaixaShopeeUpdateSchema>;
 export type FaixaMercadoLivre = z.infer<typeof FaixaMercadoLivreSchema>;
+export type FaixaMercadoLivreCreate = z.infer<typeof FaixaMercadoLivreCreateSchema>;
+export type FaixaMercadoLivreUpdate = z.infer<typeof FaixaMercadoLivreUpdateSchema>;
