@@ -3,8 +3,8 @@ import type {
   FaixaShopee,
   ParametrosGlobais,
   VendedorShopee,
-} from './types.js';
-import { arredondarCentavos } from './money.js';
+} from './types';
+import { arredondarCentavos } from './money';
 
 /**
  * Localiza a faixa Shopee aplicável ao preço (última faixa cujo limInferior é <= preço).

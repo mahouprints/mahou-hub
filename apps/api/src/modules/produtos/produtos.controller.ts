@@ -5,9 +5,9 @@ import {
   type ProdutoCreate,
   type ProdutoUpdate,
 } from '@mahou-hub/contracts';
-import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
-import { JwtAuthGuard } from '../auth/jwt.guard.js';
-import { ProdutosService } from './produtos.service.js';
+import { ZodValidationPipe } from '../../common/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { ProdutosService } from './produtos.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('produtos')

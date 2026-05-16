@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CanalEnum, ImpressoraEnum } from './enums.js';
+import { CanalEnum, ImpressoraEnum } from './enums';
 
 export const ProdutoSchema = z.object({
   id: z.string(),

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VendedorShopeeEnum } from './enums.js';
+import { VendedorShopeeEnum } from './enums';
 
 export const ParametroSchema = z.object({
   id: z.literal(1).default(1),

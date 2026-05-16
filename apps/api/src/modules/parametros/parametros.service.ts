@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { ParametroUpdate } from '@mahou-hub/contracts';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class ParametrosService {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { custoEnergiaCentavos, custoFilamentoCentavos } from '../src/custos.js';
-import type { Filamento } from '../src/types.js';
+import { custoEnergiaCentavos, custoFilamentoCentavos } from '../src/custos';
+import type { Filamento } from '../src/types';
 
 const FILAMENTO_ABS: Filamento = {
   nome: 'ABS Branco',

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { FilamentoCreate, FilamentoUpdate } from '@mahou-hub/contracts';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class FilamentosService {

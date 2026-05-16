@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IdeiaStatusEnum } from './enums.js';
+import { IdeiaStatusEnum } from './enums';
 
 export const IdeiaSchema = z.object({
   id: z.string(),

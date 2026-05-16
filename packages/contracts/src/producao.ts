@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ImpressoraEnum, JobStatusEnum, OrigemEnum } from './enums.js';
+import { ImpressoraEnum, JobStatusEnum, OrigemEnum } from './enums';
 
 export const JobProducaoSchema = z.object({
   id: z.string(),

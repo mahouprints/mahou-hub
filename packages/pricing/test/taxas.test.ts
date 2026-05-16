@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { taxaMercadoLivreCentavos, taxaShopeeCentavos } from '../src/taxas.js';
-import type { FaixaMercadoLivre, FaixaShopee, ParametrosGlobais } from '../src/types.js';
+import { taxaMercadoLivreCentavos, taxaShopeeCentavos } from '../src/taxas';
+import type { FaixaMercadoLivre, FaixaShopee, ParametrosGlobais } from '../src/types';
 
 const TABELA_SHOPEE: FaixaShopee[] = [
   { limInferiorCentavos: 0, comissaoPct: 14, fixaCnpjCentavos: 0, fixaCpfBaixoCentavos: 0, fixaCpfAltoCentavos: 0 },

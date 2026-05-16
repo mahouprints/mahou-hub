@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
-import { PrismaModule } from './prisma/prisma.module.js';
-import { AuthModule } from './modules/auth/auth.module.js';
-import { ProdutosModule } from './modules/produtos/produtos.module.js';
-import { FilamentosModule } from './modules/filamentos/filamentos.module.js';
-import { ParametrosModule } from './modules/parametros/parametros.module.js';
-import { PricingModule } from './modules/pricing/pricing.module.js';
-import { HealthController } from './modules/health/health.controller.js';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { ProdutosModule } from './modules/produtos/produtos.module';
+import { FilamentosModule } from './modules/filamentos/filamentos.module';
+import { ParametrosModule } from './modules/parametros/parametros.module';
+import { PricingModule } from './modules/pricing/pricing.module';
+import { HealthController } from './modules/health/health.controller';
 
 @Module({
   imports: [

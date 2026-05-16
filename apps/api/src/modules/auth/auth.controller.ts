@@ -1,8 +1,8 @@
 import { Body, Controller, Post, Res, UsePipes } from '@nestjs/common';
 import type { Response } from 'express';
 import { LoginInputSchema, type LoginInput } from '@mahou-hub/contracts';
-import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
-import { AuthService } from './auth.service.js';
+import { ZodValidationPipe } from '../../common/zod-validation.pipe';
+import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {

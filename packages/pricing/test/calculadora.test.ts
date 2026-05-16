@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { calcularProduto } from '../src/calculadora.js';
+import { calcularProduto } from '../src/calculadora';
 import type {
   CalculoEntrada,
   FaixaMercadoLivre,
   FaixaShopee,
   Filamento,
   ParametrosGlobais,
-} from '../src/types.js';
+} from '../src/types';
 
 const FILAMENTO_PLA: Filamento = {
   nome: 'PLA Preto',

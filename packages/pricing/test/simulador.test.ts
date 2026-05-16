@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { capacidade, simularCenario } from '../src/simulador.js';
+import { capacidade, simularCenario } from '../src/simulador';
 
 describe('capacidade', () => {
   it('arredonda para baixo', () => {

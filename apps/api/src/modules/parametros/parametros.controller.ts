@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ParametroUpdateSchema, type ParametroUpdate } from '@mahou-hub/contracts';
-import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
-import { JwtAuthGuard } from '../auth/jwt.guard.js';
-import { ParametrosService } from './parametros.service.js';
+import { ZodValidationPipe } from '../../common/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { ParametrosService } from './parametros.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('parametros')

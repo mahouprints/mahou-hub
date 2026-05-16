@@ -1,5 +1,5 @@
-import type { Filamento, Impressora } from './types.js';
-import { arredondarCentavos } from './money.js';
+import type { Filamento, Impressora } from './types';
+import { arredondarCentavos } from './money';
 
 /**
  * Custo do filamento usado no produto.

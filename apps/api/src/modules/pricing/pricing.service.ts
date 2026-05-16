@@ -9,7 +9,7 @@ import {
   type ParametrosGlobais,
 } from '@mahou-hub/pricing';
 import type { CalcularInput, SimularInput, SimularOutput } from '@mahou-hub/contracts';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class PricingService {

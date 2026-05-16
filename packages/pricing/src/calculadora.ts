@@ -1,7 +1,7 @@
-import type { CalculoEntrada, CalculoSaida } from './types.js';
-import { custoEnergiaCentavos, custoFilamentoCentavos } from './custos.js';
-import { taxaMercadoLivreCentavos, taxaShopeeCentavos } from './taxas.js';
-import { arredondarCentavos } from './money.js';
+import type { CalculoEntrada, CalculoSaida } from './types';
+import { custoEnergiaCentavos, custoFilamentoCentavos } from './custos';
+import { taxaMercadoLivreCentavos, taxaShopeeCentavos } from './taxas';
+import { arredondarCentavos } from './money';
 
 /**
  * Calcula custos, taxas e líquido por canal para um produto (hipotético ou cadastrado).

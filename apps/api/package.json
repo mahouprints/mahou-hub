@@ -14,7 +14,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "import:xlsx": "tsx scripts/import-xlsx.ts"
+    "import:xlsx": "tsx scripts/import-xlsx.ts",
+    "seed:admin": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
     "@mahou-hub/contracts": "workspace:*",
@@ -28,6 +29,7 @@
     "@prisma/client": "^5.20.0",
     "argon2": "^0.41.1",
     "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.5",
     "nestjs-pino": "^4.1.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

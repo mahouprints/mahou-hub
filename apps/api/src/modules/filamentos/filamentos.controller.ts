@@ -5,9 +5,9 @@ import {
   type FilamentoCreate,
   type FilamentoUpdate,
 } from '@mahou-hub/contracts';
-import { ZodValidationPipe } from '../../common/zod-validation.pipe.js';
-import { JwtAuthGuard } from '../auth/jwt.guard.js';
-import { FilamentosService } from './filamentos.service.js';
+import { ZodValidationPipe } from '../../common/zod-validation.pipe';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { FilamentosService } from './filamentos.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('filamentos')

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ImpressoraEnum } from './enums.js';
+import { ImpressoraEnum } from './enums';
 
 /**
  * Input da Calculadora (`POST /pricing/calcular`) — stateless, recebe ID de filamento
