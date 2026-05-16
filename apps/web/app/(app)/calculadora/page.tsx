@@ -98,7 +98,7 @@ export default function CalculadoraPage() {
   }
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Calculadora de viabilidade</h1>
         <p className="text-sm text-muted-foreground">

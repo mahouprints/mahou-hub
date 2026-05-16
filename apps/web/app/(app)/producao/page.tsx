@@ -8,7 +8,7 @@ import {
 
 export default function ProducaoPage() {
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Produção</h1>
         <p className="text-sm text-muted-foreground">
