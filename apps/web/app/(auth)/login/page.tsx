@@ -2,6 +2,11 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -31,44 +36,47 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 rounded-xl bg-white p-8 shadow">
-        <h1 className="text-2xl font-semibold">Mahou Hub</h1>
-        <p className="text-sm text-mahou-mute">Acesse com sua conta</p>
-
-        <label className="block">
-          <span className="text-sm text-mahou-mute">Email</span>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="mt-1 w-full rounded-md border border-mahou-line px-3 py-2 outline-none focus:border-mahou-accent"
-          />
-        </label>
-
-        <label className="block">
-          <span className="text-sm text-mahou-mute">Senha</span>
-          <input
-            type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            required
-            minLength={8}
-            className="mt-1 w-full rounded-md border border-mahou-line px-3 py-2 outline-none focus:border-mahou-accent"
-          />
-        </label>
-
-        {erro && <p className="text-sm text-red-600">{erro}</p>}
-
-        <button
-          type="submit"
-          disabled={carregando}
-          className="w-full rounded-md bg-mahou-accent px-4 py-2 text-white disabled:opacity-60"
-        >
-          {carregando ? 'Entrando...' : 'Entrar'}
-        </button>
-      </form>
+    <main className="flex min-h-screen items-center justify-center px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader>
+          <div className="mb-2 flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <CardTitle>Mahou Hub</CardTitle>
+          </div>
+          <CardDescription>Acesse com sua conta</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="senha">Senha</Label>
+              <Input
+                id="senha"
+                type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="current-password"
+              />
+            </div>
+            {erro && <p className="text-sm text-destructive">{erro}</p>}
+            <Button type="submit" disabled={carregando} className="w-full">
+              {carregando ? 'Entrando…' : 'Entrar'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }

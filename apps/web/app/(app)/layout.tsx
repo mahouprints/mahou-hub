@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
-import { Sidebar } from '../../components/sidebar';
+import { Sidebar } from '@/components/sidebar';
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen flex">
+    <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 p-8 overflow-x-auto">{children}</main>
+      <main className="flex-1 overflow-x-auto p-8">{children}</main>
     </div>
   );
 }

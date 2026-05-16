@@ -2,9 +2,21 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import type { Produto } from '@mahou-hub/contracts';
-import { apiFetch } from '../../../lib/api-client';
-import { centavosParaReais } from '../../../lib/format';
+import { apiFetch } from '@/lib/api-client';
+import { centavosParaReais } from '@/lib/format';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 type ProdutoComFilamento = Produto & { filamento: { nome: string } };
 
@@ -18,55 +30,55 @@ export default function ProdutosPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Produtos</h1>
-          <p className="text-sm text-mahou-mute">{data?.length ?? 0} itens cadastrados</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Produtos</h1>
+          <p className="text-sm text-muted-foreground">{data?.length ?? 0} itens cadastrados</p>
         </div>
-        <Link
-          href="/produtos/novo"
-          className="rounded-md bg-mahou-accent px-4 py-2 text-sm text-white"
-        >
-          Novo produto
-        </Link>
+        <Button asChild>
+          <Link href="/produtos/novo">
+            <Plus className="h-4 w-4" /> Novo produto
+          </Link>
+        </Button>
       </header>
 
-      {isLoading && <p className="text-sm text-mahou-mute">Carregando…</p>}
-      {error && <p className="text-sm text-red-600">{(error as Error).message}</p>}
+      {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
 
       {data && (
-        <div className="overflow-x-auto rounded-xl bg-white shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b border-mahou-line text-left text-mahou-mute">
-              <tr>
-                <Th>Nome</Th>
-                <Th>Filamento</Th>
-                <Th>Peso</Th>
-                <Th>Tempo</Th>
-                <Th>Preço</Th>
-                <Th>Canal</Th>
-              </tr>
-            </thead>
-            <tbody>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Filamento</TableHead>
+                <TableHead className="text-right">Peso</TableHead>
+                <TableHead className="text-right">Tempo</TableHead>
+                <TableHead className="text-right">Preço</TableHead>
+                <TableHead>Canal</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {data.map((p) => (
-                <tr key={p.id} className="border-b border-mahou-line/50 last:border-0">
-                  <Td>{p.nome}</Td>
-                  <Td>{p.filamento.nome}</Td>
-                  <Td>{Number(p.pesoG).toFixed(0)}g</Td>
-                  <Td>{Number(p.tempoH).toFixed(1)}h</Td>
-                  <Td>{centavosParaReais(p.precoCentavos)}</Td>
-                  <Td>{p.canalPrincipal}</Td>
-                </tr>
+                <TableRow key={p.id}>
+                  <TableCell className="font-medium">{p.nome}</TableCell>
+                  <TableCell>{p.filamento.nome}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {Number(p.pesoG).toFixed(0)}g
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {Number(p.tempoH).toFixed(1)}h
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {centavosParaReais(p.precoCentavos)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{p.canalPrincipal}</Badge>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </div>
   );
-}
-
-function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-4 py-3 font-medium">{children}</th>;
-}
-function Td({ children }: { children: React.ReactNode }) {
-  return <td className="px-4 py-3">{children}</td>;
 }

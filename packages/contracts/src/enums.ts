@@ -12,11 +12,9 @@ export const JobStatusEnum = z.enum([
   'ENVIADO',
   'CANCELADO',
 ]);
-export const IdeiaStatusEnum = z.enum(['BACKLOG', 'EM_ESTUDO', 'EM_PROD', 'ARQUIVADA']);
 
 export type Impressora = z.infer<typeof ImpressoraEnum>;
 export type Canal = z.infer<typeof CanalEnum>;
 export type VendedorShopee = z.infer<typeof VendedorShopeeEnum>;
 export type Origem = z.infer<typeof OrigemEnum>;
 export type JobStatus = z.infer<typeof JobStatusEnum>;
-export type IdeiaStatus = z.infer<typeof IdeiaStatusEnum>;

@@ -41,13 +41,6 @@ enum JobStatus {
   CANCELADO
 }
 
-enum IdeiaStatus {
-  BACKLOG
-  EM_ESTUDO
-  EM_PROD
-  ARQUIVADA
-}
-
 model Usuario {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -138,24 +131,6 @@ model PrecoConcorrente {
   precoCentavos  Int
   capturadoEm    DateTime    @default(now())
   fonteUrl       String?
-}
-
-model Conteudo {
-  id        String   @id @default(cuid())
-  titulo    String
-  url       String
-  descricao String?
-  tags      String[]
-  criadoEm  DateTime @default(now())
-}
-
-model Ideia {
-  id         String      @id @default(cuid())
-  titulo     String
-  descricao  String?
-  status     IdeiaStatus @default(BACKLOG)
-  referencia String?
-  criadaEm   DateTime    @default(now())
 }
 
 model JobProducao {

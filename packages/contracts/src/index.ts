@@ -5,5 +5,4 @@ export * from './parametro';
 export * from './pricing';
 export * from './producao';
 export * from './concorrente';
-export * from './ideia';
 export * from './auth';

@@ -3,8 +3,26 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { CalcularInput, CalcularOutput, Filamento, Parametro } from '@mahou-hub/contracts';
-import { apiFetch } from '../../../lib/api-client';
-import { centavosParaReais, pct } from '../../../lib/format';
+import { apiFetch } from '@/lib/api-client';
+import { centavosParaReais, pct } from '@/lib/format';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface FormState {
   filamentoId: string;
@@ -30,7 +48,7 @@ function reaisStrParaCentavos(s: string): number {
 
 export default function CalculadoraPage() {
   const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
-  const [resultado, setResultado] = useState<CalculoOutputComCanal | null>(null);
+  const [resultado, setResultado] = useState<CalcularOutput | null>(null);
   const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE'>('SHOPEE');
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -80,118 +98,137 @@ export default function CalculadoraPage() {
   }
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Calculadora de viabilidade</h1>
-        <p className="text-sm text-mahou-mute">
+        <h1 className="text-2xl font-semibold tracking-tight">Calculadora de viabilidade</h1>
+        <p className="text-sm text-muted-foreground">
           Tira-teima antes de cadastrar um produto. Nada é salvo no banco.
         </p>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section className="rounded-xl bg-white p-6 shadow-sm space-y-4">
-          <Field label="Filamento">
-            <select
-              value={form.filamentoId}
-              onChange={(e) => setForm({ ...form, filamentoId: e.target.value })}
-              className="w-full rounded-md border border-mahou-line px-3 py-2"
-            >
-              <option value="">— selecione —</option>
-              {filamentos?.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.nome} ({centavosParaReais(f.custoKgCentavos)}/kg)
-                </option>
-              ))}
-            </select>
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Peso (g)">
-              <input
-                type="number"
-                step="0.1"
-                value={form.pesoG}
-                onChange={(e) => setForm({ ...form, pesoG: e.target.value })}
-                className="w-full rounded-md border border-mahou-line px-3 py-2"
-              />
-            </Field>
-            <Field label="Tempo (h)">
-              <input
-                type="number"
-                step="0.1"
-                value={form.tempoH}
-                onChange={(e) => setForm({ ...form, tempoH: e.target.value })}
-                className="w-full rounded-md border border-mahou-line px-3 py-2"
-              />
-            </Field>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Impressora">
-              <select
-                value={form.impressora}
-                onChange={(e) =>
-                  setForm({ ...form, impressora: e.target.value as 'A1' | 'H2C' })
-                }
-                className="w-full rounded-md border border-mahou-line px-3 py-2"
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Entrada</CardTitle>
+            <CardDescription>Configure o produto hipotético</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Filamento</Label>
+              <Select
+                value={form.filamentoId}
+                onValueChange={(v) => setForm({ ...form, filamentoId: v })}
               >
-                <option value="A1">A1</option>
-                <option value="H2C">H2C</option>
-              </select>
-            </Field>
-            <Field label="Embalagem (R$)">
-              <input
+                <SelectTrigger>
+                  <SelectValue placeholder="— selecione —" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filamentos?.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>
+                      {f.nome} ({centavosParaReais(f.custoKgCentavos)}/kg)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="pesoG">Peso (g)</Label>
+                <Input
+                  id="pesoG"
+                  type="number"
+                  step="0.1"
+                  value={form.pesoG}
+                  onChange={(e) => setForm({ ...form, pesoG: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="tempoH">Tempo (h)</Label>
+                <Input
+                  id="tempoH"
+                  type="number"
+                  step="0.1"
+                  value={form.tempoH}
+                  onChange={(e) => setForm({ ...form, tempoH: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Impressora</Label>
+                <Select
+                  value={form.impressora}
+                  onValueChange={(v) => setForm({ ...form, impressora: v as 'A1' | 'H2C' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A1">A1</SelectItem>
+                    <SelectItem value="H2C">H2C</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="embalagem">Embalagem (R$)</Label>
+                <Input
+                  id="embalagem"
+                  type="number"
+                  step="0.01"
+                  value={form.embalagemReais}
+                  onChange={(e) => setForm({ ...form, embalagemReais: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="preco">Preço de venda (R$)</Label>
+              <Input
+                id="preco"
                 type="number"
                 step="0.01"
-                value={form.embalagemReais}
-                onChange={(e) => setForm({ ...form, embalagemReais: e.target.value })}
-                className="w-full rounded-md border border-mahou-line px-3 py-2"
+                value={form.precoReais}
+                onChange={(e) => setForm({ ...form, precoReais: e.target.value })}
               />
-            </Field>
-          </div>
+            </div>
 
-          <Field label="Preço de venda (R$)">
-            <input
-              type="number"
-              step="0.01"
-              value={form.precoReais}
-              onChange={(e) => setForm({ ...form, precoReais: e.target.value })}
-              className="w-full rounded-md border border-mahou-line px-3 py-2"
-            />
-          </Field>
+            <Button onClick={calcular} disabled={carregando || !form.filamentoId} className="w-full">
+              {carregando ? 'Calculando…' : 'Calcular'}
+            </Button>
+            {erro && <p className="text-sm text-destructive">{erro}</p>}
+          </CardContent>
+        </Card>
 
-          <button
-            onClick={calcular}
-            disabled={carregando}
-            className="w-full rounded-md bg-mahou-accent px-4 py-2 text-white disabled:opacity-60"
-          >
-            {carregando ? 'Calculando...' : 'Calcular'}
-          </button>
-          {erro && <p className="text-sm text-red-600">{erro}</p>}
-        </section>
-
-        <section className="rounded-xl bg-white p-6 shadow-sm">
-          {resultado ? (
-            <Resultado
-              resultado={resultado}
-              canal={canal}
-              onCanalChange={setCanal}
-              thresholds={{
-                verde: Number(parametros?.margemThresholdVerde ?? 0.3),
-                amarelo: Number(parametros?.margemThresholdAmarelo ?? 0.15),
-              }}
-              onSalvar={salvarComoProduto}
-            />
-          ) : (
-            <p className="text-sm text-mahou-mute">Preencha o formulário e clique em Calcular.</p>
-          )}
-        </section>
+        <Card>
+          <CardHeader>
+            <CardTitle>Resultado</CardTitle>
+            <CardDescription>Custos, taxas e líquido por canal</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {resultado ? (
+              <Resultado
+                resultado={resultado}
+                canal={canal}
+                onCanalChange={setCanal}
+                thresholds={{
+                  verde: Number(parametros?.margemThresholdVerde ?? 0.3),
+                  amarelo: Number(parametros?.margemThresholdAmarelo ?? 0.15),
+                }}
+                onSalvar={salvarComoProduto}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Preencha o formulário e clique em Calcular.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
-
-type CalculoOutputComCanal = CalcularOutput;
 
 function Resultado({
   resultado,
@@ -219,12 +256,8 @@ function Resultado({
         ? resultado.margemMl
         : resultado.margemSite;
 
-  const cor =
-    margem >= thresholds.verde
-      ? 'bg-green-500'
-      : margem >= thresholds.amarelo
-        ? 'bg-yellow-500'
-        : 'bg-red-500';
+  const variantBadge: 'success' | 'warning' | 'danger' =
+    margem >= thresholds.verde ? 'success' : margem >= thresholds.amarelo ? 'warning' : 'danger';
   const label =
     margem >= thresholds.verde
       ? 'Vale a pena'
@@ -233,26 +266,23 @@ function Resultado({
         : 'Não compensa';
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <span className={`inline-block w-3 h-3 rounded-full ${cor}`} aria-hidden />
-        <h2 className="text-lg font-semibold">{label}</h2>
-      </div>
-
-      <div className="flex gap-2">
-        {(['SHOPEE', 'ML', 'SITE'] as const).map((c) => (
-          <button
-            key={c}
-            onClick={() => onCanalChange(c)}
-            className={`px-3 py-1 rounded-md text-sm ${
-              c === canal
-                ? 'bg-mahou-ink text-white'
-                : 'bg-mahou-bg text-mahou-mute hover:bg-mahou-line'
-            }`}
-          >
-            {c}
-          </button>
-        ))}
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <Badge variant={variantBadge} className="text-sm">
+          {label}
+        </Badge>
+        <div className="flex gap-2">
+          {(['SHOPEE', 'ML', 'SITE'] as const).map((c) => (
+            <Button
+              key={c}
+              size="sm"
+              variant={c === canal ? 'default' : 'outline'}
+              onClick={() => onCanalChange(c)}
+            >
+              {c}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <dl className="grid grid-cols-2 gap-y-2 text-sm">
@@ -280,22 +310,10 @@ function Resultado({
         />
       </dl>
 
-      <button
-        onClick={onSalvar}
-        className="w-full rounded-md border border-mahou-accent px-4 py-2 text-mahou-accent hover:bg-mahou-accent/5"
-      >
+      <Button onClick={onSalvar} variant="outline" className="w-full">
         Salvar como produto
-      </button>
+      </Button>
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="text-sm text-mahou-mute">{label}</span>
-      <div className="mt-1">{children}</div>
-    </label>
   );
 }
 
@@ -310,7 +328,7 @@ function Linha({
 }) {
   return (
     <>
-      <dt className="text-mahou-mute">{rotulo}</dt>
+      <dt className="text-muted-foreground">{rotulo}</dt>
       <dd className={destaque ? 'text-right font-semibold' : 'text-right'}>{valor}</dd>
     </>
   );

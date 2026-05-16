@@ -2,8 +2,23 @@
 
 import { useQuery } from '@tanstack/react-query';
 import type { FaixaMercadoLivre, FaixaShopee, Filamento, Parametro } from '@mahou-hub/contracts';
-import { apiFetch } from '../../../lib/api-client';
-import { centavosParaReais } from '../../../lib/format';
+import { apiFetch } from '@/lib/api-client';
+import { centavosParaReais } from '@/lib/format';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function ConfiguracoesPage() {
   const parametros = useQuery({
@@ -24,117 +39,140 @@ export default function ConfiguracoesPage() {
   });
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">Configurações</h1>
-        <p className="text-sm text-mahou-mute">Parâmetros globais, filamentos e tabelas de taxas.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+        <p className="text-sm text-muted-foreground">
+          Parâmetros globais, filamentos e tabelas de taxas.
+        </p>
       </header>
 
-      <Bloco titulo="Parâmetros globais">
-        {parametros.data ? (
-          <dl className="grid grid-cols-2 gap-y-2 text-sm">
-            <Linha rotulo="Tarifa kWh" valor={centavosParaReais(parametros.data.tarifaKwhCentavos)} />
-            <Linha rotulo="Vendedor Shopee" valor={parametros.data.vendedorShopee} />
-            <Linha
-              rotulo="Em campanha"
-              valor={parametros.data.emCampanhaShopee ? 'Sim' : 'Não'}
-            />
-            <Linha rotulo="Adicional campanha" valor={`${parametros.data.adicionalCampanhaPct}%`} />
-            <Linha rotulo="Comissão ML" valor={`${parametros.data.comissaoMlPct}%`} />
-            <Linha rotulo="Imposto" valor={parametros.data.impostoAtivo ? `${parametros.data.impostoPct}%` : 'Inativo'} />
-          </dl>
-        ) : (
-          <p className="text-sm text-mahou-mute">Carregando…</p>
-        )}
-      </Bloco>
+      <Card>
+        <CardHeader>
+          <CardTitle>Parâmetros globais</CardTitle>
+          <CardDescription>Valores aplicados em todos os cálculos</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {parametros.data ? (
+            <dl className="grid grid-cols-2 gap-y-2 text-sm">
+              <Linha rotulo="Tarifa kWh" valor={centavosParaReais(parametros.data.tarifaKwhCentavos)} />
+              <Linha rotulo="Vendedor Shopee" valor={parametros.data.vendedorShopee} />
+              <Linha
+                rotulo="Em campanha"
+                valor={parametros.data.emCampanhaShopee ? 'Sim' : 'Não'}
+              />
+              <Linha rotulo="Adicional campanha" valor={`${parametros.data.adicionalCampanhaPct}%`} />
+              <Linha rotulo="Comissão ML" valor={`${parametros.data.comissaoMlPct}%`} />
+              <Linha
+                rotulo="Imposto"
+                valor={parametros.data.impostoAtivo ? `${parametros.data.impostoPct}%` : 'Inativo'}
+              />
+            </dl>
+          ) : (
+            <p className="text-sm text-muted-foreground">Carregando…</p>
+          )}
+        </CardContent>
+      </Card>
 
-      <Bloco titulo={`Filamentos (${filamentos.data?.length ?? 0})`}>
-        <ul className="text-sm divide-y divide-mahou-line">
-          {filamentos.data?.map((f) => (
-            <li key={f.id} className="py-2 flex justify-between">
-              <span>{f.nome}</span>
-              <span className="text-mahou-mute">
-                {centavosParaReais(f.custoKgCentavos)}/kg · A1 {f.potenciaA1W}W · H2C {f.potenciaH2cW}W
-              </span>
-            </li>
-          ))}
-        </ul>
-      </Bloco>
+      <Card>
+        <CardHeader>
+          <CardTitle>Filamentos</CardTitle>
+          <CardDescription>{filamentos.data?.length ?? 0} cadastrados</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead className="text-right">Custo/kg</TableHead>
+                <TableHead className="text-right">Potência A1</TableHead>
+                <TableHead className="text-right">Potência H2C</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filamentos.data?.map((f) => (
+                <TableRow key={f.id}>
+                  <TableCell className="font-medium">{f.nome}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {centavosParaReais(f.custoKgCentavos)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{f.potenciaA1W}W</TableCell>
+                  <TableCell className="text-right tabular-nums">{f.potenciaH2cW}W</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      <Bloco titulo="Taxas Shopee">
-        <Tabela
-          colunas={['Limite inferior', 'Comissão', 'Fixa CNPJ', 'Fixa CPF baixo', 'Fixa CPF alto']}
-          linhas={
-            taxasShopee.data?.map((t) => [
-              centavosParaReais(t.limInferiorCentavos),
-              `${t.comissaoPct}%`,
-              centavosParaReais(t.fixaCnpjCentavos),
-              centavosParaReais(t.fixaCpfBaixoCentavos),
-              centavosParaReais(t.fixaCpfAltoCentavos),
-            ]) ?? []
-          }
-        />
-      </Bloco>
+      <Card>
+        <CardHeader>
+          <CardTitle>Taxas Shopee</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Limite inferior</TableHead>
+                <TableHead className="text-right">Comissão</TableHead>
+                <TableHead className="text-right">Fixa CNPJ</TableHead>
+                <TableHead className="text-right">Fixa CPF baixo</TableHead>
+                <TableHead className="text-right">Fixa CPF alto</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {taxasShopee.data?.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="tabular-nums">{centavosParaReais(t.limInferiorCentavos)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{t.comissaoPct}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{centavosParaReais(t.fixaCnpjCentavos)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{centavosParaReais(t.fixaCpfBaixoCentavos)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{centavosParaReais(t.fixaCpfAltoCentavos)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-      <Bloco titulo="Taxas Mercado Livre">
-        <Tabela
-          colunas={['Faixa', 'Limite inferior', 'Custo fixo', '% alternativo', 'Comissão categoria']}
-          linhas={
-            taxasMl.data?.map((t) => [
-              t.faixa,
-              centavosParaReais(t.limInferiorCentavos),
-              centavosParaReais(t.custoFixoCentavos),
-              `${t.pctAlternativo}%`,
-              `${t.comissaoCategoriaPct}%`,
-            ]) ?? []
-          }
-        />
-      </Bloco>
+      <Card>
+        <CardHeader>
+          <CardTitle>Taxas Mercado Livre</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Faixa</TableHead>
+                <TableHead>Limite inferior</TableHead>
+                <TableHead className="text-right">Custo fixo</TableHead>
+                <TableHead className="text-right">% alternativo</TableHead>
+                <TableHead className="text-right">Comissão categoria</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {taxasMl.data?.map((t) => (
+                <TableRow key={t.id}>
+                  <TableCell className="font-medium">{t.faixa}</TableCell>
+                  <TableCell className="tabular-nums">{centavosParaReais(t.limInferiorCentavos)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{centavosParaReais(t.custoFixoCentavos)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{t.pctAlternativo}%</TableCell>
+                  <TableCell className="text-right tabular-nums">{t.comissaoCategoriaPct}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
-  );
-}
-
-function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-xl bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold mb-4">{titulo}</h2>
-      {children}
-    </section>
   );
 }
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <>
-      <dt className="text-mahou-mute">{rotulo}</dt>
-      <dd className="text-right">{valor}</dd>
+      <dt className="text-muted-foreground">{rotulo}</dt>
+      <dd className="text-right tabular-nums">{valor}</dd>
     </>
-  );
-}
-
-function Tabela({ colunas, linhas }: { colunas: string[]; linhas: string[][] }) {
-  return (
-    <table className="w-full text-sm">
-      <thead className="text-left text-mahou-mute">
-        <tr>
-          {colunas.map((c) => (
-            <th key={c} className="py-2 font-medium">
-              {c}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {linhas.map((linha, i) => (
-          <tr key={i} className="border-t border-mahou-line">
-            {linha.map((celula, j) => (
-              <td key={j} className="py-2">
-                {celula}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
   );
 }
