@@ -1,0 +1,180 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Impressora {
+  A1
+  H2C
+}
+
+enum Canal {
+  SHOPEE
+  ML
+  SITE
+}
+
+enum VendedorShopeeTipo {
+  CNPJ
+  CPF_BAIXO
+  CPF_ALTO
+}
+
+enum Origem {
+  ML
+  SHOPEE
+  SITE
+  ESTOQUE
+}
+
+enum JobStatus {
+  FILA
+  IMPRIMINDO
+  CONCLUIDO
+  EMBALADO
+  ENVIADO
+  CANCELADO
+}
+
+enum IdeiaStatus {
+  BACKLOG
+  EM_ESTUDO
+  EM_PROD
+  ARQUIVADA
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  senhaHash String
+  criadoEm  DateTime @default(now())
+}
+
+model Filamento {
+  id              String    @id @default(cuid())
+  nome            String    @unique
+  custoKgCentavos Int
+  potenciaA1W     Int
+  potenciaH2cW    Int
+  observacao      String?
+  ativo           Boolean   @default(true)
+  produtos        Produto[]
+  criadoEm        DateTime  @default(now())
+  atualizadoEm    DateTime  @updatedAt
+}
+
+model Produto {
+  id                String        @id @default(cuid())
+  nome              String
+  inspiracao        String?
+  modelo3dUrl       String?
+  filamentoId       String
+  filamento         Filamento     @relation(fields: [filamentoId], references: [id])
+  pesoG             Decimal       @db.Decimal(10, 2)
+  tempoH            Decimal       @db.Decimal(10, 2)
+  impressora        Impressora
+  embalagemCentavos Int
+  precoCentavos     Int
+  canalPrincipal    Canal
+  ativo             Boolean       @default(true)
+  jobs              JobProducao[]
+  criadoEm          DateTime      @default(now())
+  atualizadoEm      DateTime      @updatedAt
+}
+
+/// Singleton: sempre id=1. Configurações globais do Hub.
+model Parametro {
+  id                     Int                @id @default(1)
+  tarifaKwhCentavos      Int
+  vendedorShopee         VendedorShopeeTipo
+  emCampanhaShopee       Boolean            @default(false)
+  adicionalCampanhaPct   Decimal            @db.Decimal(5, 2)
+  comissaoMlPct          Decimal            @db.Decimal(5, 2)
+  impostoAtivo           Boolean            @default(false)
+  impostoPct             Decimal            @db.Decimal(5, 2)
+  margemThresholdVerde   Decimal            @default(0.30) @db.Decimal(4, 3)
+  margemThresholdAmarelo Decimal            @default(0.15) @db.Decimal(4, 3)
+  atualizadoEm           DateTime           @updatedAt
+}
+
+model TaxaShopee {
+  id                   String  @id @default(cuid())
+  limInferiorCentavos  Int     @unique
+  comissaoPct          Decimal @db.Decimal(5, 2)
+  fixaCnpjCentavos     Int
+  fixaCpfBaixoCentavos Int
+  fixaCpfAltoCentavos  Int
+}
+
+model TaxaMercadoLivre {
+  id                   String  @id @default(cuid())
+  faixa                String  @unique // A..E
+  limInferiorCentavos  Int
+  custoFixoCentavos    Int
+  pctAlternativo       Decimal @db.Decimal(5, 2)
+  comissaoCategoriaPct Decimal @db.Decimal(5, 2)
+}
+
+model Concorrente {
+  id         String             @id @default(cuid())
+  loja       String
+  instagram  String?
+  website    String?
+  observacao String?
+  precos     PrecoConcorrente[]
+  criadoEm   DateTime           @default(now())
+}
+
+model PrecoConcorrente {
+  id             String      @id @default(cuid())
+  concorrenteId  String
+  concorrente    Concorrente @relation(fields: [concorrenteId], references: [id], onDelete: Cascade)
+  produtoSimilar String
+  precoCentavos  Int
+  capturadoEm    DateTime    @default(now())
+  fonteUrl       String?
+}
+
+model Conteudo {
+  id        String   @id @default(cuid())
+  titulo    String
+  url       String
+  descricao String?
+  tags      String[]
+  criadoEm  DateTime @default(now())
+}
+
+model Ideia {
+  id         String      @id @default(cuid())
+  titulo     String
+  descricao  String?
+  status     IdeiaStatus @default(BACKLOG)
+  referencia String?
+  criadaEm   DateTime    @default(now())
+}
+
+model JobProducao {
+  id            String     @id @default(cuid())
+  dataInicio    DateTime
+  dataFim       DateTime?
+  origem        Origem
+  produtoId     String
+  produto       Produto    @relation(fields: [produtoId], references: [id])
+  qtd           Int
+  prioridade    Int        @default(0)
+  impressora    Impressora
+  status        JobStatus  @default(FILA)
+  anuncioCriado Boolean    @default(false)
+  anunciado     Boolean    @default(false)
+  observacao    String?
+  criadoEm      DateTime   @default(now())
+  atualizadoEm  DateTime   @updatedAt
+
+  @@index([status])
+  @@index([dataInicio])
+}

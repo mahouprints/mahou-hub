@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mahou-hub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mahou
+      POSTGRES_PASSWORD: mahou_dev
+      POSTGRES_DB: mahou_hub
+    ports:
+      - "5432:5432"
+    volumes:
+      - mahou_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mahou -d mahou_hub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: mahou-hub-api:latest
+    container_name: mahou-hub-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://mahou:${POSTGRES_PASSWORD:-mahou_dev}@postgres:5432/mahou_hub
+      JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: https://hub.mahouprints.com
+    profiles:
+      - prod
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: mahou-hub-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    profiles:
+      - prod
+
+volumes:
+  mahou_pg_data:
+  caddy_data:
+  caddy_config:
