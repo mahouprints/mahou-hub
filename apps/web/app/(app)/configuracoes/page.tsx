@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { FilamentoDialog } from '@/components/filamento-dialog';
 import { TaxaShopeeDialog } from '@/components/taxa-shopee-dialog';
 import { TaxaMlDialog } from '@/components/taxa-ml-dialog';
+import { ParametrosDialog } from '@/components/parametros-dialog';
 
 export default function ConfiguracoesPage() {
   const parametros = useQuery({
@@ -47,6 +48,7 @@ export default function ConfiguracoesPage() {
   const [filDialog, setFilDialog] = useState<{ open: boolean; item: Filamento | null }>({ open: false, item: null });
   const [shopeeDialog, setShopeeDialog] = useState<{ open: boolean; item: FaixaShopee | null }>({ open: false, item: null });
   const [mlDialog, setMlDialog] = useState<{ open: boolean; item: FaixaMercadoLivre | null }>({ open: false, item: null });
+  const [paramsDialog, setParamsDialog] = useState(false);
 
   const qc = useQueryClient();
   const desativarFilamento = useMutation({
@@ -70,9 +72,14 @@ export default function ConfiguracoesPage() {
       </header>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Parâmetros globais</CardTitle>
-          <CardDescription>Valores aplicados em todos os cálculos</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle>Parâmetros globais</CardTitle>
+            <CardDescription>Valores aplicados em todos os cálculos</CardDescription>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setParamsDialog(true)}>
+            <Pencil className="h-4 w-4" /> Editar
+          </Button>
         </CardHeader>
         <CardContent>
           {parametros.data ? (
@@ -246,6 +253,11 @@ export default function ConfiguracoesPage() {
         </CardContent>
       </Card>
 
+      <ParametrosDialog
+        open={paramsDialog}
+        onOpenChange={setParamsDialog}
+        parametros={parametros.data ?? null}
+      />
       <FilamentoDialog
         open={filDialog.open}
         onOpenChange={(o) => setFilDialog({ open: o, item: o ? filDialog.item : null })}

@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Box, ExternalLink, Plus } from 'lucide-react';
 import type { CalcularOutput, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
-import { centavosParaReais, centavosParaReaisSemSimbolo, isUrl, pct } from '@/lib/format';
+import { centavosParaReais, isUrl, pct } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -117,16 +117,16 @@ export default function ProdutosPage() {
                     <TableCell className="text-right tabular-nums">{p.pesoG}g</TableCell>
                     <TableCell className="text-right tabular-nums">{p.tempoH}h</TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {centavosParaReaisSemSimbolo(p.pricing.custoTotalProducaoCentavos)}
+                      {centavosParaReais(p.pricing.custoTotalProducaoCentavos)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-medium">
-                      {centavosParaReaisSemSimbolo(p.precoCentavos)}
+                      {centavosParaReais(p.precoCentavos)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {centavosParaReaisSemSimbolo(p.pricing.impostoCentavos)}
+                      {centavosParaReais(p.pricing.impostoCentavos)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {centavosParaReaisSemSimbolo(melhor.liquidoCentavos)}
+                      {centavosParaReais(melhor.liquidoCentavos)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       <MargemBadge valor={melhor.margem} />
