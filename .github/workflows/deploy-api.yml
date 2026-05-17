@@ -35,9 +35,10 @@ jobs:
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /opt/mahou-hub/infra
-            docker compose --profile prod build api
-            docker compose --profile prod up -d postgres api
-            sleep 3
-            docker compose --profile prod exec -T api node -e "console.log('api up')"
-            docker compose --profile prod exec -T api npx prisma migrate deploy
+            export $(grep -v '^#' .env.prod | xargs)
+            docker compose --env-file .env.prod --profile prod build api
+            docker compose --env-file .env.prod --profile prod up -d postgres api
+            sleep 5
+            docker compose --env-file .env.prod --profile prod exec -T api node -e "console.log('api up')"
+            docker compose --env-file .env.prod --profile prod exec -T api npx prisma migrate deploy
           EOF
