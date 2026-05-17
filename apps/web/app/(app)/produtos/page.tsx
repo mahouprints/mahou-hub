@@ -1,15 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { Box, ExternalLink, Plus } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Box, ExternalLink, Plus, Trash2 } from 'lucide-react';
 import type { CalcularOutput, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -94,7 +104,7 @@ export default function ProdutosPage() {
                 <TableHead className="text-right">Líquido</TableHead>
                 <TableHead className="text-right">Margem</TableHead>
                 <TableHead className="text-right">Lucro/h</TableHead>
-                <TableHead className="w-20 text-right">Links</TableHead>
+                <TableHead className="w-28 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -138,7 +148,11 @@ export default function ProdutosPage() {
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                     >
-                      <BotoesLink inspiracao={p.inspiracao} modelo3dUrl={p.modelo3dUrl} />
+                      <div className="flex items-center justify-end gap-1">
+                        <IconeLink url={p.inspiracao} icon={ExternalLink} label="Abrir inspiração" />
+                        <IconeLink url={p.modelo3dUrl} icon={Box} label="Abrir modelo 3D" />
+                        <BotaoExcluir produtoId={p.id} produtoNome={p.nome} />
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -160,18 +174,54 @@ function MargemBadge({ valor }: { valor: number }) {
   );
 }
 
-function BotoesLink({
-  inspiracao,
-  modelo3dUrl,
-}: {
-  inspiracao: string | null;
-  modelo3dUrl: string | null;
-}) {
+function BotaoExcluir({ produtoId, produtoNome }: { produtoId: string; produtoNome: string }) {
+  const [aberto, setAberto] = useState(false);
+  const qc = useQueryClient();
+  const excluir = useMutation({
+    mutationFn: () => apiFetch(`/produtos/${produtoId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['produtos'] });
+      setAberto(false);
+    },
+  });
+
   return (
-    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-      <IconeLink url={inspiracao} icon={ExternalLink} label="Abrir inspiração" />
-      <IconeLink url={modelo3dUrl} icon={Box} label="Abrir modelo 3D" />
-    </div>
+    <Dialog open={aberto} onOpenChange={setAberto}>
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        title="Excluir produto"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Excluir produto</DialogTitle>
+          <DialogDescription>
+            Tem certeza que deseja excluir <strong>{produtoNome}</strong>? Esta ação pode ser
+            revertida apenas via banco de dados.
+          </DialogDescription>
+        </DialogHeader>
+        {excluir.error && (
+          <p className="text-sm text-destructive">{(excluir.error as Error).message}</p>
+        )}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={excluir.isPending}>
+              Cancelar
+            </Button>
+          </DialogClose>
+          <Button
+            variant="destructive"
+            onClick={() => excluir.mutate()}
+            disabled={excluir.isPending}
+          >
+            {excluir.isPending ? 'Excluindo…' : 'Excluir'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

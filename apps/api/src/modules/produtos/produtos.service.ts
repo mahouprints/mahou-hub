@@ -16,6 +16,7 @@ export class ProdutosService {
   /** Lista produtos com o breakdown completo de pricing já calculado. */
   async list() {
     const produtos = await this.prisma.produto.findMany({
+      where: { ativo: true },
       orderBy: { criadoEm: 'desc' },
       include: { filamento: true },
     });
