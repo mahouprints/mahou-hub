@@ -165,7 +165,7 @@ function BotoesLink({
   modelo3dUrl: string | null;
 }) {
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
       <IconeLink url={inspiracao} icon={ExternalLink} label="Abrir inspiração" />
       <IconeLink url={modelo3dUrl} icon={Box} label="Abrir modelo 3D" />
     </div>
@@ -183,7 +183,10 @@ function IconeLink({
 }) {
   if (!isUrl(url)) {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center text-muted-foreground/30">
+      <span
+        title={url ? `Sem URL: "${url}"` : 'Sem link cadastrado'}
+        className="inline-flex h-7 w-7 cursor-default items-center justify-center text-muted-foreground/30"
+      >
         <Icon className="h-3.5 w-3.5" />
       </span>
     );
@@ -193,7 +196,6 @@ function IconeLink({
       href={url ?? '#'}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={(e) => e.stopPropagation()}
       title={label}
       className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
