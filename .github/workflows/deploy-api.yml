@@ -28,14 +28,16 @@ jobs:
       - name: Rsync para VPS
         run: |
           rsync -az --delete \
-            --exclude node_modules --exclude .turbo --exclude .next \
+            --exclude node_modules --exclude .turbo --exclude .next --exclude .git \
             ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/mahou-hub/
 
       - name: Build e restart na VPS
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd /opt/mahou-hub
+            cd /opt/mahou-hub/infra
             docker compose --profile prod build api
-            docker compose --profile prod up -d
+            docker compose --profile prod up -d postgres api
+            sleep 3
             docker compose --profile prod exec -T api node -e "console.log('api up')"
+            docker compose --profile prod exec -T api npx prisma migrate deploy
           EOF
