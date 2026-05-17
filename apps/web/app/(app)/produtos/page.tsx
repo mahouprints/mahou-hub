@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Box, ExternalLink, Plus } from 'lucide-react';
 import type { CalcularOutput, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
-import { centavosParaReaisSemSimbolo, isUrl, pct } from '@/lib/format';
+import { centavosParaReais, centavosParaReaisSemSimbolo, isUrl, pct } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -131,8 +131,8 @@ export default function ProdutosPage() {
                     <TableCell className="text-right tabular-nums">
                       <MargemBadge valor={melhor.margem} />
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {centavosParaReaisSemSimbolo(melhor.lucroPorHoraCentavos)}
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {centavosParaReais(melhor.lucroPorHoraCentavos)}
                     </TableCell>
                     <TableCell>
                       <BotoesLink inspiracao={p.inspiracao} modelo3dUrl={p.modelo3dUrl} />
