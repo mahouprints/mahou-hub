@@ -13,14 +13,15 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const NAV = [
+const NAV_PRINCIPAL = [
   { href: '/calculadora', label: 'Calculadora', icon: Calculator },
   { href: '/produtos', label: 'Produtos', icon: Boxes },
   { href: '/simulador', label: 'Simulador', icon: PlayCircle },
   { href: '/producao', label: 'Produção', icon: Factory },
   { href: '/concorrentes', label: 'Concorrentes', icon: Crosshair },
-  { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
+
+const NAV_RODAPE = [{ href: '/configuracoes', label: 'Configurações', icon: Settings }];
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -31,27 +32,41 @@ export function Sidebar() {
         <span className="text-lg font-semibold tracking-tight">Mahou Hub</span>
       </Link>
       <ul className="flex-1 space-y-0.5">
-        {NAV.map((item) => {
-          const ativo = pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                  ativo
-                    ? 'bg-primary/15 text-primary-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            </li>
-          );
-        })}
+        {NAV_PRINCIPAL.map((item) => (
+          <ItemNav key={item.href} item={item} pathname={pathname} />
+        ))}
+      </ul>
+      <ul className="space-y-0.5 border-t border-border pt-3">
+        {NAV_RODAPE.map((item) => (
+          <ItemNav key={item.href} item={item} pathname={pathname} />
+        ))}
       </ul>
     </nav>
+  );
+}
+
+interface ItemNavProps {
+  item: { href: string; label: string; icon: typeof Calculator };
+  pathname: string;
+}
+
+function ItemNav({ item, pathname }: ItemNavProps) {
+  const ativo = pathname.startsWith(item.href);
+  const Icon = item.icon;
+  return (
+    <li>
+      <Link
+        href={item.href}
+        className={cn(
+          'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
+          ativo
+            ? 'bg-primary/15 text-primary-foreground font-medium'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+        )}
+      >
+        <Icon className="h-4 w-4" />
+        {item.label}
+      </Link>
+    </li>
   );
 }
