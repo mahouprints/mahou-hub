@@ -10,8 +10,7 @@ RUN pnpm install --frozen-lockfile \
  && pnpm --filter api deploy --prod /app/deploy
 
 FROM node:22-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@9.12.0 --activate \
- && addgroup -S app && adduser -S app -G app
+RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 COPY --from=build --chown=app:app /app/deploy ./
 COPY --from=build --chown=app:app /app/apps/api/dist ./dist
@@ -21,7 +20,7 @@ COPY --from=build --chown=app:app /app/packages/pricing/package.json ./node_modu
 COPY --from=build --chown=app:app /app/packages/contracts/dist ./node_modules/@mahou-hub/contracts/dist
 COPY --from=build --chown=app:app /app/packages/contracts/package.json ./node_modules/@mahou-hub/contracts/package.json
 
-RUN chown -R app:app /app && npx -y prisma generate --schema=./prisma/schema.prisma
+RUN chown -R app:app /app && ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
 
 USER app
 ENV NODE_ENV=production
