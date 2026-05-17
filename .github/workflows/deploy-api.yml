@@ -28,7 +28,7 @@ jobs:
       - name: Rsync para VPS
         run: |
           rsync -az --delete \
-            --exclude node_modules --exclude .turbo --exclude .next --exclude .git \
+            --exclude node_modules --exclude .turbo --exclude .next --exclude .git --exclude .env.prod \
             ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/mahou-hub/
 
       - name: Build e restart na VPS
