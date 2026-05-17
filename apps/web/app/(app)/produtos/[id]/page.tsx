@@ -91,7 +91,7 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
               <Linha rotulo="Impressora" valor={produto.impressora} />
               <Linha rotulo="Peso" valor={`${Number(produto.pesoG)} g`} />
               <Linha rotulo="Tempo" valor={`${Number(produto.tempoH)} h`} />
-              <Linha rotulo="Dimensões" valor={produto.dimensoes ?? '—'} />
+              <Linha rotulo="Dimensões" valor={formatarDimensoes(produto)} />
               <Linha rotulo="Embalagem" valor={centavosParaReais(produto.embalagemCentavos)} />
               <Linha rotulo="Preço de venda" valor={centavosParaReais(produto.precoCentavos)} />
               <Linha rotulo="Canal principal" valor={canalLabel} />
@@ -140,6 +140,21 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
       </div>
     </div>
   );
+}
+
+/**
+ * Mostra "L × A × P cm" se TODAS as 3 dimensões existem, senão um traço.
+ * Optei por exigir as 3 — uma só fica estranho. Pra mostrar parcial,
+ * mude o `every` por `some` e ajuste a formatação.
+ */
+function formatarDimensoes(p: { larguraCm: number | null; alturaCm: number | null; profundidadeCm: number | null }): string {
+  const dims = [p.larguraCm, p.alturaCm, p.profundidadeCm];
+  if (!dims.every((d) => d != null)) return '—';
+  return `${formatarCm(p.larguraCm!)} × ${formatarCm(p.alturaCm!)} × ${formatarCm(p.profundidadeCm!)} cm`;
+}
+
+function formatarCm(n: number): string {
+  return Number(n).toString().replace('.', ',');
 }
 
 function Linha({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {

@@ -7,6 +7,9 @@ import { ProdutosModule } from './modules/produtos/produtos.module';
 import { FilamentosModule } from './modules/filamentos/filamentos.module';
 import { ParametrosModule } from './modules/parametros/parametros.module';
 import { PricingModule } from './modules/pricing/pricing.module';
+import { VendasModule } from './modules/vendas/vendas.module';
+import { CustosModule } from './modules/custos/custos.module';
+import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { HealthController } from './modules/health/health.controller';
 
 @Module({
@@ -27,6 +30,9 @@ import { HealthController } from './modules/health/health.controller';
     FilamentosModule,
     ParametrosModule,
     PricingModule,
+    VendasModule,
+    CustosModule,
+    FinanceiroModule,
   ],
   controllers: [HealthController],
 })

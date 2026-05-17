@@ -41,6 +41,17 @@ enum JobStatus {
   CANCELADO
 }
 
+enum CategoriaCusto {
+  ALUGUEL
+  ENERGIA
+  INTERNET
+  SOFTWARE
+  MARKETING
+  INSUMOS
+  IMPOSTOS
+  OUTROS
+}
+
 model Usuario {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -66,7 +77,9 @@ model Produto {
   nome              String
   inspiracao        String?
   modelo3dUrl       String?
-  dimensoes         String?       // formato livre, ex: "10x5x3 cm"
+  larguraCm         Decimal?      @db.Decimal(6, 1)
+  alturaCm          Decimal?      @db.Decimal(6, 1)
+  profundidadeCm    Decimal?      @db.Decimal(6, 1)
   filamentoId       String
   filamento         Filamento     @relation(fields: [filamentoId], references: [id])
   pesoG             Decimal       @db.Decimal(10, 2)
@@ -77,8 +90,42 @@ model Produto {
   canalPrincipal    Canal
   ativo             Boolean       @default(true)
   jobs              JobProducao[]
+  vendas            Venda[]
   criadoEm          DateTime      @default(now())
   atualizadoEm      DateTime      @updatedAt
+}
+
+model Venda {
+  id                    String   @id @default(cuid())
+  produtoId             String
+  produto               Produto  @relation(fields: [produtoId], references: [id])
+  qtd                   Int
+  precoUnitarioCentavos Int      // pode diferir de Produto.precoCentavos
+  canal                 Canal
+  dataVenda             DateTime
+  observacao            String?
+  criadoEm              DateTime @default(now())
+
+  @@index([dataVenda])
+  @@index([canal])
+}
+
+/// Custo geral da Mahou Prints (aluguel, internet, software, etc).
+/// `dataCompetencia` é sempre dia 1 do mês — agrupa por mês competência.
+/// `recorrente=true` gera 12 cópias futuras na criação (com geradoAutomatico=true).
+model Custo {
+  id               String         @id @default(cuid())
+  descricao        String
+  categoria        CategoriaCusto
+  valorCentavos    Int
+  dataCompetencia  DateTime
+  recorrente       Boolean        @default(false)
+  geradoAutomatico Boolean        @default(false)
+  observacao       String?
+  criadoEm         DateTime       @default(now())
+
+  @@index([dataCompetencia])
+  @@index([categoria])
 }
 
 /// Singleton: sempre id=1. Configurações globais do Hub.

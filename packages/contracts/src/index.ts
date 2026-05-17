@@ -6,3 +6,6 @@ export * from './pricing';
 export * from './producao';
 export * from './concorrente';
 export * from './auth';
+export * from './venda';
+export * from './custo';
+export * from './financeiro';

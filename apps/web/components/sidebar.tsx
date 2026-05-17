@@ -8,6 +8,7 @@ import {
   PlayCircle,
   Factory,
   Crosshair,
+  DollarSign,
   Settings,
   Sparkles,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ const NAV_PRINCIPAL = [
   { href: '/produtos', label: 'Produtos', icon: Boxes },
   { href: '/simulador', label: 'Simulador', icon: PlayCircle },
   { href: '/producao', label: 'Produção', icon: Factory },
+  { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { href: '/concorrentes', label: 'Concorrentes', icon: Crosshair },
 ];
 

@@ -43,7 +43,9 @@ interface FormState {
   nome: string;
   inspiracao: string;
   modelo3dUrl: string;
-  dimensoes: string;
+  larguraCm: string;
+  alturaCm: string;
+  profundidadeCm: string;
   filamentoId: string;
   pesoG: string;
   tempoH: string;
@@ -57,7 +59,9 @@ const VAZIO: FormState = {
   nome: '',
   inspiracao: '',
   modelo3dUrl: '',
-  dimensoes: '',
+  larguraCm: '',
+  alturaCm: '',
+  profundidadeCm: '',
   filamentoId: '',
   pesoG: '',
   tempoH: '',
@@ -78,7 +82,10 @@ export function ProdutoForm({ produto, inicial }: Props) {
         nome: produto.nome,
         inspiracao: produto.inspiracao ?? '',
         modelo3dUrl: produto.modelo3dUrl ?? '',
-        dimensoes: produto.dimensoes ?? '',
+        larguraCm: produto.larguraCm != null ? String(produto.larguraCm).replace('.', ',') : '',
+        alturaCm: produto.alturaCm != null ? String(produto.alturaCm).replace('.', ',') : '',
+        profundidadeCm:
+          produto.profundidadeCm != null ? String(produto.profundidadeCm).replace('.', ',') : '',
         filamentoId: produto.filamentoId,
         pesoG: String(produto.pesoG).replace('.', ','),
         tempoH: String(produto.tempoH).replace('.', ','),
@@ -139,7 +146,9 @@ export function ProdutoForm({ produto, inicial }: Props) {
         nome: form.nome.trim(),
         inspiracao: form.inspiracao.trim() || null,
         modelo3dUrl: form.modelo3dUrl.trim() || null,
-        dimensoes: form.dimensoes.trim() || null,
+        larguraCm: parseDimensaoCm(form.larguraCm),
+        alturaCm: parseDimensaoCm(form.alturaCm),
+        profundidadeCm: parseDimensaoCm(form.profundidadeCm),
         filamentoId: form.filamentoId,
         pesoG: parseDecimalBr(form.pesoG),
         tempoH: parseDecimalBr(form.tempoH),
@@ -209,13 +218,27 @@ export function ProdutoForm({ produto, inicial }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="dimensoes">Dimensões</Label>
-              <Input
-                id="dimensoes"
-                value={form.dimensoes}
-                onChange={(e) => setForm({ ...form, dimensoes: e.target.value })}
-                placeholder="ex: 10x5x3 cm"
-              />
+              <Label>Dimensões (cm)</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <InputDecimal
+                  value={form.larguraCm}
+                  onChange={(s) => setForm({ ...form, larguraCm: s })}
+                  decimals={1}
+                  placeholder="largura"
+                />
+                <InputDecimal
+                  value={form.alturaCm}
+                  onChange={(s) => setForm({ ...form, alturaCm: s })}
+                  decimals={1}
+                  placeholder="altura"
+                />
+                <InputDecimal
+                  value={form.profundidadeCm}
+                  onChange={(s) => setForm({ ...form, profundidadeCm: s })}
+                  decimals={1}
+                  placeholder="profundidade"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -380,6 +403,12 @@ function Preview({
       </dl>
     </div>
   );
+}
+
+/** Parse pra centímetros: aceita "10,5" ou "10.5"; vazio/inválido vira null. */
+function parseDimensaoCm(s: string): number | null {
+  const n = parseDecimalBr(s);
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
