@@ -23,4 +23,4 @@ COPY --from=build --chown=app:app /app/packages/contracts/package.json ./node_mo
 USER app
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

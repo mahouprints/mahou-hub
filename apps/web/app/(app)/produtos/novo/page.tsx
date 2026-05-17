@@ -1,9 +1,18 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ProdutoForm } from '@/components/produto-form';
 
 export default function ProdutoNovoPage() {
+  return (
+    <Suspense>
+      <ProdutoNovoContent />
+    </Suspense>
+  );
+}
+
+function ProdutoNovoContent() {
   const searchParams = useSearchParams();
 
   const inicial = {
