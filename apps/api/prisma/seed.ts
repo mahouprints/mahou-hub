@@ -93,8 +93,19 @@ async function seedProdutos() {
 
   let criados = 0;
   let pulados = 0;
+  let urlsAtualizadas = 0;
   for (const p of PRODUTOS) {
-    if (existentes.has(p.nome)) continue;
+    if (existentes.has(p.nome)) {
+      // Produto já existe: atualiza somente os campos vindos da planilha que
+      // não costumam ser editados pelo usuário (URLs de inspiração e modelo).
+      // Demais campos (preço, peso, tempo, etc.) são preservados.
+      await prisma.produto.updateMany({
+        where: { nome: p.nome },
+        data: { inspiracao: p.inspiracao, modelo3dUrl: p.modelo3dUrl },
+      });
+      urlsAtualizadas++;
+      continue;
+    }
     const filamento = porNome.get(p.filamentoNome);
     if (!filamento) {
       console.warn(`produto "${p.nome}" pulado: filamento "${p.filamentoNome}" não encontrado`);
@@ -111,7 +122,9 @@ async function seedProdutos() {
     });
     criados++;
   }
-  console.log(`produtos: ${criados} novos (${existentes.size} já existiam, ${pulados} pulados)`);
+  console.log(
+    `produtos: ${criados} novos, ${urlsAtualizadas} URLs atualizadas, ${pulados} pulados`,
+  );
 }
 
 async function main() {
