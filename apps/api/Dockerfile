@@ -1,4 +1,5 @@
-FROM node:22-alpine AS build
+FROM node:22-slim AS build
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 WORKDIR /app
 COPY . .
@@ -9,8 +10,9 @@ RUN pnpm install --frozen-lockfile \
  && pnpm --filter api run build \
  && pnpm --filter api deploy --prod /app/deploy
 
-FROM node:22-alpine AS runner
-RUN addgroup -S app && adduser -S app -G app
+FROM node:22-slim AS runner
+RUN apt-get update && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/* \
+ && addgroup --system app && adduser --system --ingroup app app
 WORKDIR /app
 COPY --from=build --chown=app:app /app/deploy ./
 COPY --from=build --chown=app:app /app/apps/api/dist ./dist
