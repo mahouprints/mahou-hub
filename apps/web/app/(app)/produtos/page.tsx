@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Box, ExternalLink, Plus } from 'lucide-react';
-import type { CalcularOutput, Canal, Produto } from '@mahou-hub/contracts';
+import type { CalcularOutput, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReaisSemSimbolo, isUrl, pct } from '@/lib/format';
 import { Button } from '@/components/ui/button';
@@ -80,80 +80,68 @@ export default function ProdutosPage() {
       {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
 
       {data && (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky left-0 bg-card">Nome</TableHead>
-                  <TableHead>Filamento</TableHead>
-                  <TableHead className="text-right">Peso</TableHead>
-                  <TableHead className="text-right">Tempo</TableHead>
-                  <TableHead>Impr.</TableHead>
-                  <TableHead className="text-right">Custo total</TableHead>
-                  <TableHead className="text-right">Preço</TableHead>
-                  <TableHead className="text-right">Imposto</TableHead>
-                  <TableHead className="text-right">Líquido</TableHead>
-                  <TableHead className="text-right">Margem</TableHead>
-                  <TableHead className="text-right">Lucro/h</TableHead>
-                  <TableHead>Canal</TableHead>
-                  <TableHead className="w-20 text-right">Links</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((p) => {
-                  const melhor = melhorCanalMarketplace(p);
-                  return (
-                    <TableRow
-                      key={p.id}
-                      onClick={() => router.push(`/produtos/${p.id}/editar`)}
-                      className="cursor-pointer"
-                    >
-                      <TableCell className="sticky left-0 bg-card font-medium">
-                        <span className="block truncate max-w-[240px]" title={p.nome}>
-                          {p.nome}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {p.filamento.nome}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{p.pesoG}g</TableCell>
-                      <TableCell className="text-right tabular-nums">{p.tempoH}h</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {p.impressora}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {centavosParaReaisSemSimbolo(p.pricing.custoTotalProducaoCentavos)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
-                        {centavosParaReaisSemSimbolo(p.precoCentavos)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {centavosParaReaisSemSimbolo(p.pricing.impostoCentavos)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {centavosParaReaisSemSimbolo(melhor.liquidoCentavos)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        <MargemBadge valor={melhor.margem} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {centavosParaReaisSemSimbolo(melhor.lucroPorHoraCentavos)}
-                      </TableCell>
-                      <TableCell>
-                        <CanalBadge canal={melhor.canal} principal={p.canalPrincipal} />
-                      </TableCell>
-                      <TableCell>
-                        <BotoesLink inspiracao={p.inspiracao} modelo3dUrl={p.modelo3dUrl} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Filamento</TableHead>
+                <TableHead className="text-right">Peso</TableHead>
+                <TableHead className="text-right">Tempo</TableHead>
+                <TableHead className="text-right">Custo total</TableHead>
+                <TableHead className="text-right">Preço</TableHead>
+                <TableHead className="text-right">Imposto</TableHead>
+                <TableHead className="text-right">Líquido</TableHead>
+                <TableHead className="text-right">Margem</TableHead>
+                <TableHead className="text-right">Lucro/h</TableHead>
+                <TableHead className="w-20 text-right">Links</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.map((p) => {
+                const melhor = melhorCanalMarketplace(p);
+                return (
+                  <TableRow
+                    key={p.id}
+                    onClick={() => router.push(`/produtos/${p.id}/editar`)}
+                    className="cursor-pointer"
+                  >
+                    <TableCell className="font-medium">
+                      <span className="block truncate max-w-[260px]" title={p.nome}>
+                        {p.nome}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {p.filamento.nome}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{p.pesoG}g</TableCell>
+                    <TableCell className="text-right tabular-nums">{p.tempoH}h</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {centavosParaReaisSemSimbolo(p.pricing.custoTotalProducaoCentavos)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {centavosParaReaisSemSimbolo(p.precoCentavos)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {centavosParaReaisSemSimbolo(p.pricing.impostoCentavos)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {centavosParaReaisSemSimbolo(melhor.liquidoCentavos)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <MargemBadge valor={melhor.margem} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {centavosParaReaisSemSimbolo(melhor.lucroPorHoraCentavos)}
+                    </TableCell>
+                    <TableCell>
+                      <BotoesLink inspiracao={p.inspiracao} modelo3dUrl={p.modelo3dUrl} />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </Card>
       )}
     </div>
@@ -166,20 +154,6 @@ function MargemBadge({ valor }: { valor: number }) {
     <Badge variant={variant} className="font-normal">
       {pct(valor)}
     </Badge>
-  );
-}
-
-function CanalBadge({ canal, principal }: { canal: 'SHOPEE' | 'ML'; principal: Canal }) {
-  const divergente = canal !== principal && principal !== 'SITE';
-  const title = divergente
-    ? `Melhor canal seria ${canal}, mas o cadastro está em ${principal}`
-    : `Melhor canal: ${canal}`;
-  return (
-    <span title={title} className="inline-flex items-center gap-1">
-      <Badge variant={divergente ? 'warning' : 'outline'} className="text-xs">
-        {canal}
-      </Badge>
-    </span>
   );
 }
 
