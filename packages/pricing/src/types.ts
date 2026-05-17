@@ -71,4 +71,5 @@ export interface CalculoSaida {
   margemSite: number;
   lucroPorHoraShopeeCentavos: number;
   lucroPorHoraMlCentavos: number;
+  lucroPorHoraSiteCentavos: number;
 }

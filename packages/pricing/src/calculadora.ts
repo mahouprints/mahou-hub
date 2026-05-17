@@ -52,5 +52,6 @@ export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
     margemSite: precoCentavos === 0 ? 0 : liquidoSite / precoCentavos,
     lucroPorHoraShopeeCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoShopee / tempoH),
     lucroPorHoraMlCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoMl / tempoH),
+    lucroPorHoraSiteCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoSite / tempoH),
   };
 }

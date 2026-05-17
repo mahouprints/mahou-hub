@@ -287,13 +287,13 @@ function Resultado({
         <Linha rotulo="Margem" valor={pct(margem)} destaque />
         <Linha
           rotulo="Lucro/hora"
-          valor={
+          valor={centavosParaReais(
             canal === 'ML'
-              ? centavosParaReais(resultado.lucroPorHoraMlCentavos)
+              ? resultado.lucroPorHoraMlCentavos
               : canal === 'SHOPEE'
-                ? centavosParaReais(resultado.lucroPorHoraShopeeCentavos)
-                : '—'
-          }
+                ? resultado.lucroPorHoraShopeeCentavos
+                : resultado.lucroPorHoraSiteCentavos,
+          )}
         />
       </dl>
 

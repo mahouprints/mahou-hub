@@ -32,6 +32,7 @@ export const CalcularOutputSchema = z.object({
   margemSite: z.number(),
   lucroPorHoraShopeeCentavos: z.number().int(),
   lucroPorHoraMlCentavos: z.number().int(),
+  lucroPorHoraSiteCentavos: z.number().int(),
 });
 
 export const SimularInputSchema = z.object({
