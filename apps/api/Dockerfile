@@ -20,7 +20,9 @@ COPY --from=build --chown=app:app /app/packages/pricing/package.json ./node_modu
 COPY --from=build --chown=app:app /app/packages/contracts/dist ./node_modules/@mahou-hub/contracts/dist
 COPY --from=build --chown=app:app /app/packages/contracts/package.json ./node_modules/@mahou-hub/contracts/package.json
 
-RUN chown -R app:app /app && ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
+RUN npm install -g prisma@5.22.0 \
+ && prisma generate --schema=./prisma/schema.prisma \
+ && chown -R app:app /app
 
 USER app
 ENV NODE_ENV=production

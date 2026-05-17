@@ -40,5 +40,5 @@ jobs:
             docker compose --env-file .env.prod --profile prod up -d postgres api
             sleep 5
             docker compose --env-file .env.prod --profile prod exec -T api node -e "console.log('api up')"
-            docker compose --env-file .env.prod --profile prod exec -T api npx prisma migrate deploy
+            docker compose --env-file .env.prod --profile prod exec -T api prisma migrate deploy
           EOF
