@@ -134,7 +134,10 @@ export default function ProdutosPage() {
                     <TableCell className="text-right tabular-nums font-medium">
                       {centavosParaReais(melhor.lucroPorHoraCentavos)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
                       <BotoesLink inspiracao={p.inspiracao} modelo3dUrl={p.modelo3dUrl} />
                     </TableCell>
                   </TableRow>
