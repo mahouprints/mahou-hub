@@ -66,6 +66,7 @@ model Produto {
   nome              String
   inspiracao        String?
   modelo3dUrl       String?
+  dimensoes         String?       // formato livre, ex: "10x5x3 cm"
   filamentoId       String
   filamento         Filamento     @relation(fields: [filamentoId], references: [id])
   pesoG             Decimal       @db.Decimal(10, 2)

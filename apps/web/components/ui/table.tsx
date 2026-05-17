@@ -3,7 +3,10 @@ import { cn } from '@/lib/utils';
 
 export const Table = forwardRef<HTMLTableElement, HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
+    // overflow-x explícito + min-w-0: garante que a tabela rola DENTRO
+    // do wrapper em vez de empurrar o layout. Combinar com min-w-0 nos
+    // ancestrais flex (ver apps/web/app/(app)/layout.tsx).
+    <div className="relative w-full min-w-0 overflow-x-auto overflow-y-hidden">
       <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   ),

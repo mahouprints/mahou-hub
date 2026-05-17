@@ -42,6 +42,7 @@ interface FormState {
   nome: string;
   inspiracao: string;
   modelo3dUrl: string;
+  dimensoes: string;
   filamentoId: string;
   pesoG: string;
   tempoH: string;
@@ -55,6 +56,7 @@ const VAZIO: FormState = {
   nome: '',
   inspiracao: '',
   modelo3dUrl: '',
+  dimensoes: '',
   filamentoId: '',
   pesoG: '',
   tempoH: '',
@@ -75,6 +77,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
         nome: produto.nome,
         inspiracao: produto.inspiracao ?? '',
         modelo3dUrl: produto.modelo3dUrl ?? '',
+        dimensoes: produto.dimensoes ?? '',
         filamentoId: produto.filamentoId,
         pesoG: String(produto.pesoG).replace('.', ','),
         tempoH: String(produto.tempoH).replace('.', ','),
@@ -137,6 +140,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
         nome: form.nome.trim(),
         inspiracao: form.inspiracao.trim() || null,
         modelo3dUrl: form.modelo3dUrl.trim() || null,
+        dimensoes: form.dimensoes.trim() || null,
         filamentoId: form.filamentoId,
         pesoG: parseDecimalBr(form.pesoG),
         tempoH: parseDecimalBr(form.tempoH),
@@ -201,6 +205,16 @@ export function ProdutoForm({ produto, inicial }: Props) {
                   placeholder="https://..."
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="dimensoes">Dimensões</Label>
+              <Input
+                id="dimensoes"
+                value={form.dimensoes}
+                onChange={(e) => setForm({ ...form, dimensoes: e.target.value })}
+                placeholder="ex: 10x5x3 cm"
+              />
             </div>
 
             <div className="space-y-1.5">

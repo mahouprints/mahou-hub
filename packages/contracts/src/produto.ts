@@ -6,6 +6,7 @@ export const ProdutoSchema = z.object({
   nome: z.string().min(1),
   inspiracao: z.string().nullable(),
   modelo3dUrl: z.string().url().nullable(),
+  dimensoes: z.string().nullable(),
   filamentoId: z.string(),
   pesoG: z.number().positive(),
   tempoH: z.number().positive(),
