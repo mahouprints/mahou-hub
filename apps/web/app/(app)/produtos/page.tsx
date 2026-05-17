@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Box, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Box, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CalcularOutput, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
@@ -77,7 +77,7 @@ export default function ProdutosPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Produtos</h1>
           <p className="text-sm text-muted-foreground">
-            {data?.length ?? 0} itens · clique numa linha para editar
+            {data?.length ?? 0} itens · clique numa linha para ver detalhes
           </p>
         </div>
         <Button asChild>
@@ -96,7 +96,6 @@ export default function ProdutosPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Filamento</TableHead>
                 <TableHead className="text-right">Peso</TableHead>
                 <TableHead className="text-right">Tempo</TableHead>
                 <TableHead className="text-right">Custo total</TableHead>
@@ -105,7 +104,7 @@ export default function ProdutosPage() {
                 <TableHead className="text-right">Líquido</TableHead>
                 <TableHead className="text-right">Margem</TableHead>
                 <TableHead className="text-right">Lucro/h</TableHead>
-                <TableHead className="w-28 text-right">Ações</TableHead>
+                <TableHead className="w-36 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -114,16 +113,13 @@ export default function ProdutosPage() {
                 return (
                   <TableRow
                     key={p.id}
-                    onClick={() => router.push(`/produtos/${p.id}/editar`)}
+                    onClick={() => router.push(`/produtos/${p.id}`)}
                     className="cursor-pointer"
                   >
                     <TableCell className="font-medium">
                       <span className="block truncate max-w-[260px]" title={p.nome}>
                         {p.nome}
                       </span>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {p.filamento.nome}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{p.pesoG}g</TableCell>
                     <TableCell className="text-right tabular-nums">{p.tempoH}h</TableCell>
@@ -152,6 +148,7 @@ export default function ProdutosPage() {
                       <div className="flex items-center justify-end gap-1">
                         <IconeLink url={p.inspiracao} icon={ExternalLink} label="Abrir inspiração" />
                         <IconeLink url={p.modelo3dUrl} icon={Box} label="Abrir modelo 3D" />
+                        <BotaoEditar produtoId={p.id} />
                         <BotaoExcluir produtoId={p.id} produtoNome={p.nome} />
                       </div>
                     </TableCell>
@@ -172,6 +169,18 @@ function MargemBadge({ valor }: { valor: number }) {
     <Badge variant={variant} className="font-normal">
       {pct(valor)}
     </Badge>
+  );
+}
+
+function BotaoEditar({ produtoId }: { produtoId: string }) {
+  return (
+    <Link
+      href={`/produtos/${produtoId}/editar`}
+      title="Editar produto"
+      className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      <Pencil className="h-3.5 w-3.5" />
+    </Link>
   );
 }
 
