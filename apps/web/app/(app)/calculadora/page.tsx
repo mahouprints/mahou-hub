@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { CalcularInput, CalcularOutput, Filamento, Parametro } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
@@ -48,7 +48,6 @@ export default function CalculadoraPage() {
   const [resultado, setResultado] = useState<CalcularOutput | null>(null);
   const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE'>('SHOPEE');
   const [erro, setErro] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(false);
 
   const { data: filamentos } = useQuery({
     queryKey: ['filamentos'],
@@ -60,26 +59,38 @@ export default function CalculadoraPage() {
     queryFn: () => apiFetch<Parametro>('/parametros'),
   });
 
-  async function calcular() {
-    setErro(null);
-    setCarregando(true);
-    try {
-      const input: CalcularInput = {
-        filamentoId: form.filamentoId || undefined,
-        pesoG: parseDecimalBr(form.pesoG),
-        tempoH: parseDecimalBr(form.tempoH),
-        impressora: form.impressora,
-        embalagemCentavos: parseDecimalParaCentavos(form.embalagemReais),
-        precoCentavos: parseDecimalParaCentavos(form.precoReais),
-      };
-      const r = await apiFetch<CalcularOutput>('/pricing/calcular', { method: 'POST', json: input });
-      setResultado(r);
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro inesperado');
-    } finally {
-      setCarregando(false);
+  /** Recalcula em background (debounce 300ms) sempre que o form ficar válido. */
+  useEffect(() => {
+    const peso = parseDecimalBr(form.pesoG);
+    const tempo = parseDecimalBr(form.tempoH);
+    const preco = parseDecimalParaCentavos(form.precoReais);
+    const embalagem = parseDecimalParaCentavos(form.embalagemReais);
+
+    if (!form.filamentoId || !Number.isFinite(peso) || peso <= 0 || !Number.isFinite(tempo) || tempo <= 0 || !Number.isFinite(preco) || preco <= 0) {
+      setResultado(null);
+      setErro(null);
+      return;
     }
-  }
+
+    const input: CalcularInput = {
+      filamentoId: form.filamentoId,
+      pesoG: peso,
+      tempoH: tempo,
+      impressora: form.impressora,
+      embalagemCentavos: Number.isFinite(embalagem) ? embalagem : 0,
+      precoCentavos: preco,
+    };
+
+    const t = setTimeout(() => {
+      apiFetch<CalcularOutput>('/pricing/calcular', { method: 'POST', json: input })
+        .then((r) => {
+          setResultado(r);
+          setErro(null);
+        })
+        .catch((e) => setErro(e instanceof Error ? e.message : 'Erro inesperado'));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [form]);
 
   function salvarComoProduto() {
     const params = new URLSearchParams({
@@ -181,9 +192,6 @@ export default function CalculadoraPage() {
               />
             </div>
 
-            <Button onClick={calcular} disabled={carregando || !form.filamentoId} className="w-full">
-              {carregando ? 'Calculando…' : 'Calcular'}
-            </Button>
             {erro && <p className="text-sm text-destructive">{erro}</p>}
           </CardContent>
         </Card>
@@ -194,27 +202,27 @@ export default function CalculadoraPage() {
             <CardDescription>Custos, taxas e líquido por canal</CardDescription>
           </CardHeader>
           <CardContent>
-            {resultado ? (
-              <Resultado
-                resultado={resultado}
-                canal={canal}
-                onCanalChange={setCanal}
-                thresholds={{
-                  verde: Number(parametros?.margemThresholdVerde ?? 0.3),
-                  amarelo: Number(parametros?.margemThresholdAmarelo ?? 0.15),
-                }}
-                onSalvar={salvarComoProduto}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Preencha o formulário e clique em Calcular.
-              </p>
-            )}
+            <Resultado
+              resultado={resultado}
+              canal={canal}
+              onCanalChange={setCanal}
+              thresholds={{
+                verde: Number(parametros?.margemThresholdVerde ?? 0.3),
+                amarelo: Number(parametros?.margemThresholdAmarelo ?? 0.15),
+              }}
+              onSalvar={salvarComoProduto}
+            />
           </CardContent>
         </Card>
       </div>
     </div>
   );
+}
+
+const VAZIO = '—';
+
+function valorOuVazio(centavos: number | undefined): string {
+  return centavos == null ? VAZIO : centavosParaReais(centavos);
 }
 
 function Resultado({
@@ -224,33 +232,50 @@ function Resultado({
   thresholds,
   onSalvar,
 }: {
-  resultado: CalcularOutput;
+  resultado: CalcularOutput | null;
   canal: 'SHOPEE' | 'ML' | 'SITE';
   onCanalChange: (c: 'SHOPEE' | 'ML' | 'SITE') => void;
   thresholds: { verde: number; amarelo: number };
   onSalvar: () => void;
 }) {
-  const liquido =
-    canal === 'SHOPEE'
+  const liquido = !resultado
+    ? undefined
+    : canal === 'SHOPEE'
       ? resultado.liquidoShopeeCentavos
       : canal === 'ML'
         ? resultado.liquidoMlCentavos
         : resultado.liquidoSiteCentavos;
-  const margem =
-    canal === 'SHOPEE'
+  const margem = !resultado
+    ? undefined
+    : canal === 'SHOPEE'
       ? resultado.margemShopee
       : canal === 'ML'
         ? resultado.margemMl
         : resultado.margemSite;
+  const lucroHora = !resultado
+    ? undefined
+    : canal === 'SHOPEE'
+      ? resultado.lucroPorHoraShopeeCentavos
+      : canal === 'ML'
+        ? resultado.lucroPorHoraMlCentavos
+        : resultado.lucroPorHoraSiteCentavos;
 
-  const variantBadge: 'success' | 'warning' | 'danger' =
-    margem >= thresholds.verde ? 'success' : margem >= thresholds.amarelo ? 'warning' : 'danger';
+  const variantBadge: 'success' | 'warning' | 'danger' | 'outline' =
+    margem == null
+      ? 'outline'
+      : margem >= thresholds.verde
+        ? 'success'
+        : margem >= thresholds.amarelo
+          ? 'warning'
+          : 'danger';
   const label =
-    margem >= thresholds.verde
-      ? 'Vale a pena'
-      : margem >= thresholds.amarelo
-        ? 'Atenção'
-        : 'Não compensa';
+    margem == null
+      ? 'Aguardando dados'
+      : margem >= thresholds.verde
+        ? 'Vale a pena'
+        : margem >= thresholds.amarelo
+          ? 'Atenção'
+          : 'Não compensa';
 
   return (
     <div className="space-y-5">
@@ -273,31 +298,22 @@ function Resultado({
       </div>
 
       <dl className="grid grid-cols-2 gap-y-2 text-sm">
-        <Linha rotulo="Custo filamento" valor={centavosParaReais(resultado.custoFilamentoCentavos)} />
-        <Linha rotulo="Custo energia" valor={centavosParaReais(resultado.custoEnergiaCentavos)} />
-        <Linha rotulo="Custo produção" valor={centavosParaReais(resultado.custoTotalProducaoCentavos)} />
-        <Linha rotulo="Imposto" valor={centavosParaReais(resultado.impostoCentavos)} />
+        <Linha rotulo="Custo filamento" valor={valorOuVazio(resultado?.custoFilamentoCentavos)} />
+        <Linha rotulo="Custo energia" valor={valorOuVazio(resultado?.custoEnergiaCentavos)} />
+        <Linha rotulo="Custo produção" valor={valorOuVazio(resultado?.custoTotalProducaoCentavos)} />
+        <Linha rotulo="Imposto" valor={valorOuVazio(resultado?.impostoCentavos)} />
         {canal === 'SHOPEE' && (
-          <Linha rotulo="Taxa Shopee" valor={centavosParaReais(resultado.taxaShopeeCentavos)} />
+          <Linha rotulo="Taxa Shopee" valor={valorOuVazio(resultado?.taxaShopeeCentavos)} />
         )}
         {canal === 'ML' && (
-          <Linha rotulo="Taxa ML" valor={centavosParaReais(resultado.taxaMlCentavos)} />
+          <Linha rotulo="Taxa ML" valor={valorOuVazio(resultado?.taxaMlCentavos)} />
         )}
-        <Linha rotulo="Líquido" valor={centavosParaReais(liquido)} destaque />
-        <Linha rotulo="Margem" valor={pct(margem)} destaque />
-        <Linha
-          rotulo="Lucro/hora"
-          valor={centavosParaReais(
-            canal === 'ML'
-              ? resultado.lucroPorHoraMlCentavos
-              : canal === 'SHOPEE'
-                ? resultado.lucroPorHoraShopeeCentavos
-                : resultado.lucroPorHoraSiteCentavos,
-          )}
-        />
+        <Linha rotulo="Líquido" valor={valorOuVazio(liquido)} destaque />
+        <Linha rotulo="Margem" valor={margem == null ? VAZIO : pct(margem)} destaque />
+        <Linha rotulo="Lucro/hora" valor={valorOuVazio(lucroHora)} />
       </dl>
 
-      <Button onClick={onSalvar} variant="outline" className="w-full">
+      <Button onClick={onSalvar} variant="outline" className="w-full" disabled={!resultado}>
         Salvar como produto
       </Button>
     </div>
