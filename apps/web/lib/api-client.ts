@@ -27,8 +27,34 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
-    const corpo = await res.text();
-    throw new Error(`HTTP ${res.status}: ${corpo}`);
+    throw new ApiError(res.status, await extrairMensagem(res));
   }
   return res.json() as Promise<T>;
+}
+
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/**
+ * Extrai mensagem legível da resposta de erro. NestJS retorna
+ * `{ message, error, statusCode }` ou `{ message: string[], ... }` em
+ * validation errors. Cai pro texto cru se não for JSON.
+ */
+async function extrairMensagem(res: Response): Promise<string> {
+  const texto = await res.text();
+  try {
+    const corpo = JSON.parse(texto) as { message?: string | string[] };
+    if (Array.isArray(corpo.message)) return corpo.message.join(' · ');
+    if (typeof corpo.message === 'string') return corpo.message;
+  } catch {
+    // não é JSON, devolve o texto cru
+  }
+  return texto || `Erro ${res.status}`;
 }

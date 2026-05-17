@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { Toaster } from 'sonner';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="pt-BR" className="dark">
       <body>
         <Providers>{children}</Providers>
+        <Toaster position="top-right" theme="dark" richColors closeButton />
       </body>
     </html>
   );

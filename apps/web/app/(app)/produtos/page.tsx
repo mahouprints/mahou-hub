@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Box, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { CalcularOutput, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
@@ -182,6 +183,7 @@ function BotaoExcluir({ produtoId, produtoNome }: { produtoId: string; produtoNo
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['produtos'] });
       setAberto(false);
+      toast.success(`Produto "${produtoNome}" excluído`);
     },
   });
 
@@ -203,9 +205,6 @@ function BotaoExcluir({ produtoId, produtoNome }: { produtoId: string; produtoNo
             revertida apenas via banco de dados.
           </DialogDescription>
         </DialogHeader>
-        {excluir.error && (
-          <p className="text-sm text-destructive">{(excluir.error as Error).message}</p>
-        )}
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={excluir.isPending}>

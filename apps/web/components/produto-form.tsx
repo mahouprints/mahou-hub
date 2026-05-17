@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type {
   CalcularOutput,
   Filamento,
@@ -91,7 +92,6 @@ export function ProdutoForm({ produto, inicial }: Props) {
   });
 
   const [preview, setPreview] = useState<CalcularOutput | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
   const { data: filamentos } = useQuery({
@@ -133,7 +133,6 @@ export function ProdutoForm({ produto, inicial }: Props) {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setErro(null);
     setSalvando(true);
     try {
       const payload: ProdutoCreate = {
@@ -152,13 +151,15 @@ export function ProdutoForm({ produto, inicial }: Props) {
       };
       if (produto) {
         await apiFetch(`/produtos/${produto.id}`, { method: 'PATCH', json: payload });
+        toast.success('Produto atualizado');
       } else {
         await apiFetch('/produtos', { method: 'POST', json: payload });
+        toast.success('Produto criado');
       }
       await qc.invalidateQueries({ queryKey: ['produtos'] });
       router.push('/produtos');
     } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Erro inesperado');
+      toast.error(e instanceof Error ? e.message : 'Erro ao salvar produto');
     } finally {
       setSalvando(false);
     }
@@ -305,8 +306,6 @@ export function ProdutoForm({ produto, inicial }: Props) {
                 />
               </div>
             </div>
-
-            {erro && <p className="text-sm text-destructive">{erro}</p>}
 
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={() => router.push('/produtos')}>
