@@ -76,7 +76,6 @@ type ColunaSort =
   | 'tempoH'
   | 'custoTotal'
   | 'preco'
-  | 'imposto'
   | 'liquido'
   | 'margem'
   | 'lucroH'
@@ -129,7 +128,6 @@ export default function ProdutosPage() {
     tempoH: (p) => p.tempoH,
     custoTotal: (p) => p.pricing.custoTotalProducaoCentavos,
     preco: (p) => p.precoCentavos,
-    imposto: (p) => p.pricing.impostoCentavos,
     liquido: (p) => melhorCanalMarketplace(p).liquidoCentavos,
     margem: (p) => melhorCanalMarketplace(p).margem,
     lucroH: (p) => melhorCanalMarketplace(p).lucroPorHoraCentavos,
@@ -310,15 +308,6 @@ export default function ProdutosPage() {
                   Preço
                 </SortableHead>
                 <SortableHead
-                  chave="imposto"
-                  estado={sort.estado}
-                  onClick={sort.alternar}
-                  align="right"
-                  className="text-right"
-                >
-                  Imposto
-                </SortableHead>
-                <SortableHead
                   chave="liquido"
                   estado={sort.estado}
                   onClick={sort.alternar}
@@ -386,9 +375,6 @@ export default function ProdutosPage() {
                     <TableCell className="text-right tabular-nums font-medium">
                       {centavosParaReais(p.precoCentavos)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {centavosParaReais(p.pricing.impostoCentavos)}
-                    </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {centavosParaReais(melhor.liquidoCentavos)}
                     </TableCell>
@@ -420,7 +406,7 @@ export default function ProdutosPage() {
               {filtrados.length === 0 && data.length > 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={sel.modoSelecao ? 12 : 11}
+                    colSpan={sel.modoSelecao ? 11 : 10}
                     className="text-center text-sm text-muted-foreground"
                   >
                     Nenhum produto bate com os filtros atuais.

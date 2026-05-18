@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InputDecimal } from '@/components/ui/input-decimal';
 import { Badge } from '@/components/ui/badge';
+import { UploadDropzone } from '@/components/upload-dropzone';
 import {
   Card,
   CardContent,
@@ -120,6 +121,12 @@ export function ProdutoForm({ produto, inicial }: Props) {
 
   const [preview, setPreview] = useState<CalcularOutput | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // Buffer de imagens selecionadas no form (só usado em modo criar).
+  // No fluxo de edição, o user gerencia as imagens direto no detail.
+  const [imagensPendentes, setImagensPendentes] = useState<File[]>([]);
+  const [origemImagens, setOrigemImagens] = useState<'INSPIRACAO' | 'MODELO_3D' | 'OUTRA'>(
+    'INSPIRACAO',
+  );
 
   const { data: filamentos } = useQuery({
     queryKey: ['filamentos'],
@@ -207,8 +214,29 @@ export function ProdutoForm({ produto, inicial }: Props) {
         await apiFetch(`/produtos/${produto.id}`, { method: 'PATCH', json: payload });
         toast.success('Produto atualizado');
       } else {
-        await apiFetch('/produtos', { method: 'POST', json: payload });
-        toast.success('Produto criado');
+        const criado = await apiFetch<{ id: string }>('/produtos', {
+          method: 'POST',
+          json: payload,
+        });
+        // Upload das imagens pendentes depois que o produto existe (precisa do ID).
+        // Falhas no upload viram aviso, mas o produto fica criado normalmente —
+        // user pode subir manualmente na tela de detalhe depois.
+        if (imagensPendentes.length > 0) {
+          try {
+            const fd = new FormData();
+            imagensPendentes.forEach((f) => fd.append('arquivos', f));
+            const res = await fetch(
+              `/api/produtos/${criado.id}/imagens?origem=${origemImagens}`,
+              { method: 'POST', body: fd, credentials: 'include' },
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            toast.success(`Produto criado com ${imagensPendentes.length} imagem(ns)`);
+          } catch {
+            toast.error('Produto criado, mas falha ao subir imagens. Tente pela tela de detalhe.');
+          }
+        } else {
+          toast.success('Produto criado');
+        }
       }
       await qc.invalidateQueries({ queryKey: ['produtos'] });
       router.push('/produtos');
@@ -383,6 +411,16 @@ export function ProdutoForm({ produto, inicial }: Props) {
                 />
               </div>
             </div>
+
+            {!editando && (
+              <ImagensInicialSecao
+                arquivos={imagensPendentes}
+                onArquivos={setImagensPendentes}
+                origem={origemImagens}
+                onOrigemChange={setOrigemImagens}
+                desabilitado={salvando}
+              />
+            )}
 
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={() => router.push('/produtos')}>
@@ -563,6 +601,89 @@ function InsumosSecao({
 }
 
 /** Parse pra centímetros: aceita "10,5" ou "10.5"; vazio/inválido vira null. */
+/**
+ * Buffer de imagens selecionadas antes de criar o produto. Não envia nada —
+ * só acumula File[]; o submit do form faz upload depois que tem o ID do produto.
+ * Renderizada apenas em modo criar (em editar, user usa a seção do detail).
+ */
+function ImagensInicialSecao({
+  arquivos,
+  onArquivos,
+  origem,
+  onOrigemChange,
+  desabilitado,
+}: {
+  arquivos: File[];
+  onArquivos: (a: File[]) => void;
+  origem: 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA';
+  onOrigemChange: (o: 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA') => void;
+  desabilitado: boolean;
+}) {
+  function remover(idx: number) {
+    onArquivos(arquivos.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div className="space-y-2 rounded-md border border-border bg-card/40 p-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm">Imagens (opcional)</Label>
+        {arquivos.length > 0 && (
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {arquivos.length} {arquivos.length === 1 ? 'arquivo' : 'arquivos'} prontos pra upload
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-[200px_1fr] gap-2">
+        <Select
+          value={origem}
+          onValueChange={(v) => onOrigemChange(v as 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA')}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="INSPIRACAO">Inspiração</SelectItem>
+            <SelectItem value="MODELO_3D">Modelo 3D</SelectItem>
+            <SelectItem value="OUTRA">Outra</SelectItem>
+          </SelectContent>
+        </Select>
+        <UploadDropzone
+          onArquivos={(novos) => onArquivos([...arquivos, ...novos])}
+          disabled={desabilitado}
+          label="Adicione imagens (envio após criar o produto)"
+        />
+      </div>
+
+      {arquivos.length > 0 && (
+        <ul className="space-y-1 text-xs">
+          {arquivos.map((f, i) => (
+            <li
+              key={`${f.name}-${i}`}
+              className="flex items-center justify-between rounded bg-muted/40 px-2 py-1"
+            >
+              <span className="truncate">
+                {f.name}{' '}
+                <span className="text-muted-foreground">
+                  ({(f.size / 1024).toFixed(0)} KB)
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => remover(i)}
+                className="text-muted-foreground hover:text-destructive"
+                title="Remover"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function parseDimensaoCm(s: string): number | null {
   const n = parseDecimalBr(s);
   return Number.isFinite(n) && n > 0 ? n : null;
