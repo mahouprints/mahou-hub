@@ -74,7 +74,7 @@ export function ImagensSection({ produtoId, imagens }: Props) {
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {imagens.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {imagens.map((img) => (
@@ -88,9 +88,11 @@ export function ImagensSection({ produtoId, imagens }: Props) {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
+      <div className="space-y-3 rounded-lg border border-border/60 bg-card/30 p-4">
         <div className="space-y-1.5">
-          <Label className="text-xs uppercase text-muted-foreground">Origem padrão</Label>
+          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+            Origem padrão
+          </Label>
           <Select
             value={origemPadrao}
             onValueChange={(v) => setOrigemPadrao(v as OrigemImagem)}

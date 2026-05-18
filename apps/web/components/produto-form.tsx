@@ -624,17 +624,25 @@ function ImagensInicialSecao({
   }
 
   return (
-    <div className="space-y-2 rounded-md border border-border bg-card/40 p-3">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm">Imagens (opcional)</Label>
+    <div className="space-y-3 rounded-lg border border-border/60 bg-card/30 p-4">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <Label className="text-sm font-medium">Imagens</Label>
+          <p className="text-xs text-muted-foreground">
+            Opcional · enviadas após criar o produto
+          </p>
+        </div>
         {arquivos.length > 0 && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {arquivos.length} {arquivos.length === 1 ? 'arquivo' : 'arquivos'} prontos pra upload
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {arquivos.length} {arquivos.length === 1 ? 'arquivo selecionado' : 'arquivos selecionados'}
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-[200px_1fr] gap-2">
+      <div className="space-y-1.5">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          Origem padrão
+        </Label>
         <Select
           value={origem}
           onValueChange={(v) => onOrigemChange(v as 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA')}
@@ -648,38 +656,67 @@ function ImagensInicialSecao({
             <SelectItem value="OUTRA">Outra</SelectItem>
           </SelectContent>
         </Select>
-        <UploadDropzone
-          onArquivos={(novos) => onArquivos([...arquivos, ...novos])}
-          disabled={desabilitado}
-          label="Adicione imagens (envio após criar o produto)"
-        />
       </div>
 
+      <UploadDropzone
+        onArquivos={(novos) => onArquivos([...arquivos, ...novos])}
+        disabled={desabilitado}
+        label="Arraste imagens aqui ou clique pra selecionar"
+      />
+
       {arquivos.length > 0 && (
-        <ul className="space-y-1 text-xs">
-          {arquivos.map((f, i) => (
-            <li
-              key={`${f.name}-${i}`}
-              className="flex items-center justify-between rounded bg-muted/40 px-2 py-1"
-            >
-              <span className="truncate">
-                {f.name}{' '}
-                <span className="text-muted-foreground">
-                  ({(f.size / 1024).toFixed(0)} KB)
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => remover(i)}
-                className="text-muted-foreground hover:text-destructive"
-                title="Remover"
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
+        <PreviewArquivos arquivos={arquivos} onRemover={remover} />
       )}
+    </div>
+  );
+}
+
+/**
+ * Preview dos arquivos selecionados com thumb da imagem (via URL.createObjectURL).
+ * Revoga as object-URLs no unmount/mudança pra não vazar memória.
+ */
+function PreviewArquivos({
+  arquivos,
+  onRemover,
+}: {
+  arquivos: File[];
+  onRemover: (idx: number) => void;
+}) {
+  const [urls, setUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    const novas = arquivos.map((f) => URL.createObjectURL(f));
+    setUrls(novas);
+    return () => novas.forEach((u) => URL.revokeObjectURL(u));
+  }, [arquivos]);
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      {arquivos.map((f, i) => (
+        <div
+          key={`${f.name}-${i}`}
+          className="group relative aspect-square overflow-hidden rounded-md border border-border bg-muted"
+        >
+          {urls[i] && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={urls[i]} alt={f.name} className="h-full w-full object-cover" />
+          )}
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
+            <p className="truncate text-[10px] text-white">{f.name}</p>
+            <p className="text-[10px] text-white/70 tabular-nums">
+              {(f.size / 1024).toFixed(0)} KB
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemover(i)}
+            title="Remover"
+            className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-background/90 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100"
+          >
+            ×
+          </button>
+        </div>
+      ))}
     </div>
   );
 }
