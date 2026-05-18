@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Receipt, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowRight, Boxes, Receipt, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import type { ResumoFinanceiro } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, pct } from '@/lib/format';
@@ -55,6 +55,11 @@ export default function FinanceiroPage() {
 
 function KpiGrid({ resumo }: { resumo: ResumoFinanceiro }) {
   const positivo = resumo.lucroLiquidoCentavos >= 0;
+  const margemVariant: 'success' | 'warning' | 'danger' =
+    resumo.margem >= 0.2 ? 'success' : resumo.margem >= 0.1 ? 'warning' : 'danger';
+
+  // 4 cards: separamos "Custos gerais" (lançamentos manuais) de "Custos com
+  // insumos" (consumo derivado das vendas). Margem vira sublinha do Lucro.
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <KpiCard
@@ -65,32 +70,29 @@ function KpiGrid({ resumo }: { resumo: ResumoFinanceiro }) {
       />
       <KpiCard
         icon={Receipt}
-        rotulo="Custos totais"
-        valor={centavosParaReais(
-          resumo.custosVariaveisCentavos +
-            resumo.custosGeraisCentavos +
-            resumo.impostosCentavos +
-            resumo.taxasMarketplaceCentavos,
-        )}
-        sublinha={`Variáveis ${centavosParaReais(resumo.custosVariaveisCentavos)} · Gerais ${centavosParaReais(resumo.custosGeraisCentavos)}`}
+        rotulo="Custos gerais"
+        valor={centavosParaReais(resumo.custosGeraisCentavos)}
+        sublinha="aluguel, internet, software"
+      />
+      <KpiCard
+        icon={Boxes}
+        rotulo="Custos com insumos"
+        valor={centavosParaReais(resumo.custosInsumosCentavos)}
+        sublinha="consumo nas vendas do mês"
       />
       <KpiCard
         icon={positivo ? TrendingUp : TrendingDown}
         rotulo="Lucro líquido"
         valor={centavosParaReais(resumo.lucroLiquidoCentavos)}
-        sublinha={
-          resumo.impostosCentavos + resumo.taxasMarketplaceCentavos > 0
-            ? `Impostos ${centavosParaReais(resumo.impostosCentavos)} · Taxas ${centavosParaReais(resumo.taxasMarketplaceCentavos)}`
-            : 'Sem impostos/taxas no período'
+        sublinhaNode={
+          <span className="inline-flex items-center gap-1.5">
+            margem{' '}
+            <Badge variant={margemVariant} className="font-normal">
+              {pct(resumo.margem)}
+            </Badge>
+          </span>
         }
         destaque={positivo ? 'success' : 'danger'}
-      />
-      <KpiCard
-        icon={positivo ? TrendingUp : TrendingDown}
-        rotulo="Margem"
-        valor={pct(resumo.margem)}
-        sublinha="Lucro / faturamento"
-        destaque={resumo.margem >= 0.2 ? 'success' : resumo.margem >= 0.1 ? 'warning' : 'danger'}
       />
     </div>
   );
@@ -141,12 +143,14 @@ function KpiCard({
   rotulo,
   valor,
   sublinha,
+  sublinhaNode,
   destaque,
 }: {
   icon: typeof Wallet;
   rotulo: string;
   valor: string;
   sublinha?: string;
+  sublinhaNode?: React.ReactNode;
   destaque?: 'success' | 'warning' | 'danger';
 }) {
   return (
@@ -161,7 +165,11 @@ function KpiCard({
         <div className="text-2xl font-semibold tabular-nums">
           {destaque ? <Badge variant={destaque}>{valor}</Badge> : valor}
         </div>
-        {sublinha && <p className="text-xs text-muted-foreground">{sublinha}</p>}
+        {sublinhaNode ? (
+          <p className="text-xs text-muted-foreground">{sublinhaNode}</p>
+        ) : sublinha ? (
+          <p className="text-xs text-muted-foreground">{sublinha}</p>
+        ) : null}
       </CardContent>
     </Card>
   );

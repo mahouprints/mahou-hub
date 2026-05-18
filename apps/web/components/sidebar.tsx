@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Calculator,
   Boxes,
+  Package,
   PlayCircle,
   Factory,
   Crosshair,
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils';
 const NAV_PRINCIPAL = [
   { href: '/calculadora', label: 'Calculadora', icon: Calculator },
   { href: '/produtos', label: 'Produtos', icon: Boxes },
+  { href: '/insumos', label: 'Insumos', icon: Package },
   { href: '/simulador', label: 'Simulador', icon: PlayCircle },
   { href: '/producao', label: 'Produção', icon: Factory },
   { href: '/financeiro', label: 'Financeiro', icon: DollarSign },

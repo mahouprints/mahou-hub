@@ -3,8 +3,9 @@ import { z } from 'zod';
 export const ResumoFinanceiroSchema = z.object({
   mes: z.string(), // 'YYYY-MM'
   faturamentoCentavos: z.number().int(),
-  custosVariaveisCentavos: z.number().int(), // soma de custo produção + embalagem dos produtos vendidos
-  custosGeraisCentavos: z.number().int(), // soma dos Custo do mês
+  custosVariaveisCentavos: z.number().int(), // filamento + energia + embalagem dos produtos vendidos (sem insumos)
+  custosInsumosCentavos: z.number().int(), // consumo de insumos cadastrados nas vendas do período
+  custosGeraisCentavos: z.number().int(), // soma dos Custo lançados manualmente no mês
   impostosCentavos: z.number().int(),
   taxasMarketplaceCentavos: z.number().int(),
   lucroLiquidoCentavos: z.number().int(),

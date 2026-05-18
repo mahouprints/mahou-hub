@@ -25,7 +25,11 @@ export class FinanceiroService {
 
     const vendas = await this.prisma.venda.findMany({
       where: { dataVenda: { gte, lt } },
-      include: { produto: { include: { filamento: true } } },
+      include: {
+        produto: {
+          include: { filamento: true, insumos: { include: { insumo: true } } },
+        },
+      },
     });
 
     const parametros = await this.carregarParametros();
@@ -36,6 +40,7 @@ export class FinanceiroService {
       mes,
       faturamentoCentavos: 0,
       custosVariaveisCentavos: 0,
+      custosInsumosCentavos: 0,
       custosGeraisCentavos: 0,
       impostosCentavos: 0,
       taxasMarketplaceCentavos: 0,
@@ -47,6 +52,12 @@ export class FinanceiroService {
     };
 
     for (const v of vendas) {
+      // Custo unitário dos insumos cadastrados no produto (caixa, fita etc).
+      // Mantemos separado dos custos variáveis (filamento+energia+embalagem)
+      // pra exibir como métrica própria no dashboard. Soma ainda entra no
+      // pricing pra margem/líquido refletirem o custo total real.
+      const custoInsumosUnit = somarCustoInsumosProduto(v.produto.insumos);
+
       const calc = calcularProduto({
         pesoG: Number(v.produto.pesoG),
         tempoH: Number(v.produto.tempoH),
@@ -58,6 +69,7 @@ export class FinanceiroService {
           potenciaH2cW: v.produto.filamento.potenciaH2cW,
         },
         embalagemCentavos: v.produto.embalagemCentavos,
+        custoInsumosCentavos: custoInsumosUnit,
         precoCentavos: v.precoUnitarioCentavos, // preço REAL da venda
         parametros,
         tabelaShopee,
@@ -72,8 +84,12 @@ export class FinanceiroService {
             ? calc.taxaMlCentavos
             : 0;
 
+      // custoTotalProducao já inclui insumos — subtraímos pra não duplicar.
+      const custoVariavelUnit = calc.custoTotalProducaoCentavos - custoInsumosUnit;
+
       acc.faturamentoCentavos += fatVenda;
-      acc.custosVariaveisCentavos += calc.custoTotalProducaoCentavos * v.qtd;
+      acc.custosVariaveisCentavos += custoVariavelUnit * v.qtd;
+      acc.custosInsumosCentavos += custoInsumosUnit * v.qtd;
       acc.impostosCentavos += calc.impostoCentavos * v.qtd;
       acc.taxasMarketplaceCentavos += taxaCanal * v.qtd;
       acc.porCanal[v.canal] += fatVenda;
@@ -88,6 +104,7 @@ export class FinanceiroService {
     acc.lucroLiquidoCentavos =
       acc.faturamentoCentavos -
       acc.custosVariaveisCentavos -
+      acc.custosInsumosCentavos -
       acc.impostosCentavos -
       acc.taxasMarketplaceCentavos -
       acc.custosGeraisCentavos;
@@ -136,6 +153,15 @@ export class FinanceiroService {
       comissaoCategoriaPct: Number(r.comissaoCategoriaPct),
     }));
   }
+}
+
+function somarCustoInsumosProduto(
+  insumos: Array<{ qtd: { toString(): string }; insumo: { custoUnitarioCentavos: number } }>,
+): number {
+  return insumos.reduce(
+    (acc, pi) => acc + Math.round(Number(pi.qtd) * pi.insumo.custoUnitarioCentavos),
+    0,
+  );
 }
 
 function rangeDoMes(mes: string) {

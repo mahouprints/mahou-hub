@@ -73,26 +73,54 @@ model Filamento {
 }
 
 model Produto {
-  id                String        @id @default(cuid())
+  id                String          @id @default(cuid())
   nome              String
   inspiracao        String?
   modelo3dUrl       String?
-  larguraCm         Decimal?      @db.Decimal(6, 1)
-  alturaCm          Decimal?      @db.Decimal(6, 1)
-  profundidadeCm    Decimal?      @db.Decimal(6, 1)
+  larguraCm         Decimal?        @db.Decimal(6, 1)
+  alturaCm          Decimal?        @db.Decimal(6, 1)
+  profundidadeCm    Decimal?        @db.Decimal(6, 1)
   filamentoId       String
-  filamento         Filamento     @relation(fields: [filamentoId], references: [id])
-  pesoG             Decimal       @db.Decimal(10, 2)
-  tempoH            Decimal       @db.Decimal(10, 2)
+  filamento         Filamento       @relation(fields: [filamentoId], references: [id])
+  pesoG             Decimal         @db.Decimal(10, 2)
+  tempoH            Decimal         @db.Decimal(10, 2)
   impressora        Impressora
   embalagemCentavos Int
   precoCentavos     Int
   canalPrincipal    Canal
-  ativo             Boolean       @default(true)
+  ativo             Boolean         @default(true)
   jobs              JobProducao[]
   vendas            Venda[]
-  criadoEm          DateTime      @default(now())
-  atualizadoEm      DateTime      @updatedAt
+  insumos           ProdutoInsumo[]
+  criadoEm          DateTime        @default(now())
+  atualizadoEm      DateTime        @updatedAt
+}
+
+/// Insumo reutilizável usado em vários produtos (caixa, fita, etiqueta).
+/// Soft-delete via ativo=false — produtos antigos referenciam insumos antigos.
+model Insumo {
+  id                    String          @id @default(cuid())
+  nome                  String          @unique
+  unidade               String // texto livre: "un", "m", "kg", "ml"
+  custoUnitarioCentavos Int
+  observacao            String?
+  ativo                 Boolean         @default(true)
+  produtos              ProdutoInsumo[]
+  criadoEm              DateTime        @default(now())
+  atualizadoEm          DateTime        @updatedAt
+}
+
+/// Pivot Produto↔Insumo com quantidade consumida por unidade de produto.
+/// qtd em Decimal(10,3) cobre frações: 0.5m de fita, 0.125kg de papel etc.
+model ProdutoInsumo {
+  id        String  @id @default(cuid())
+  produtoId String
+  produto   Produto @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  insumoId  String
+  insumo    Insumo  @relation(fields: [insumoId], references: [id])
+  qtd       Decimal @db.Decimal(10, 3)
+
+  @@unique([produtoId, insumoId])
 }
 
 model Venda {

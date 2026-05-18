@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProdutosModule } from './modules/produtos/produtos.module';
 import { FilamentosModule } from './modules/filamentos/filamentos.module';
+import { InsumosModule } from './modules/insumos/insumos.module';
 import { ParametrosModule } from './modules/parametros/parametros.module';
 import { PricingModule } from './modules/pricing/pricing.module';
 import { VendasModule } from './modules/vendas/vendas.module';
@@ -28,6 +29,7 @@ import { HealthController } from './modules/health/health.controller';
     AuthModule,
     ProdutosModule,
     FilamentosModule,
+    InsumosModule,
     ParametrosModule,
     PricingModule,
     VendasModule,

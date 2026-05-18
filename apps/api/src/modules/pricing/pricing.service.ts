@@ -27,6 +27,7 @@ export class PricingService {
       impressora: input.impressora,
       filamento,
       embalagemCentavos: input.embalagemCentavos,
+      custoInsumosCentavos: input.custoInsumosCentavos ?? 0,
       precoCentavos: input.precoCentavos,
       parametros,
       tabelaShopee,

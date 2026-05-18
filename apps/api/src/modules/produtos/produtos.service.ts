@@ -18,7 +18,7 @@ export class ProdutosService {
     const produtos = await this.prisma.produto.findMany({
       where: { ativo: true },
       orderBy: { criadoEm: 'desc' },
-      include: { filamento: true },
+      include: { filamento: true, insumos: { include: { insumo: true } } },
     });
     if (produtos.length === 0) return [];
 
@@ -30,6 +30,7 @@ export class ProdutosService {
       ...p,
       pesoG: Number(p.pesoG),
       tempoH: Number(p.tempoH),
+      custoInsumosCentavos: somarCustoInsumos(p.insumos),
       pricing: calcularProduto({
         pesoG: Number(p.pesoG),
         tempoH: Number(p.tempoH),
@@ -41,6 +42,7 @@ export class ProdutosService {
           potenciaH2cW: p.filamento.potenciaH2cW,
         },
         embalagemCentavos: p.embalagemCentavos,
+        custoInsumosCentavos: somarCustoInsumos(p.insumos),
         precoCentavos: p.precoCentavos,
         parametros,
         tabelaShopee,
@@ -52,18 +54,43 @@ export class ProdutosService {
   async get(id: string) {
     const p = await this.prisma.produto.findUnique({
       where: { id },
-      include: { filamento: true },
+      include: { filamento: true, insumos: { include: { insumo: true } } },
     });
     if (!p) throw new NotFoundException(`Produto ${id} não existe`);
     return p;
   }
 
-  create(data: ProdutoCreate) {
-    return this.prisma.produto.create({ data });
+  async create(data: ProdutoCreate) {
+    const { insumos, ...resto } = data;
+    return this.prisma.produto.create({
+      data: {
+        ...resto,
+        insumos: insumos?.length
+          ? { create: insumos.map((i) => ({ insumoId: i.insumoId, qtd: i.qtd })) }
+          : undefined,
+      },
+      include: { insumos: { include: { insumo: true } } },
+    });
   }
 
-  update(id: string, data: ProdutoUpdate) {
-    return this.prisma.produto.update({ where: { id }, data });
+  /**
+   * Update faz delete-and-recreate dos ProdutoInsumo quando `insumos` vem no payload.
+   * Se `insumos` não vier, lista atual é preservada.
+   */
+  async update(id: string, data: ProdutoUpdate) {
+    const { insumos, ...resto } = data;
+    return this.prisma.$transaction(async (tx) => {
+      const atualizado = await tx.produto.update({ where: { id }, data: resto });
+      if (insumos !== undefined) {
+        await tx.produtoInsumo.deleteMany({ where: { produtoId: id } });
+        if (insumos.length > 0) {
+          await tx.produtoInsumo.createMany({
+            data: insumos.map((i) => ({ produtoId: id, insumoId: i.insumoId, qtd: i.qtd })),
+          });
+        }
+      }
+      return atualizado;
+    });
   }
 
   async desativar(id: string) {
@@ -164,3 +191,16 @@ export class ProdutosService {
 
 export type ProdutoComPricing = Awaited<ReturnType<ProdutosService['list']>>[number];
 export type { CalculoSaida };
+
+/**
+ * Soma dos insumos consumidos pelo produto (em centavos).
+ * `qtd` vem como Decimal do Prisma; conversão via Number tolera precisão usual.
+ */
+function somarCustoInsumos(
+  insumos: Array<{ qtd: { toString(): string }; insumo: { custoUnitarioCentavos: number } }>,
+): number {
+  return insumos.reduce(
+    (acc, pi) => acc + Math.round(Number(pi.qtd) * pi.insumo.custoUnitarioCentavos),
+    0,
+  );
+}

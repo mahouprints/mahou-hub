@@ -50,6 +50,8 @@ export interface CalculoEntrada {
   impressora: Impressora;
   filamento: Filamento;
   embalagemCentavos: number;
+  /** Soma `qtd × custoUnitário` dos Insumos do produto. Opcional — default 0. */
+  custoInsumosCentavos?: number;
   precoCentavos: number;
   parametros: ParametrosGlobais;
   tabelaShopee: FaixaShopee[];

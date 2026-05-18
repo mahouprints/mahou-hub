@@ -1,5 +1,6 @@
 export * from './enums';
 export * from './filamento';
+export * from './insumo';
 export * from './produto';
 export * from './parametro';
 export * from './pricing';

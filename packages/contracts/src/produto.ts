@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CanalEnum, ImpressoraEnum } from './enums';
+import { ProdutoInsumoInputSchema } from './insumo';
 
 export const ProdutoSchema = z.object({
   id: z.string(),
@@ -21,6 +22,7 @@ export const ProdutoSchema = z.object({
 
 export const ProdutoCreateSchema = ProdutoSchema.omit({ id: true, ativo: true }).extend({
   ativo: z.boolean().default(true),
+  insumos: z.array(ProdutoInsumoInputSchema).optional(),
 });
 
 export const ProdutoUpdateSchema = ProdutoCreateSchema.partial();

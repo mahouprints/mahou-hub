@@ -14,8 +14,16 @@ import { arredondarCentavos } from './money';
  *   })
  */
 export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
-  const { pesoG, tempoH, impressora, filamento, embalagemCentavos, precoCentavos, parametros } =
-    entrada;
+  const {
+    pesoG,
+    tempoH,
+    impressora,
+    filamento,
+    embalagemCentavos,
+    custoInsumosCentavos = 0,
+    precoCentavos,
+    parametros,
+  } = entrada;
 
   const custoFilamento = custoFilamentoCentavos(pesoG, filamento.custoKgCentavos);
   const custoEnergia = custoEnergiaCentavos(
@@ -24,7 +32,8 @@ export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
     impressora,
     parametros.tarifaKwhCentavos,
   );
-  const custoTotalProducao = custoFilamento + custoEnergia + embalagemCentavos;
+  const custoTotalProducao =
+    custoFilamento + custoEnergia + embalagemCentavos + custoInsumosCentavos;
 
   const imposto = parametros.impostoAtivo
     ? arredondarCentavos(precoCentavos * (parametros.impostoPct / 100))

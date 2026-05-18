@@ -4,9 +4,11 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { Trash2 } from 'lucide-react';
 import type {
   CalcularOutput,
   Filamento,
+  Insumo,
   Parametro,
   Produto,
   ProdutoCreate,
@@ -34,9 +36,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+/** GET /produtos/:id devolve insumos populados; declaramos local pra não poluir contracts. */
+type ProdutoComInsumos = Produto & {
+  insumos?: Array<{ insumoId: string; qtd: number | string }>;
+};
+
 interface Props {
-  produto?: Produto | null;
+  produto?: ProdutoComInsumos | null;
   inicial?: Partial<FormState>;
+}
+
+interface InsumoLinha {
+  insumoId: string;
+  qtdStr: string; // string pro input controlled
 }
 
 interface FormState {
@@ -53,6 +65,7 @@ interface FormState {
   embalagemReais: string;
   precoReais: string;
   canalPrincipal: 'SHOPEE' | 'ML' | 'SITE';
+  insumos: InsumoLinha[];
 }
 
 const VAZIO: FormState = {
@@ -69,6 +82,7 @@ const VAZIO: FormState = {
   embalagemReais: '',
   precoReais: '',
   canalPrincipal: 'SHOPEE',
+  insumos: [],
 };
 
 export function ProdutoForm({ produto, inicial }: Props) {
@@ -93,6 +107,10 @@ export function ProdutoForm({ produto, inicial }: Props) {
         embalagemReais: (produto.embalagemCentavos / 100).toFixed(2).replace('.', ','),
         precoReais: (produto.precoCentavos / 100).toFixed(2).replace('.', ','),
         canalPrincipal: produto.canalPrincipal,
+        insumos: (produto.insumos ?? []).map((pi) => ({
+          insumoId: pi.insumoId,
+          qtdStr: String(pi.qtd).replace('.', ','),
+        })),
       };
     }
     return { ...VAZIO, ...inicial };
@@ -110,6 +128,23 @@ export function ProdutoForm({ produto, inicial }: Props) {
     queryKey: ['parametros'],
     queryFn: () => apiFetch<Parametro>('/parametros'),
   });
+
+  const { data: insumosDisponiveis } = useQuery({
+    queryKey: ['insumos'],
+    queryFn: () => apiFetch<Insumo[]>('/insumos'),
+  });
+
+  /**
+   * Soma o custo dos insumos selecionados no form (em centavos). Usado tanto pro
+   * preview ao vivo quanto pra exibir o subtotal abaixo da lista de linhas.
+   */
+  const custoInsumosCentavos = form.insumos.reduce((acc, linha) => {
+    const insumo = insumosDisponiveis?.find((i) => i.id === linha.insumoId);
+    if (!insumo) return acc;
+    const qtd = parseDecimalBr(linha.qtdStr);
+    if (!Number.isFinite(qtd)) return acc;
+    return acc + Math.round(qtd * insumo.custoUnitarioCentavos);
+  }, 0);
 
   useEffect(() => {
     const peso = parseDecimalBr(form.pesoG);
@@ -129,6 +164,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
           tempoH: tempo,
           impressora: form.impressora,
           embalagemCentavos: Number.isFinite(embalagem) ? embalagem : 0,
+          custoInsumosCentavos,
           precoCentavos: preco,
         },
       })
@@ -136,7 +172,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
         .catch(() => setPreview(null));
     }, 300);
     return () => clearTimeout(t);
-  }, [form]);
+  }, [form, custoInsumosCentavos]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -157,6 +193,9 @@ export function ProdutoForm({ produto, inicial }: Props) {
         precoCentavos: parseDecimalParaCentavos(form.precoReais),
         canalPrincipal: form.canalPrincipal,
         ativo: true,
+        insumos: form.insumos
+          .filter((l) => l.insumoId && Number.isFinite(parseDecimalBr(l.qtdStr)) && parseDecimalBr(l.qtdStr) > 0)
+          .map((l) => ({ insumoId: l.insumoId, qtd: parseDecimalBr(l.qtdStr) })),
       };
       if (produto) {
         await apiFetch(`/produtos/${produto.id}`, { method: 'PATCH', json: payload });
@@ -259,6 +298,13 @@ export function ProdutoForm({ produto, inicial }: Props) {
                 </SelectContent>
               </Select>
             </div>
+
+            <InsumosSecao
+              linhas={form.insumos}
+              onChange={(insumos) => setForm({ ...form, insumos })}
+              insumosDisponiveis={insumosDisponiveis ?? []}
+              subtotalCentavos={custoInsumosCentavos}
+            />
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -401,6 +447,99 @@ function Preview({
         <Linha rotulo="Lucro/h Shopee" valor={centavosParaReais(preview.lucroPorHoraShopeeCentavos)} />
         <Linha rotulo="Lucro/h ML" valor={centavosParaReais(preview.lucroPorHoraMlCentavos)} />
       </dl>
+    </div>
+  );
+}
+
+function InsumosSecao({
+  linhas,
+  onChange,
+  insumosDisponiveis,
+  subtotalCentavos,
+}: {
+  linhas: InsumoLinha[];
+  onChange: (l: InsumoLinha[]) => void;
+  insumosDisponiveis: Insumo[];
+  subtotalCentavos: number;
+}) {
+  function adicionar() {
+    onChange([...linhas, { insumoId: '', qtdStr: '' }]);
+  }
+  function remover(idx: number) {
+    onChange(linhas.filter((_, i) => i !== idx));
+  }
+  function alterar(idx: number, patch: Partial<InsumoLinha>) {
+    onChange(linhas.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  }
+
+  // Insumos já escolhidos em outras linhas (pra esconder das opções)
+  const idsEmUso = new Set(linhas.map((l) => l.insumoId).filter(Boolean));
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Insumos consumidos</Label>
+        {subtotalCentavos > 0 && (
+          <span className="text-xs text-muted-foreground">
+            subtotal{' '}
+            <span className="font-medium text-foreground tabular-nums">
+              {centavosParaReais(subtotalCentavos)}
+            </span>
+          </span>
+        )}
+      </div>
+
+      {linhas.length === 0 && (
+        <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+          Nenhum insumo. Adicione caixa, fita, etiqueta etc. que esse produto consome.
+        </p>
+      )}
+
+      {linhas.map((linha, idx) => {
+        const insumo = insumosDisponiveis.find((i) => i.id === linha.insumoId);
+        const opcoes = insumosDisponiveis.filter(
+          (i) => i.id === linha.insumoId || !idsEmUso.has(i.id),
+        );
+        return (
+          <div key={idx} className="grid grid-cols-[1fr_120px_auto] items-center gap-2">
+            <Select
+              value={linha.insumoId}
+              onValueChange={(v) => alterar(idx, { insumoId: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="— selecione um insumo —" />
+              </SelectTrigger>
+              <SelectContent>
+                {opcoes.map((i) => (
+                  <SelectItem key={i.id} value={i.id}>
+                    {i.nome} ({centavosParaReais(i.custoUnitarioCentavos)}/{i.unidade})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <InputDecimal
+              value={linha.qtdStr}
+              onChange={(s) => alterar(idx, { qtdStr: s })}
+              decimals={3}
+              placeholder={insumo ? `qtd em ${insumo.unidade}` : 'qtd'}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => remover(idx)}
+              title="Remover linha"
+              className="h-9 w-9 text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      })}
+
+      <Button type="button" variant="outline" size="sm" onClick={adicionar}>
+        + Adicionar insumo
+      </Button>
     </div>
   );
 }

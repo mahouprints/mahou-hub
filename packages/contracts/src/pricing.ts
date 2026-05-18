@@ -14,6 +14,7 @@ export const CalcularInputSchema = z.object({
   tempoH: z.number().positive(),
   impressora: ImpressoraEnum,
   embalagemCentavos: z.number().int().nonnegative(),
+  custoInsumosCentavos: z.number().int().nonnegative().optional(),
   precoCentavos: z.number().int().positive(),
 });
 

@@ -33,7 +33,15 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 
-type ProdutoComFilamento = Produto & { filamento: { id: string; nome: string } };
+type ProdutoComFilamento = Produto & {
+  filamento: { id: string; nome: string };
+  insumos: Array<{
+    id: string;
+    insumoId: string;
+    qtd: number | string;
+    insumo: { id: string; nome: string; unidade: string; custoUnitarioCentavos: number };
+  }>;
+};
 type Canal = 'SHOPEE' | 'ML' | 'SITE';
 const CANAL_LABEL: Record<Canal, string> = {
   SHOPEE: 'Shopee',
@@ -49,8 +57,14 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
     queryFn: () => apiFetch<ProdutoComFilamento>(`/produtos/${id}`),
   });
 
+  const custoInsumosCentavos =
+    produto?.insumos.reduce(
+      (acc, pi) => acc + Math.round(Number(pi.qtd) * pi.insumo.custoUnitarioCentavos),
+      0,
+    ) ?? 0;
+
   const { data: pricing } = useQuery({
-    queryKey: ['produto-pricing', id],
+    queryKey: ['produto-pricing', id, custoInsumosCentavos],
     enabled: !!produto,
     queryFn: () =>
       apiFetch<CalcularOutput>('/pricing/calcular', {
@@ -61,6 +75,7 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           tempoH: Number(produto!.tempoH),
           impressora: produto!.impressora,
           embalagemCentavos: produto!.embalagemCentavos,
+          custoInsumosCentavos,
           precoCentavos: produto!.precoCentavos,
         },
       }),
@@ -118,6 +133,8 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
               pricing={pricing}
               canal={produto.canalPrincipal}
               precoCentavos={produto.precoCentavos}
+              embalagemCentavos={produto.embalagemCentavos}
+              insumos={produto.insumos}
               thresholdVerde={Number(parametros?.margemThresholdVerde ?? 0.3)}
               thresholdAmarelo={Number(parametros?.margemThresholdAmarelo ?? 0.15)}
             />
@@ -254,12 +271,16 @@ function PricingBreakdown({
   pricing,
   canal,
   precoCentavos,
+  embalagemCentavos,
+  insumos,
   thresholdVerde,
   thresholdAmarelo,
 }: {
   pricing: CalcularOutput;
   canal: Canal;
   precoCentavos: number;
+  embalagemCentavos: number;
+  insumos: ProdutoComFilamento['insumos'];
   thresholdVerde: number;
   thresholdAmarelo: number;
 }) {
@@ -270,6 +291,10 @@ function PricingBreakdown({
         ? pricing.margemMl
         : pricing.margemSite;
   const veredito = vereditoDe(margemPrincipal, thresholdVerde, thresholdAmarelo);
+  const insumosTotalCentavos = insumos.reduce(
+    (acc, pi) => acc + Math.round(Number(pi.qtd) * pi.insumo.custoUnitarioCentavos),
+    0,
+  );
 
   const canais: CanalInfo[] = [
     {
@@ -315,17 +340,8 @@ function PricingBreakdown({
         <div className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <Item rotulo="Filamento" valor={centavosParaReais(pricing.custoFilamentoCentavos)} />
           <Item rotulo="Energia" valor={centavosParaReais(pricing.custoEnergiaCentavos)} />
-          <Item
-            rotulo="Embalagem"
-            valor={centavosParaReais(
-              Math.max(
-                0,
-                pricing.custoTotalProducaoCentavos -
-                  pricing.custoFilamentoCentavos -
-                  pricing.custoEnergiaCentavos,
-              ),
-            )}
-          />
+          <Item rotulo="Embalagem" valor={centavosParaReais(embalagemCentavos)} />
+          <Item rotulo="Insumos" valor={centavosParaReais(insumosTotalCentavos)} />
           <Item rotulo="Imposto" valor={centavosParaReais(pricing.impostoCentavos)} />
           <Item
             rotulo="Custo total"
@@ -334,6 +350,36 @@ function PricingBreakdown({
           />
         </div>
       </section>
+
+      {/* Detalhamento dos insumos consumidos — só aparece se houver. */}
+      {insumos.length > 0 && (
+        <section>
+          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Detalhamento dos insumos
+          </h3>
+          <div className="rounded-md border border-border">
+            {insumos.map((pi, idx) => {
+              const linhaTotal = Math.round(Number(pi.qtd) * pi.insumo.custoUnitarioCentavos);
+              return (
+                <div
+                  key={pi.id}
+                  className={cn(
+                    'grid grid-cols-[1fr_auto_auto] items-center gap-4 px-3 py-2 text-sm',
+                    idx > 0 && 'border-t border-border',
+                  )}
+                >
+                  <span className="font-medium">{pi.insumo.nome}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {Number(pi.qtd).toString().replace('.', ',')} {pi.insumo.unidade} ×{' '}
+                    {centavosParaReais(pi.insumo.custoUnitarioCentavos)}
+                  </span>
+                  <span className="font-medium tabular-nums">{centavosParaReais(linhaTotal)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Comparação visual entre canais. Principal recebe destaque. */}
       <section>
