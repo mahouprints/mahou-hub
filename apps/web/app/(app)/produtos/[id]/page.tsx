@@ -491,9 +491,10 @@ function formatarDimensoes(p: {
   alturaCm: number | null;
   profundidadeCm: number | null;
 }): string {
-  const dims = [p.larguraCm, p.alturaCm, p.profundidadeCm];
+  const dims = [p.larguraCm, p.profundidadeCm, p.alturaCm];
   if (!dims.every((d) => d != null)) return '—';
-  return `${formatarCm(p.larguraCm!)} × ${formatarCm(p.alturaCm!)} × ${formatarCm(p.profundidadeCm!)} cm`;
+  // Apresentação L × P × A (altura por último) pra bater com a ordem do form.
+  return `${formatarCm(p.larguraCm!)} × ${formatarCm(p.profundidadeCm!)} × ${formatarCm(p.alturaCm!)} cm`;
 }
 
 function formatarCm(n: number): string {

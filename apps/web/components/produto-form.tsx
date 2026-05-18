@@ -79,7 +79,9 @@ const VAZIO: FormState = {
   pesoG: '',
   tempoH: '',
   impressora: 'A1',
-  embalagemReais: '',
+  // Embalagem default 0: custos pequenos sem rastreio individual ficam nos
+  // Insumos cadastrados; quem não usa o campo deixa zerado.
+  embalagemReais: '0,00',
   precoReais: '',
   canalPrincipal: 'SHOPEE',
   insumos: [],
@@ -189,7 +191,10 @@ export function ProdutoForm({ produto, inicial }: Props) {
         pesoG: parseDecimalBr(form.pesoG),
         tempoH: parseDecimalBr(form.tempoH),
         impressora: form.impressora,
-        embalagemCentavos: parseDecimalParaCentavos(form.embalagemReais),
+        embalagemCentavos: (() => {
+          const v = parseDecimalParaCentavos(form.embalagemReais);
+          return Number.isFinite(v) ? v : 0; // vazio/inválido vira 0
+        })(),
         precoCentavos: parseDecimalParaCentavos(form.precoReais),
         canalPrincipal: form.canalPrincipal,
         ativo: true,
@@ -258,6 +263,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
 
             <div className="space-y-1.5">
               <Label>Dimensões (cm)</Label>
+              {/* Ordem: largura, profundidade, altura — espelha a apresentação L×P×A. */}
               <div className="grid grid-cols-3 gap-2">
                 <InputDecimal
                   value={form.larguraCm}
@@ -266,16 +272,16 @@ export function ProdutoForm({ produto, inicial }: Props) {
                   placeholder="largura"
                 />
                 <InputDecimal
-                  value={form.alturaCm}
-                  onChange={(s) => setForm({ ...form, alturaCm: s })}
-                  decimals={1}
-                  placeholder="altura"
-                />
-                <InputDecimal
                   value={form.profundidadeCm}
                   onChange={(s) => setForm({ ...form, profundidadeCm: s })}
                   decimals={1}
                   placeholder="profundidade"
+                />
+                <InputDecimal
+                  value={form.alturaCm}
+                  onChange={(s) => setForm({ ...form, alturaCm: s })}
+                  decimals={1}
+                  placeholder="altura"
                 />
               </div>
             </div>

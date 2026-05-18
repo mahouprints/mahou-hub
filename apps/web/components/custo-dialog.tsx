@@ -33,6 +33,7 @@ const CATEGORIAS: { value: CategoriaCusto; label: string }[] = [
   { value: 'ENERGIA', label: 'Energia' },
   { value: 'INTERNET', label: 'Internet' },
   { value: 'SOFTWARE', label: 'Software' },
+  { value: 'ASSINATURA', label: 'Assinatura' },
   { value: 'MARKETING', label: 'Marketing' },
   { value: 'INSUMOS', label: 'Insumos' },
   { value: 'IMPOSTOS', label: 'Impostos' },
@@ -59,6 +60,7 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
   );
   // Recorrente só faz sentido na criação — após gerado, é só editar/deletar.
   const [recorrente, setRecorrente] = useState(false);
+  const [mesesRecorrencia, setMesesRecorrencia] = useState('12');
   const [observacao, setObservacao] = useState(custo?.observacao ?? '');
 
   const salvar = useMutation({
@@ -69,7 +71,14 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['custos'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
-      toast.success(editando ? 'Custo atualizado' : recorrente ? 'Custo + 12 cópias futuras criadas' : 'Custo registrado');
+      const n = Number(mesesRecorrencia);
+      toast.success(
+        editando
+          ? 'Custo atualizado'
+          : recorrente
+            ? `Custo + ${n} cópia${n === 1 ? '' : 's'} futura${n === 1 ? '' : 's'} criada${n === 1 ? '' : 's'}`
+            : 'Custo registrado',
+      );
       onOpenChange(false);
     },
   });
@@ -81,12 +90,18 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
       toast.error('Preencha descrição, valor e mês competência');
       return;
     }
+    const n = Number(mesesRecorrencia);
+    if (recorrente && (!Number.isInteger(n) || n < 1 || n > 60)) {
+      toast.error('Recorrência: informe um número inteiro entre 1 e 60 meses');
+      return;
+    }
     salvar.mutate({
       descricao: descricao.trim(),
       categoria,
       valorCentavos,
       dataCompetencia: monthToDate(mes),
       recorrente: editando ? false : recorrente,
+      mesesRecorrencia: !editando && recorrente ? n : undefined,
       observacao: observacao.trim() || null,
     });
   }
@@ -142,21 +157,41 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
           </div>
 
           {!editando && (
-            <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-card p-3">
-              <input
-                type="checkbox"
-                checked={recorrente}
-                onChange={(e) => setRecorrente(e.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-primary"
-              />
-              <span className="text-sm">
-                Recorrente mensal
-                <span className="block text-xs text-muted-foreground">
-                  Gera automaticamente 12 cópias nos meses seguintes — cada uma pode ser editada
-                  ou removida individualmente.
+            <div className="space-y-3 rounded-md border border-border bg-card p-3">
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={recorrente}
+                  onChange={(e) => setRecorrente(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 accent-primary"
+                />
+                <span className="text-sm">
+                  Recorrente mensal
+                  <span className="block text-xs text-muted-foreground">
+                    Gera cópias nos meses seguintes — cada uma pode ser editada ou removida
+                    individualmente.
+                  </span>
                 </span>
-              </span>
-            </label>
+              </label>
+              {recorrente && (
+                <div className="flex items-center gap-2 pl-6">
+                  <Label htmlFor="meses" className="text-xs">
+                    Repetir por
+                  </Label>
+                  <Input
+                    id="meses"
+                    type="number"
+                    min={1}
+                    max={60}
+                    step={1}
+                    value={mesesRecorrencia}
+                    onChange={(e) => setMesesRecorrencia(e.target.value)}
+                    className="w-20"
+                  />
+                  <span className="text-xs text-muted-foreground">meses (1 a 60)</span>
+                </div>
+              )}
+            </div>
           )}
 
           <div className="space-y-1.5">

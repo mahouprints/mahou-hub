@@ -36,6 +36,7 @@ const CATEGORIA_LABEL: Record<CategoriaCusto, string> = {
   ENERGIA: 'Energia',
   INTERNET: 'Internet',
   SOFTWARE: 'Software',
+  ASSINATURA: 'Assinatura',
   MARKETING: 'Marketing',
   INSUMOS: 'Insumos',
   IMPOSTOS: 'Impostos',

@@ -5,6 +5,7 @@ export const CategoriaCustoEnum = z.enum([
   'ENERGIA',
   'INTERNET',
   'SOFTWARE',
+  'ASSINATURA',
   'MARKETING',
   'INSUMOS',
   'IMPOSTOS',
@@ -22,8 +23,14 @@ export const CustoSchema = z.object({
   observacao: z.string().nullable(),
 });
 
-// Na criação, geradoAutomatico é controlado pelo backend (sempre false na entrada manual).
-export const CustoCreateSchema = CustoSchema.omit({ id: true, geradoAutomatico: true });
+/**
+ * Na criação, `geradoAutomatico` é controlado pelo backend (sempre false na entrada manual).
+ * `mesesRecorrencia` só é usado quando `recorrente=true` — define quantas cópias mensais
+ * são geradas no futuro (1..60). Default no service é 12. Ignorado em update.
+ */
+export const CustoCreateSchema = CustoSchema.omit({ id: true, geradoAutomatico: true }).extend({
+  mesesRecorrencia: z.number().int().min(1).max(60).optional(),
+});
 export const CustoUpdateSchema = CustoCreateSchema.partial();
 
 export type CategoriaCusto = z.infer<typeof CategoriaCustoEnum>;

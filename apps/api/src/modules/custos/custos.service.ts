@@ -2,8 +2,8 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { CustoCreate, CustoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 
-/** Quantos meses futuros são gerados quando recorrente=true. */
-const MESES_RECORRENCIA = 12;
+/** Default de meses futuros gerados quando recorrente=true sem `mesesRecorrencia` no payload. */
+const MESES_RECORRENCIA_DEFAULT = 12;
 
 @Injectable()
 export class CustosService {
@@ -24,16 +24,19 @@ export class CustosService {
   }
 
   /**
-   * Cria o custo. Se recorrente=true, também gera N cópias mensais
-   * subsequentes (geradoAutomatico=true, recorrente=false pra não cascatear).
-   * Cada cópia é editável/deletável individualmente.
+   * Cria o custo. Se recorrente=true, gera `mesesRecorrencia` cópias mensais
+   * subsequentes (default 12). Cópias herdam geradoAutomatico=true,
+   * recorrente=false pra não cascatear; cada uma é editável/deletável
+   * individualmente.
    */
   async create(data: CustoCreate) {
+    const { mesesRecorrencia, ...persistivel } = data;
     const base = await this.prisma.custo.create({
-      data: { ...data, geradoAutomatico: false },
+      data: { ...persistivel, geradoAutomatico: false },
     });
     if (data.recorrente) {
-      const futuros = mesesSeguintes(data.dataCompetencia, MESES_RECORRENCIA).map((d) => ({
+      const n = mesesRecorrencia ?? MESES_RECORRENCIA_DEFAULT;
+      const futuros = mesesSeguintes(data.dataCompetencia, n).map((d) => ({
         descricao: data.descricao,
         categoria: data.categoria,
         valorCentavos: data.valorCentavos,
@@ -48,7 +51,9 @@ export class CustosService {
   }
 
   update(id: string, data: CustoUpdate) {
-    return this.prisma.custo.update({ where: { id }, data });
+    // mesesRecorrencia só faz sentido na criação — descarta no update.
+    const { mesesRecorrencia: _ignorado, ...persistivel } = data;
+    return this.prisma.custo.update({ where: { id }, data: persistivel });
   }
 
   async remove(id: string) {
