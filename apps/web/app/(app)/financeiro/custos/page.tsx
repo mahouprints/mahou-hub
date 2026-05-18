@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Pencil, Plus, RefreshCcw, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckSquare, Pencil, Plus, RefreshCcw, Trash2, X } from 'lucide-react';
 import type { CategoriaCusto, Custo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
@@ -162,6 +162,15 @@ export default function CustosPage() {
                 </SelectContent>
               </Select>
             </div>
+            {sel.modoSelecao ? (
+              <Button variant="outline" onClick={sel.acoes.sairModo}>
+                <X className="h-4 w-4" /> Sair da seleção
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={sel.acoes.entrarModo}>
+                <CheckSquare className="h-4 w-4" /> Selecionar
+              </Button>
+            )}
             <Button onClick={abrirNovo}>
               <Plus className="h-4 w-4" /> Novo custo
             </Button>
@@ -184,19 +193,21 @@ export default function CustosPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={
-                      sel.todosVisiveisMarcados
-                        ? true
-                        : sel.algumVisivelMarcado
-                          ? 'indeterminate'
-                          : false
-                    }
-                    onCheckedChange={() => sel.acoes.toggleTodos()}
-                    aria-label="Selecionar todos visíveis"
-                  />
-                </TableHead>
+                {sel.modoSelecao && (
+                  <TableHead className="w-8">
+                    <Checkbox
+                      checked={
+                        sel.todosVisiveisMarcados
+                          ? true
+                          : sel.algumVisivelMarcado
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={() => sel.acoes.toggleTodos()}
+                      aria-label="Selecionar todos visíveis"
+                    />
+                  </TableHead>
+                )}
                 <TableHead>Descrição</TableHead>
                 <TableHead>Categoria</TableHead>
                 <TableHead className="text-right">Valor</TableHead>
@@ -208,13 +219,15 @@ export default function CustosPage() {
             <TableBody>
               {filtrados.map((c) => (
                 <TableRow key={c.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={sel.selecionados.has(c.id)}
-                      onCheckedChange={() => sel.acoes.toggle(c.id)}
-                      aria-label={`Selecionar ${c.descricao}`}
-                    />
-                  </TableCell>
+                  {sel.modoSelecao && (
+                    <TableCell>
+                      <Checkbox
+                        checked={sel.selecionados.has(c.id)}
+                        onCheckedChange={() => sel.acoes.toggle(c.id)}
+                        aria-label={`Selecionar ${c.descricao}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">{c.descricao}</TableCell>
                   <TableCell>
                     <Badge variant="default">{CATEGORIA_LABEL[c.categoria]}</Badge>
@@ -255,7 +268,10 @@ export default function CustosPage() {
               ))}
               {filtrados.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={sel.modoSelecao ? 7 : 6}
+                    className="text-center text-sm text-muted-foreground"
+                  >
                     {data.length === 0 ? 'Nenhum custo no período.' : 'Nenhum custo bate com os filtros.'}
                   </TableCell>
                 </TableRow>

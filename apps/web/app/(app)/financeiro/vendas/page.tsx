@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, CheckSquare, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Venda } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
@@ -130,6 +130,15 @@ export default function VendasPage() {
                 </SelectContent>
               </Select>
             </div>
+            {sel.modoSelecao ? (
+              <Button variant="outline" onClick={sel.acoes.sairModo}>
+                <X className="h-4 w-4" /> Sair da seleção
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={sel.acoes.entrarModo}>
+                <CheckSquare className="h-4 w-4" /> Selecionar
+              </Button>
+            )}
             <Button onClick={abrirNova}>
               <Plus className="h-4 w-4" /> Nova venda
             </Button>
@@ -152,19 +161,21 @@ export default function VendasPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={
-                      sel.todosVisiveisMarcados
-                        ? true
-                        : sel.algumVisivelMarcado
-                          ? 'indeterminate'
-                          : false
-                    }
-                    onCheckedChange={() => sel.acoes.toggleTodos()}
-                    aria-label="Selecionar todas visíveis"
-                  />
-                </TableHead>
+                {sel.modoSelecao && (
+                  <TableHead className="w-8">
+                    <Checkbox
+                      checked={
+                        sel.todosVisiveisMarcados
+                          ? true
+                          : sel.algumVisivelMarcado
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={() => sel.acoes.toggleTodos()}
+                      aria-label="Selecionar todas visíveis"
+                    />
+                  </TableHead>
+                )}
                 <TableHead>Produto</TableHead>
                 <TableHead className="text-right">Qtd</TableHead>
                 <TableHead className="text-right">Preço unit.</TableHead>
@@ -177,13 +188,15 @@ export default function VendasPage() {
             <TableBody>
               {filtradas.map((v) => (
                 <TableRow key={v.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={sel.selecionados.has(v.id)}
-                      onCheckedChange={() => sel.acoes.toggle(v.id)}
-                      aria-label={`Selecionar venda de ${v.produto.nome}`}
-                    />
-                  </TableCell>
+                  {sel.modoSelecao && (
+                    <TableCell>
+                      <Checkbox
+                        checked={sel.selecionados.has(v.id)}
+                        onCheckedChange={() => sel.acoes.toggle(v.id)}
+                        aria-label={`Selecionar venda de ${v.produto.nome}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">
                     <span className="block truncate max-w-[260px]" title={v.produto.nome}>
                       {v.produto.nome}
@@ -219,7 +232,10 @@ export default function VendasPage() {
               ))}
               {filtradas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={sel.modoSelecao ? 8 : 7}
+                    className="text-center text-sm text-muted-foreground"
+                  >
                     {data.length === 0 ? 'Nenhuma venda no período.' : 'Nenhuma venda bate com os filtros.'}
                   </TableCell>
                 </TableRow>

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Box, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Box, CheckSquare, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { CalcularOutput, Filamento, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
@@ -128,11 +128,22 @@ export default function ProdutosPage() {
             {filtrados.length} de {data?.length ?? 0} itens · clique numa linha pra ver detalhes
           </p>
         </div>
-        <Button asChild>
-          <Link href="/produtos/novo">
-            <Plus className="h-4 w-4" /> Novo produto
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {sel.modoSelecao ? (
+            <Button variant="outline" onClick={sel.acoes.sairModo}>
+              <X className="h-4 w-4" /> Sair da seleção
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={sel.acoes.entrarModo}>
+              <CheckSquare className="h-4 w-4" /> Selecionar
+            </Button>
+          )}
+          <Button asChild>
+            <Link href="/produtos/novo">
+              <Plus className="h-4 w-4" /> Novo produto
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <FiltrosBar
@@ -161,19 +172,21 @@ export default function ProdutosPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    checked={
-                      sel.todosVisiveisMarcados
-                        ? true
-                        : sel.algumVisivelMarcado
-                          ? 'indeterminate'
-                          : false
-                    }
-                    onCheckedChange={() => sel.acoes.toggleTodos()}
-                    aria-label="Selecionar todos visíveis"
-                  />
-                </TableHead>
+                {sel.modoSelecao && (
+                  <TableHead className="w-8">
+                    <Checkbox
+                      checked={
+                        sel.todosVisiveisMarcados
+                          ? true
+                          : sel.algumVisivelMarcado
+                            ? 'indeterminate'
+                            : false
+                      }
+                      onCheckedChange={() => sel.acoes.toggleTodos()}
+                      aria-label="Selecionar todos visíveis"
+                    />
+                  </TableHead>
+                )}
                 <TableHead>Nome</TableHead>
                 <TableHead className="text-right">Peso</TableHead>
                 <TableHead className="text-right">Tempo</TableHead>
@@ -196,16 +209,18 @@ export default function ProdutosPage() {
                     onClick={() => router.push(`/produtos/${p.id}`)}
                     className="cursor-pointer"
                   >
-                    <TableCell
-                      onClick={(e) => e.stopPropagation()}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    >
-                      <Checkbox
-                        checked={marcado}
-                        onCheckedChange={() => sel.acoes.toggle(p.id)}
-                        aria-label={`Selecionar ${p.nome}`}
-                      />
-                    </TableCell>
+                    {sel.modoSelecao && (
+                      <TableCell
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={marcado}
+                          onCheckedChange={() => sel.acoes.toggle(p.id)}
+                          aria-label={`Selecionar ${p.nome}`}
+                        />
+                      </TableCell>
+                    )}
                     <TableCell className="font-medium">
                       <span className="block truncate max-w-[260px]" title={p.nome}>
                         {p.nome}
@@ -247,7 +262,10 @@ export default function ProdutosPage() {
               })}
               {filtrados.length === 0 && data.length > 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center text-sm text-muted-foreground">
+                  <TableCell
+                    colSpan={sel.modoSelecao ? 11 : 10}
+                    className="text-center text-sm text-muted-foreground"
+                  >
                     Nenhum produto bate com os filtros atuais.
                   </TableCell>
                 </TableRow>

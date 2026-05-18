@@ -3,15 +3,17 @@
 import { useCallback, useMemo, useState } from 'react';
 
 /**
- * Gerencia seleção de N itens em uma tabela. Use o `selecionados` (Set) pra
- * checkar se uma linha está marcada, e `acoes` pra disparar mudanças.
+ * Gerencia seleção de N itens em uma tabela + modo de seleção (esconde/mostra
+ * a coluna de checkboxes). Padrão: modo desligado — usuário clica "Selecionar"
+ * pra ativar; sair limpa toda a seleção.
  *
  * @example
- * const { selecionados, acoes, count } = useTableSelection(produtos.map(p => p.id));
- * <Checkbox checked={selecionados.has(p.id)} onCheckedChange={() => acoes.toggle(p.id)} />
+ * const sel = useTableSelection(produtos.map(p => p.id));
+ * {sel.modoSelecao && <Checkbox checked={sel.selecionados.has(p.id)} ... />}
  */
 export function useTableSelection(idsVisiveis: string[]) {
   const [set, setSet] = useState<Set<string>>(new Set());
+  const [modoSelecao, setModoSelecao] = useState(false);
 
   const acoes = useMemo(
     () => ({
@@ -40,8 +42,13 @@ export function useTableSelection(idsVisiveis: string[]) {
       limpar() {
         setSet(new Set());
       },
-      definir(ids: string[]) {
-        setSet(new Set(ids));
+      entrarModo() {
+        setModoSelecao(true);
+      },
+      sairModo() {
+        // Sair do modo descarta a seleção — evita estado fantasma quando reabrir.
+        setSet(new Set());
+        setModoSelecao(false);
       },
     }),
     [idsVisiveis],
@@ -60,6 +67,7 @@ export function useTableSelection(idsVisiveis: string[]) {
   return {
     selecionados: set,
     count: set.size,
+    modoSelecao,
     todosVisiveisMarcados,
     algumVisivelMarcado,
     acoes,
