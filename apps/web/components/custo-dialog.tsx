@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { InputDecimal } from '@/components/ui/input-decimal';
 import { Label } from '@/components/ui/label';
+import { MonthPicker } from '@/components/ui/month-picker';
 import {
   Select,
   SelectContent,
@@ -136,14 +137,8 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="mes">Mês competência</Label>
-            <Input
-              id="mes"
-              type="month"
-              value={mes}
-              onChange={(e) => setMes(e.target.value)}
-              required
-            />
+            <Label>Mês competência</Label>
+            <MonthPicker value={mes} onChange={setMes} placeholder="Selecionar mês" />
           </div>
 
           {!editando && (

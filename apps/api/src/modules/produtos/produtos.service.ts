@@ -71,6 +71,56 @@ export class ProdutosService {
     return { ok: true };
   }
 
+  /**
+   * Estatísticas agregadas pra exibir no detalhe do produto:
+   * - vendidos = soma de qtd nas Vendas
+   * - faturamentoCentavos = soma de preço × qtd nas Vendas
+   * - produzidos = soma de qtd nos JobProducao com status terminal (CONCLUIDO/EMBALADO/ENVIADO)
+   * - emProducao = soma nos status ativos (FILA/IMPRIMINDO)
+   * - ultimaVendaEm = data da venda mais recente, ou null
+   */
+  async estatisticas(id: string) {
+    const existe = await this.prisma.produto.findUnique({ where: { id }, select: { id: true } });
+    if (!existe) throw new NotFoundException(`Produto ${id} não existe`);
+
+    const vendasAgg = await this.prisma.venda.aggregate({
+      where: { produtoId: id },
+      _sum: { qtd: true },
+      _count: { _all: true },
+    });
+
+    const vendas = await this.prisma.venda.findMany({
+      where: { produtoId: id },
+      select: { precoUnitarioCentavos: true, qtd: true, dataVenda: true },
+      orderBy: { dataVenda: 'desc' },
+    });
+
+    const faturamentoCentavos = vendas.reduce(
+      (s, v) => s + v.precoUnitarioCentavos * v.qtd,
+      0,
+    );
+    const ultimaVendaEm = vendas[0]?.dataVenda ?? null;
+
+    const produzidos = await this.prisma.jobProducao.aggregate({
+      where: { produtoId: id, status: { in: ['CONCLUIDO', 'EMBALADO', 'ENVIADO'] } },
+      _sum: { qtd: true },
+    });
+
+    const emProducao = await this.prisma.jobProducao.aggregate({
+      where: { produtoId: id, status: { in: ['FILA', 'IMPRIMINDO'] } },
+      _sum: { qtd: true },
+    });
+
+    return {
+      vendidos: vendasAgg._sum.qtd ?? 0,
+      qtdVendas: vendasAgg._count._all,
+      faturamentoCentavos,
+      ultimaVendaEm,
+      produzidos: produzidos._sum.qtd ?? 0,
+      emProducao: emProducao._sum.qtd ?? 0,
+    };
+  }
+
   private async carregarParametros(): Promise<ParametrosGlobais> {
     const p = await this.prisma.parametro.findUnique({ where: { id: 1 } });
     if (!p) throw new NotFoundException('Parâmetros não inicializados');

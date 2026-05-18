@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { MonthPicker } from '@/components/ui/month-picker';
 import {
   Table,
   TableBody,
@@ -80,15 +80,13 @@ export default function CustosPage() {
           </div>
           <div className="flex items-end gap-3">
             <div className="space-y-1.5">
-              <label htmlFor="mes" className="text-xs uppercase text-muted-foreground">
-                Filtrar por mês
-              </label>
-              <Input
-                id="mes"
-                type="month"
+              <label className="text-xs uppercase text-muted-foreground">Filtrar por mês</label>
+              <MonthPicker
                 value={mes}
-                onChange={(e) => setMes(e.target.value)}
-                className="w-44"
+                onChange={setMes}
+                placeholder="Todos os meses"
+                clearable
+                className="w-56"
               />
             </div>
             <Button onClick={abrirNovo}>

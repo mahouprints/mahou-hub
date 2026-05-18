@@ -24,6 +24,11 @@ export class ProdutosController {
     return this.service.get(id);
   }
 
+  @Get(':id/estatisticas')
+  estatisticas(@Param('id') id: string) {
+    return this.service.estatisticas(id);
+  }
+
   @Post()
   create(@Body(new ZodValidationPipe(ProdutoCreateSchema)) data: ProdutoCreate) {
     return this.service.create(data);

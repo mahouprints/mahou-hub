@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { InputDecimal } from '@/components/ui/input-decimal';
 import { Label } from '@/components/ui/label';
@@ -49,8 +50,8 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
     venda ? (venda.precoUnitarioCentavos / 100).toFixed(2).replace('.', ',') : '',
   );
   const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE'>(venda?.canal ?? 'SHOPEE');
-  const [dataVenda, setDataVenda] = useState(
-    venda ? toIsoDate(new Date(venda.dataVenda)) : toIsoDate(new Date()),
+  const [dataVenda, setDataVenda] = useState<Date | undefined>(
+    venda ? new Date(venda.dataVenda) : new Date(),
   );
   const [observacao, setObservacao] = useState(venda?.observacao ?? '');
 
@@ -80,8 +81,15 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
     e.preventDefault();
     const precoCentavos = parseDecimalParaCentavos(precoReais);
     const qtdNum = Number(qtd);
-    if (!produtoId || !Number.isFinite(qtdNum) || qtdNum <= 0 || !Number.isFinite(precoCentavos) || precoCentavos <= 0) {
-      toast.error('Preencha produto, quantidade e preço válidos');
+    if (
+      !produtoId ||
+      !Number.isFinite(qtdNum) ||
+      qtdNum <= 0 ||
+      !Number.isFinite(precoCentavos) ||
+      precoCentavos <= 0 ||
+      !dataVenda
+    ) {
+      toast.error('Preencha produto, quantidade, preço e data válidos');
       return;
     }
     salvar.mutate({
@@ -89,7 +97,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
       qtd: qtdNum,
       precoUnitarioCentavos: precoCentavos,
       canal,
-      dataVenda: new Date(dataVenda),
+      dataVenda,
       observacao: observacao.trim() || null,
     });
   }
@@ -154,14 +162,8 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="dataVenda">Data da venda</Label>
-              <Input
-                id="dataVenda"
-                type="date"
-                value={dataVenda}
-                onChange={(e) => setDataVenda(e.target.value)}
-                required
-              />
+              <Label>Data da venda</Label>
+              <DatePicker value={dataVenda} onChange={setDataVenda} />
             </div>
           </div>
 
@@ -191,7 +193,3 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
   );
 }
 
-function toIsoDate(d: Date): string {
-  // YYYY-MM-DD pro input type=date
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}

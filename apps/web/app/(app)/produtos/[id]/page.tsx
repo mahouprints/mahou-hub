@@ -3,10 +3,26 @@
 import { use } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, Box, ExternalLink, Pencil } from 'lucide-react';
-import type { CalcularOutput, Parametro, Produto } from '@mahou-hub/contracts';
+import {
+  ArrowLeft,
+  Box,
+  Calendar,
+  ExternalLink,
+  Factory,
+  Pencil,
+  Receipt,
+  ShoppingBag,
+  Star,
+} from 'lucide-react';
+import type {
+  CalcularOutput,
+  EstatisticasProduto,
+  Parametro,
+  Produto,
+} from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +34,12 @@ import {
 } from '@/components/ui/card';
 
 type ProdutoComFilamento = Produto & { filamento: { id: string; nome: string } };
+type Canal = 'SHOPEE' | 'ML' | 'SITE';
+const CANAL_LABEL: Record<Canal, string> = {
+  SHOPEE: 'Shopee',
+  ML: 'Mercado Livre',
+  SITE: 'Site próprio',
+};
 
 export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -49,12 +71,13 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
     queryFn: () => apiFetch<Parametro>('/parametros'),
   });
 
+  const { data: stats } = useQuery({
+    queryKey: ['produto-estatisticas', id],
+    queryFn: () => apiFetch<EstatisticasProduto>(`/produtos/${id}/estatisticas`),
+  });
+
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
   if (!produto) return <p className="text-sm text-muted-foreground">Produto não encontrado.</p>;
-
-  const canalLabel = { SHOPEE: 'Shopee', ML: 'Mercado Livre', SITE: 'Site próprio' }[
-    produto.canalPrincipal
-  ];
 
   return (
     <div className="space-y-6">
@@ -69,7 +92,7 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           <div className="flex flex-wrap gap-2">
             <Badge variant="default">{produto.filamento.nome}</Badge>
             <Badge variant="default">{produto.impressora}</Badge>
-            <Badge variant="default">{canalLabel}</Badge>
+            <Badge variant="default">{CANAL_LABEL[produto.canalPrincipal]}</Badge>
           </div>
         </div>
         <Button asChild>
@@ -80,74 +103,348 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Especificações</CardTitle>
-            <CardDescription>Dados cadastrados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm">
-              <Linha rotulo="Filamento" valor={produto.filamento.nome} />
-              <Linha rotulo="Impressora" valor={produto.impressora} />
-              <Linha rotulo="Peso" valor={`${Number(produto.pesoG)} g`} />
-              <Linha rotulo="Tempo" valor={`${Number(produto.tempoH)} h`} />
-              <Linha rotulo="Dimensões" valor={formatarDimensoes(produto)} />
-              <Linha rotulo="Embalagem" valor={centavosParaReais(produto.embalagemCentavos)} />
-              <Linha rotulo="Preço de venda" valor={centavosParaReais(produto.precoCentavos)} />
-              <Linha rotulo="Canal principal" valor={canalLabel} />
-              <Linha
-                rotulo="Inspiração"
-                valor={
-                  isUrl(produto.inspiracao) ? (
-                    <LinkExterno href={produto.inspiracao!} icon={ExternalLink} />
-                  ) : (
-                    produto.inspiracao || '—'
-                  )
-                }
-              />
-              <Linha
-                rotulo="Modelo 3D"
-                valor={
-                  isUrl(produto.modelo3dUrl) ? (
-                    <LinkExterno href={produto.modelo3dUrl!} icon={Box} />
-                  ) : (
-                    produto.modelo3dUrl || '—'
-                  )
-                }
-              />
-            </dl>
-          </CardContent>
-        </Card>
+        <EspecificacoesCard produto={produto} />
+        <EstatisticasCard stats={stats} />
+      </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Pricing</CardTitle>
-            <CardDescription>Custo, taxas e margem calculados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {pricing ? (
-              <PricingBreakdown
-                pricing={pricing}
-                canal={produto.canalPrincipal}
-                thresholdVerde={Number(parametros?.margemThresholdVerde ?? 0.3)}
-                thresholdAmarelo={Number(parametros?.margemThresholdAmarelo ?? 0.15)}
+      <Card>
+        <CardHeader>
+          <CardTitle>Pricing</CardTitle>
+          <CardDescription>Custo unitário e comparação entre canais</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {pricing ? (
+            <PricingBreakdown
+              pricing={pricing}
+              canal={produto.canalPrincipal}
+              precoCentavos={produto.precoCentavos}
+              thresholdVerde={Number(parametros?.margemThresholdVerde ?? 0.3)}
+              thresholdAmarelo={Number(parametros?.margemThresholdAmarelo ?? 0.15)}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Calculando…</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function EspecificacoesCard({ produto }: { produto: ProdutoComFilamento }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Especificações</CardTitle>
+        <CardDescription>Dados cadastrados</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm">
+          <Linha rotulo="Filamento" valor={produto.filamento.nome} />
+          <Linha rotulo="Impressora" valor={produto.impressora} />
+          <Linha rotulo="Peso" valor={`${Number(produto.pesoG)} g`} />
+          <Linha rotulo="Tempo" valor={`${Number(produto.tempoH)} h`} />
+          <Linha rotulo="Dimensões" valor={formatarDimensoes(produto)} />
+          <Linha rotulo="Embalagem" valor={centavosParaReais(produto.embalagemCentavos)} />
+          <Linha rotulo="Preço de venda" valor={centavosParaReais(produto.precoCentavos)} />
+          <Linha rotulo="Canal principal" valor={CANAL_LABEL[produto.canalPrincipal]} />
+          <Linha
+            rotulo="Inspiração"
+            valor={
+              isUrl(produto.inspiracao) ? (
+                <LinkExterno href={produto.inspiracao!} icon={ExternalLink} />
+              ) : (
+                produto.inspiracao || '—'
+              )
+            }
+          />
+          <Linha
+            rotulo="Modelo 3D"
+            valor={
+              isUrl(produto.modelo3dUrl) ? (
+                <LinkExterno href={produto.modelo3dUrl!} icon={Box} />
+              ) : (
+                produto.modelo3dUrl || '—'
+              )
+            }
+          />
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
+function EstatisticasCard({ stats }: { stats: EstatisticasProduto | undefined }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Histórico</CardTitle>
+        <CardDescription>Vendas e produção deste produto</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!stats ? (
+          <p className="text-sm text-muted-foreground">Carregando…</p>
+        ) : (
+          <div className="space-y-5">
+            <div className="grid grid-cols-2 gap-3">
+              <StatBox
+                icon={ShoppingBag}
+                rotulo="Vendidos"
+                valor={String(stats.vendidos)}
+                sub={`em ${stats.qtdVendas} ${stats.qtdVendas === 1 ? 'venda' : 'vendas'}`}
               />
-            ) : (
-              <p className="text-sm text-muted-foreground">Calculando…</p>
+              <StatBox
+                icon={Receipt}
+                rotulo="Faturamento"
+                valor={centavosParaReais(stats.faturamentoCentavos)}
+                sub="acumulado"
+              />
+              <StatBox
+                icon={Factory}
+                rotulo="Produzidos"
+                valor={String(stats.produzidos)}
+                sub="concluídos/embalados/enviados"
+              />
+              <StatBox
+                icon={Factory}
+                rotulo="Em produção"
+                valor={String(stats.emProducao)}
+                sub="fila + imprimindo"
+              />
+            </div>
+            <div className="flex items-center gap-2 border-t border-border pt-3 text-sm">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-muted-foreground">Última venda:</span>
+              <span className="font-medium">
+                {stats.ultimaVendaEm
+                  ? new Date(stats.ultimaVendaEm).toLocaleDateString('pt-BR')
+                  : '—'}
+              </span>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatBox({
+  icon: Icon,
+  rotulo,
+  valor,
+  sub,
+}: {
+  icon: typeof ShoppingBag;
+  rotulo: string;
+  valor: string;
+  sub?: string;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-card/50 p-3">
+      <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+        {rotulo}
+      </div>
+      <div className="mt-1 text-xl font-semibold tabular-nums">{valor}</div>
+      {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+function PricingBreakdown({
+  pricing,
+  canal,
+  precoCentavos,
+  thresholdVerde,
+  thresholdAmarelo,
+}: {
+  pricing: CalcularOutput;
+  canal: Canal;
+  precoCentavos: number;
+  thresholdVerde: number;
+  thresholdAmarelo: number;
+}) {
+  const margemPrincipal =
+    canal === 'SHOPEE'
+      ? pricing.margemShopee
+      : canal === 'ML'
+        ? pricing.margemMl
+        : pricing.margemSite;
+  const veredito = vereditoDe(margemPrincipal, thresholdVerde, thresholdAmarelo);
+
+  const canais: CanalInfo[] = [
+    {
+      key: 'SHOPEE',
+      liquidoCentavos: pricing.liquidoShopeeCentavos,
+      margem: pricing.margemShopee,
+      lucroHCentavos: pricing.lucroPorHoraShopeeCentavos,
+      taxaCentavos: pricing.taxaShopeeCentavos,
+    },
+    {
+      key: 'ML',
+      liquidoCentavos: pricing.liquidoMlCentavos,
+      margem: pricing.margemMl,
+      lucroHCentavos: pricing.lucroPorHoraMlCentavos,
+      taxaCentavos: pricing.taxaMlCentavos,
+    },
+    {
+      key: 'SITE',
+      liquidoCentavos: pricing.liquidoSiteCentavos,
+      margem: pricing.margemSite,
+      lucroHCentavos: null, // pricing não expõe lucro/h pro site (sem taxa)
+      taxaCentavos: 0,
+    },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Badge variant={veredito.variant} className="text-sm">
+          {veredito.label}
+        </Badge>
+        <p className="text-sm text-muted-foreground">
+          Margem do canal principal ({CANAL_LABEL[canal]}):{' '}
+          <span className="font-semibold text-foreground">{pct(margemPrincipal)}</span>
+        </p>
+      </div>
+
+      {/* Custos: bloco único, fácil de bater de olho. */}
+      <section>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Custos por unidade
+        </h3>
+        <div className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+          <Item rotulo="Filamento" valor={centavosParaReais(pricing.custoFilamentoCentavos)} />
+          <Item rotulo="Energia" valor={centavosParaReais(pricing.custoEnergiaCentavos)} />
+          <Item
+            rotulo="Embalagem"
+            valor={centavosParaReais(
+              Math.max(
+                0,
+                pricing.custoTotalProducaoCentavos -
+                  pricing.custoFilamentoCentavos -
+                  pricing.custoEnergiaCentavos,
+              ),
             )}
-          </CardContent>
-        </Card>
+          />
+          <Item rotulo="Imposto" valor={centavosParaReais(pricing.impostoCentavos)} />
+          <Item
+            rotulo="Custo total"
+            valor={centavosParaReais(pricing.custoTotalProducaoCentavos)}
+            destaque
+          />
+        </div>
+      </section>
+
+      {/* Comparação visual entre canais. Principal recebe destaque. */}
+      <section>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Por canal
+          </h3>
+          <span className="text-xs text-muted-foreground">
+            Preço de venda: {centavosParaReais(precoCentavos)}
+          </span>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {canais.map((c) => (
+            <CanalCard
+              key={c.key}
+              info={c}
+              principal={c.key === canal}
+              thresholdVerde={thresholdVerde}
+              thresholdAmarelo={thresholdAmarelo}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+interface CanalInfo {
+  key: Canal;
+  liquidoCentavos: number;
+  margem: number;
+  lucroHCentavos: number | null;
+  taxaCentavos: number;
+}
+
+function CanalCard({
+  info,
+  principal,
+  thresholdVerde,
+  thresholdAmarelo,
+}: {
+  info: CanalInfo;
+  principal: boolean;
+  thresholdVerde: number;
+  thresholdAmarelo: number;
+}) {
+  const v = vereditoDe(info.margem, thresholdVerde, thresholdAmarelo);
+  return (
+    <div
+      className={cn(
+        'rounded-lg border p-4 transition-colors',
+        principal ? 'border-primary/60 bg-primary/5' : 'border-border bg-card/50',
+      )}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <span className={cn('text-sm font-medium', principal && 'text-primary-foreground')}>
+          {CANAL_LABEL[info.key]}
+        </span>
+        {principal && (
+          <span className="inline-flex items-center gap-1 text-xs text-primary-foreground">
+            <Star className="h-3 w-3 fill-current" /> principal
+          </span>
+        )}
+      </div>
+      <div className="space-y-3">
+        <div>
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Líquido</div>
+          <div className="text-xl font-semibold tabular-nums">
+            {centavosParaReais(info.liquidoCentavos)}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <div className="text-xs text-muted-foreground">Margem</div>
+            <Badge variant={v.variant} className="font-normal">
+              {pct(info.margem)}
+            </Badge>
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Lucro/h</div>
+            <div className="tabular-nums">
+              {info.lucroHCentavos != null ? centavosParaReais(info.lucroHCentavos) : '—'}
+            </div>
+          </div>
+        </div>
+        <div className="border-t border-border pt-2 text-xs text-muted-foreground">
+          Taxa do canal:{' '}
+          <span className="tabular-nums text-foreground">
+            {info.taxaCentavos > 0 ? centavosParaReais(info.taxaCentavos) : '—'}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
-/**
- * Mostra "L × A × P cm" se TODAS as 3 dimensões existem, senão um traço.
- * Optei por exigir as 3 — uma só fica estranho. Pra mostrar parcial,
- * mude o `every` por `some` e ajuste a formatação.
- */
-function formatarDimensoes(p: { larguraCm: number | null; alturaCm: number | null; profundidadeCm: number | null }): string {
+function vereditoDe(
+  margem: number,
+  verde: number,
+  amarelo: number,
+): { variant: 'success' | 'warning' | 'danger'; label: string } {
+  if (margem >= verde) return { variant: 'success', label: 'Vale a pena' };
+  if (margem >= amarelo) return { variant: 'warning', label: 'Atenção' };
+  return { variant: 'danger', label: 'Não compensa' };
+}
+
+function formatarDimensoes(p: {
+  larguraCm: number | null;
+  alturaCm: number | null;
+  profundidadeCm: number | null;
+}): string {
   const dims = [p.larguraCm, p.alturaCm, p.profundidadeCm];
   if (!dims.every((d) => d != null)) return '—';
   return `${formatarCm(p.larguraCm!)} × ${formatarCm(p.alturaCm!)} × ${formatarCm(p.profundidadeCm!)} cm`;
@@ -166,6 +463,28 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {
   );
 }
 
+function Item({
+  rotulo,
+  valor,
+  destaque,
+}: {
+  rotulo: string;
+  valor: string;
+  destaque?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-between gap-3',
+        destaque && 'border-t border-border pt-2 font-semibold',
+      )}
+    >
+      <span className={destaque ? 'text-foreground' : 'text-muted-foreground'}>{rotulo}</span>
+      <span className="tabular-nums">{valor}</span>
+    </div>
+  );
+}
+
 function LinkExterno({ href, icon: Icon }: { href: string; icon: typeof ExternalLink }) {
   return (
     <a
@@ -178,89 +497,4 @@ function LinkExterno({ href, icon: Icon }: { href: string; icon: typeof External
       Abrir
     </a>
   );
-}
-
-function PricingBreakdown({
-  pricing,
-  canal,
-  thresholdVerde,
-  thresholdAmarelo,
-}: {
-  pricing: CalcularOutput;
-  canal: 'SHOPEE' | 'ML' | 'SITE';
-  thresholdVerde: number;
-  thresholdAmarelo: number;
-}) {
-  const margemPrincipal =
-    canal === 'SHOPEE'
-      ? pricing.margemShopee
-      : canal === 'ML'
-        ? pricing.margemMl
-        : pricing.margemSite;
-  const variant: 'success' | 'warning' | 'danger' =
-    margemPrincipal >= thresholdVerde
-      ? 'success'
-      : margemPrincipal >= thresholdAmarelo
-        ? 'warning'
-        : 'danger';
-  const label =
-    margemPrincipal >= thresholdVerde
-      ? 'Vale a pena'
-      : margemPrincipal >= thresholdAmarelo
-        ? 'Atenção'
-        : 'Não compensa';
-
-  return (
-    <div className="space-y-4">
-      <Badge variant={variant} className="text-sm">
-        {label}
-      </Badge>
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-        <Linha rotulo="Custo filamento" valor={centavosParaReais(pricing.custoFilamentoCentavos)} />
-        <Linha rotulo="Custo energia" valor={centavosParaReais(pricing.custoEnergiaCentavos)} />
-        <Linha
-          rotulo="Custo produção"
-          valor={centavosParaReais(pricing.custoTotalProducaoCentavos)}
-        />
-        <Linha rotulo="Imposto" valor={centavosParaReais(pricing.impostoCentavos)} />
-        <Linha rotulo="Taxa Shopee" valor={centavosParaReais(pricing.taxaShopeeCentavos)} />
-        <Linha rotulo="Taxa Mercado Livre" valor={centavosParaReais(pricing.taxaMlCentavos)} />
-        <Linha
-          rotulo="Líquido Shopee"
-          valor={
-            <Destacado destacar={canal === 'SHOPEE'}>
-              {centavosParaReais(pricing.liquidoShopeeCentavos)}
-            </Destacado>
-          }
-        />
-        <Linha
-          rotulo="Líquido Mercado Livre"
-          valor={
-            <Destacado destacar={canal === 'ML'}>
-              {centavosParaReais(pricing.liquidoMlCentavos)}
-            </Destacado>
-          }
-        />
-        <Linha
-          rotulo="Líquido Site"
-          valor={
-            <Destacado destacar={canal === 'SITE'}>
-              {centavosParaReais(pricing.liquidoSiteCentavos)}
-            </Destacado>
-          }
-        />
-        <Linha rotulo="Margem Shopee" valor={pct(pricing.margemShopee)} />
-        <Linha rotulo="Margem ML" valor={pct(pricing.margemMl)} />
-        <Linha
-          rotulo="Lucro/h Shopee"
-          valor={centavosParaReais(pricing.lucroPorHoraShopeeCentavos)}
-        />
-        <Linha rotulo="Lucro/h ML" valor={centavosParaReais(pricing.lucroPorHoraMlCentavos)} />
-      </dl>
-    </div>
-  );
-}
-
-function Destacado({ destacar, children }: { destacar: boolean; children: React.ReactNode }) {
-  return <span className={destacar ? 'font-semibold text-foreground' : ''}>{children}</span>;
 }

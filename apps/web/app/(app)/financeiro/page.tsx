@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, pct } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { MonthPicker } from '@/components/ui/month-picker';
 
 export default function FinanceiroPage() {
   const [mes, setMes] = useState(mesAtual());
@@ -28,16 +28,8 @@ export default function FinanceiroPage() {
           </p>
         </div>
         <div className="space-y-1.5">
-          <label htmlFor="mes" className="text-xs uppercase text-muted-foreground">
-            Mês competência
-          </label>
-          <Input
-            id="mes"
-            type="month"
-            value={mes}
-            onChange={(e) => setMes(e.target.value)}
-            className="w-44"
-          />
+          <label className="text-xs uppercase text-muted-foreground">Mês competência</label>
+          <MonthPicker value={mes} onChange={setMes} className="w-56" />
         </div>
       </header>
 

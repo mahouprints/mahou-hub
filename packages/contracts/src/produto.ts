@@ -28,3 +28,13 @@ export const ProdutoUpdateSchema = ProdutoCreateSchema.partial();
 export type Produto = z.infer<typeof ProdutoSchema>;
 export type ProdutoCreate = z.infer<typeof ProdutoCreateSchema>;
 export type ProdutoUpdate = z.infer<typeof ProdutoUpdateSchema>;
+
+export const EstatisticasProdutoSchema = z.object({
+  vendidos: z.number().int().nonnegative(),
+  qtdVendas: z.number().int().nonnegative(),
+  faturamentoCentavos: z.number().int().nonnegative(),
+  ultimaVendaEm: z.coerce.date().nullable(),
+  produzidos: z.number().int().nonnegative(),
+  emProducao: z.number().int().nonnegative(),
+});
+export type EstatisticasProduto = z.infer<typeof EstatisticasProdutoSchema>;
