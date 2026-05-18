@@ -324,6 +324,7 @@ function FiltrosBar({
             <SelectItem value="SHOPEE">Shopee</SelectItem>
             <SelectItem value="ML">Mercado Livre</SelectItem>
             <SelectItem value="SITE">Site próprio</SelectItem>
+            <SelectItem value="TIKTOK">TikTok Shop</SelectItem>
           </SelectContent>
         </Select>
       </div>

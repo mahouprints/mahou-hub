@@ -45,7 +45,12 @@ type VendaListada = Venda & {
   produto: { nome: string; filamento: { nome: string } };
 };
 
-const CANAL_LABEL = { SHOPEE: 'Shopee', ML: 'Mercado Livre', SITE: 'Site próprio' };
+const CANAL_LABEL = {
+  SHOPEE: 'Shopee',
+  ML: 'Mercado Livre',
+  SITE: 'Site próprio',
+  TIKTOK: 'TikTok Shop',
+};
 const TODOS = '__todos__';
 
 export default function VendasPage() {
@@ -127,6 +132,7 @@ export default function VendasPage() {
                   <SelectItem value="SHOPEE">Shopee</SelectItem>
                   <SelectItem value="ML">Mercado Livre</SelectItem>
                   <SelectItem value="SITE">Site próprio</SelectItem>
+                  <SelectItem value="TIKTOK">TikTok Shop</SelectItem>
                 </SelectContent>
               </Select>
             </div>

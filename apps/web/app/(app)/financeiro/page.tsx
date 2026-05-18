@@ -103,6 +103,7 @@ function CanaisCard({ resumo }: { resumo: ResumoFinanceiro }) {
   const canais: Array<{ nome: string; key: keyof ResumoFinanceiro['porCanal'] }> = [
     { nome: 'Shopee', key: 'SHOPEE' },
     { nome: 'Mercado Livre', key: 'ML' },
+    { nome: 'TikTok Shop', key: 'TIKTOK' },
     { nome: 'Site próprio', key: 'SITE' },
   ];
 

@@ -26,7 +26,8 @@ function ProdutoNovoContent() {
     precoReais: searchParams.get('precoCentavos')
       ? (Number(searchParams.get('precoCentavos')) / 100).toFixed(2).replace('.', ',')
       : '',
-    canalPrincipal: (searchParams.get('canalPrincipal') as 'SHOPEE' | 'ML' | 'SITE') ?? 'SHOPEE',
+    canalPrincipal:
+      (searchParams.get('canalPrincipal') as 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK') ?? 'SHOPEE',
   };
 
   return (

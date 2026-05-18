@@ -17,6 +17,7 @@ enum Canal {
   SHOPEE
   ML
   SITE
+  TIKTOK
 }
 
 enum VendedorShopeeTipo {
@@ -167,6 +168,12 @@ model Parametro {
   comissaoMlPct          Decimal            @db.Decimal(5, 2)
   impostoAtivo           Boolean            @default(false)
   impostoPct             Decimal            @db.Decimal(5, 2)
+  // Taxas do TikTok Shop são percentuais simples (sem faixa por preço).
+  // Defaults batem com a estrutura padrão (jul/2026): comissão+SFP+afiliado+pagamento.
+  tiktokComissaoPlataformaPct Decimal       @default(6.00) @db.Decimal(5, 2)
+  tiktokTaxaSfpPct            Decimal       @default(6.00) @db.Decimal(5, 2)
+  tiktokComissaoAfiliadoPct   Decimal       @default(30.00) @db.Decimal(5, 2)
+  tiktokTaxaPagamentoPct      Decimal       @default(3.00) @db.Decimal(5, 2)
   margemThresholdVerde   Decimal            @default(0.30) @db.Decimal(4, 3)
   margemThresholdAmarelo Decimal            @default(0.15) @db.Decimal(4, 3)
   atualizadoEm           DateTime           @updatedAt

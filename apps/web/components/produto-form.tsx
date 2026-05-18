@@ -64,7 +64,7 @@ interface FormState {
   impressora: 'A1' | 'H2C';
   embalagemReais: string;
   precoReais: string;
-  canalPrincipal: 'SHOPEE' | 'ML' | 'SITE';
+  canalPrincipal: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
   insumos: InsumoLinha[];
 }
 
@@ -360,6 +360,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
                     <SelectItem value="SHOPEE">Shopee</SelectItem>
                     <SelectItem value="ML">Mercado Livre</SelectItem>
                     <SelectItem value="SITE">Site próprio</SelectItem>
+                    <SelectItem value="TIKTOK">TikTok Shop</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -422,10 +423,16 @@ function Preview({
   preview: CalcularOutput;
   thresholdVerde: number;
   thresholdAmarelo: number;
-  canal: 'SHOPEE' | 'ML' | 'SITE';
+  canal: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
 }) {
   const margemPrincipal =
-    canal === 'SHOPEE' ? preview.margemShopee : canal === 'ML' ? preview.margemMl : preview.margemSite;
+    canal === 'SHOPEE'
+      ? preview.margemShopee
+      : canal === 'ML'
+        ? preview.margemMl
+        : canal === 'TIKTOK'
+          ? preview.margemTikTok
+          : preview.margemSite;
   const variant: 'success' | 'warning' | 'danger' =
     margemPrincipal >= thresholdVerde ? 'success' : margemPrincipal >= thresholdAmarelo ? 'warning' : 'danger';
   const label =
@@ -445,13 +452,17 @@ function Preview({
         <Linha rotulo="Imposto" valor={centavosParaReais(preview.impostoCentavos)} />
         <Linha rotulo="Taxa Shopee" valor={centavosParaReais(preview.taxaShopeeCentavos)} />
         <Linha rotulo="Taxa ML" valor={centavosParaReais(preview.taxaMlCentavos)} />
+        <Linha rotulo="Taxa TikTok" valor={centavosParaReais(preview.taxaTikTokCentavos)} />
         <Linha rotulo="Liq. Shopee" valor={centavosParaReais(preview.liquidoShopeeCentavos)} destaque={canal === 'SHOPEE'} />
         <Linha rotulo="Liq. ML" valor={centavosParaReais(preview.liquidoMlCentavos)} destaque={canal === 'ML'} />
         <Linha rotulo="Liq. Site" valor={centavosParaReais(preview.liquidoSiteCentavos)} destaque={canal === 'SITE'} />
+        <Linha rotulo="Liq. TikTok" valor={centavosParaReais(preview.liquidoTikTokCentavos)} destaque={canal === 'TIKTOK'} />
         <Linha rotulo="Margem Shopee" valor={pct(preview.margemShopee)} />
         <Linha rotulo="Margem ML" valor={pct(preview.margemMl)} />
+        <Linha rotulo="Margem TikTok" valor={pct(preview.margemTikTok)} />
         <Linha rotulo="Lucro/h Shopee" valor={centavosParaReais(preview.lucroPorHoraShopeeCentavos)} />
         <Linha rotulo="Lucro/h ML" valor={centavosParaReais(preview.lucroPorHoraMlCentavos)} />
+        <Linha rotulo="Lucro/h TikTok" valor={centavosParaReais(preview.lucroPorHoraTikTokCentavos)} />
       </dl>
     </div>
   );

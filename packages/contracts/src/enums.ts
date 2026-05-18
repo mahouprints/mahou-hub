@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const ImpressoraEnum = z.enum(['A1', 'H2C']);
-export const CanalEnum = z.enum(['SHOPEE', 'ML', 'SITE']);
+export const CanalEnum = z.enum(['SHOPEE', 'ML', 'SITE', 'TIKTOK']);
 export const VendedorShopeeEnum = z.enum(['CNPJ', 'CPF_BAIXO', 'CPF_ALTO']);
 export const OrigemEnum = z.enum(['ML', 'SHOPEE', 'SITE', 'ESTOQUE']);
 export const JobStatusEnum = z.enum([

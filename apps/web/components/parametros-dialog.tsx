@@ -38,6 +38,10 @@ interface FormState {
   comissaoMlPct: string;
   impostoAtivo: boolean;
   impostoPct: string;
+  tiktokComissaoPlataformaPct: string;
+  tiktokTaxaSfpPct: string;
+  tiktokComissaoAfiliadoPct: string;
+  tiktokTaxaPagamentoPct: string;
   margemThresholdVerdePct: string;
   margemThresholdAmareloPct: string;
 }
@@ -62,6 +66,10 @@ export function ParametrosDialog({ open, onOpenChange, parametros }: Props) {
       comissaoMlPct: paraStr(Number(parametros.comissaoMlPct), 2),
       impostoAtivo: parametros.impostoAtivo,
       impostoPct: paraStr(Number(parametros.impostoPct), 2),
+      tiktokComissaoPlataformaPct: paraStr(Number(parametros.tiktokComissaoPlataformaPct), 2),
+      tiktokTaxaSfpPct: paraStr(Number(parametros.tiktokTaxaSfpPct), 2),
+      tiktokComissaoAfiliadoPct: paraStr(Number(parametros.tiktokComissaoAfiliadoPct), 2),
+      tiktokTaxaPagamentoPct: paraStr(Number(parametros.tiktokTaxaPagamentoPct), 2),
       margemThresholdVerdePct: paraStr(Number(parametros.margemThresholdVerde) * 100, 0),
       margemThresholdAmareloPct: paraStr(Number(parametros.margemThresholdAmarelo) * 100, 0),
     });
@@ -82,6 +90,10 @@ export function ParametrosDialog({ open, onOpenChange, parametros }: Props) {
         comissaoMlPct: parseDecimalBr(form.comissaoMlPct),
         impostoAtivo: form.impostoAtivo,
         impostoPct: parseDecimalBr(form.impostoPct),
+        tiktokComissaoPlataformaPct: parseDecimalBr(form.tiktokComissaoPlataformaPct),
+        tiktokTaxaSfpPct: parseDecimalBr(form.tiktokTaxaSfpPct),
+        tiktokComissaoAfiliadoPct: parseDecimalBr(form.tiktokComissaoAfiliadoPct),
+        tiktokTaxaPagamentoPct: parseDecimalBr(form.tiktokTaxaPagamentoPct),
         margemThresholdVerde: parseDecimalBr(form.margemThresholdVerdePct) / 100,
         margemThresholdAmarelo: parseDecimalBr(form.margemThresholdAmareloPct) / 100,
       };
@@ -189,6 +201,56 @@ export function ParametrosDialog({ open, onOpenChange, parametros }: Props) {
                 value={form.impostoPct}
                 onChange={(s) => setForm({ ...form, impostoPct: s })}
               />
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <div className="flex items-baseline justify-between">
+              <Label className="text-sm font-medium">Taxas TikTok Shop (%)</Label>
+              <span className="text-xs text-muted-foreground tabular-nums">
+                Total{' '}
+                <span className="font-medium text-foreground">
+                  {(
+                    (parseDecimalBr(form.tiktokComissaoPlataformaPct) || 0) +
+                    (parseDecimalBr(form.tiktokTaxaSfpPct) || 0) +
+                    (parseDecimalBr(form.tiktokComissaoAfiliadoPct) || 0) +
+                    (parseDecimalBr(form.tiktokTaxaPagamentoPct) || 0)
+                  )
+                    .toFixed(2)
+                    .replace('.', ',')}
+                  %
+                </span>
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Comissão plataforma</Label>
+                <InputDecimal
+                  value={form.tiktokComissaoPlataformaPct}
+                  onChange={(s) => setForm({ ...form, tiktokComissaoPlataformaPct: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">SFP (frete subsidiado)</Label>
+                <InputDecimal
+                  value={form.tiktokTaxaSfpPct}
+                  onChange={(s) => setForm({ ...form, tiktokTaxaSfpPct: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Comissão afiliado</Label>
+                <InputDecimal
+                  value={form.tiktokComissaoAfiliadoPct}
+                  onChange={(s) => setForm({ ...form, tiktokComissaoAfiliadoPct: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Processamento pagamento</Label>
+                <InputDecimal
+                  value={form.tiktokTaxaPagamentoPct}
+                  onChange={(s) => setForm({ ...form, tiktokTaxaPagamentoPct: s })}
+                />
+              </div>
             </div>
           </div>
 

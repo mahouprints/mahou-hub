@@ -42,11 +42,12 @@ type ProdutoComFilamento = Produto & {
     insumo: { id: string; nome: string; unidade: string; custoUnitarioCentavos: number };
   }>;
 };
-type Canal = 'SHOPEE' | 'ML' | 'SITE';
+type Canal = 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
 const CANAL_LABEL: Record<Canal, string> = {
   SHOPEE: 'Shopee',
   ML: 'Mercado Livre',
   SITE: 'Site próprio',
+  TIKTOK: 'TikTok Shop',
 };
 
 export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
@@ -289,7 +290,9 @@ function PricingBreakdown({
       ? pricing.margemShopee
       : canal === 'ML'
         ? pricing.margemMl
-        : pricing.margemSite;
+        : canal === 'TIKTOK'
+          ? pricing.margemTikTok
+          : pricing.margemSite;
   const veredito = vereditoDe(margemPrincipal, thresholdVerde, thresholdAmarelo);
   const insumosTotalCentavos = insumos.reduce(
     (acc, pi) => acc + Math.round(Number(pi.qtd) * pi.insumo.custoUnitarioCentavos),
@@ -315,8 +318,15 @@ function PricingBreakdown({
       key: 'SITE',
       liquidoCentavos: pricing.liquidoSiteCentavos,
       margem: pricing.margemSite,
-      lucroHCentavos: null, // pricing não expõe lucro/h pro site (sem taxa)
+      lucroHCentavos: pricing.lucroPorHoraSiteCentavos,
       taxaCentavos: 0,
+    },
+    {
+      key: 'TIKTOK',
+      liquidoCentavos: pricing.liquidoTikTokCentavos,
+      margem: pricing.margemTikTok,
+      lucroHCentavos: pricing.lucroPorHoraTikTokCentavos,
+      taxaCentavos: pricing.taxaTikTokCentavos,
     },
   ];
 
@@ -391,7 +401,7 @@ function PricingBreakdown({
             Preço de venda: {centavosParaReais(precoCentavos)}
           </span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {canais.map((c) => (
             <CanalCard
               key={c.key}

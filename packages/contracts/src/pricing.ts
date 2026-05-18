@@ -25,15 +25,19 @@ export const CalcularOutputSchema = z.object({
   impostoCentavos: z.number().int(),
   taxaShopeeCentavos: z.number().int(),
   taxaMlCentavos: z.number().int(),
+  taxaTikTokCentavos: z.number().int(),
   liquidoShopeeCentavos: z.number().int(),
   liquidoMlCentavos: z.number().int(),
   liquidoSiteCentavos: z.number().int(),
+  liquidoTikTokCentavos: z.number().int(),
   margemShopee: z.number(),
   margemMl: z.number(),
   margemSite: z.number(),
+  margemTikTok: z.number(),
   lucroPorHoraShopeeCentavos: z.number().int(),
   lucroPorHoraMlCentavos: z.number().int(),
   lucroPorHoraSiteCentavos: z.number().int(),
+  lucroPorHoraTikTokCentavos: z.number().int(),
 });
 
 export const SimularInputSchema = z.object({

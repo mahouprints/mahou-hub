@@ -49,7 +49,9 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
   const [precoReais, setPrecoReais] = useState(
     venda ? (venda.precoUnitarioCentavos / 100).toFixed(2).replace('.', ',') : '',
   );
-  const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE'>(venda?.canal ?? 'SHOPEE');
+  const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK'>(
+    venda?.canal ?? 'SHOPEE',
+  );
   const [dataVenda, setDataVenda] = useState<Date | undefined>(
     venda ? new Date(venda.dataVenda) : new Date(),
   );
@@ -158,6 +160,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
                   <SelectItem value="SHOPEE">Shopee</SelectItem>
                   <SelectItem value="ML">Mercado Livre</SelectItem>
                   <SelectItem value="SITE">Site próprio</SelectItem>
+                  <SelectItem value="TIKTOK">TikTok Shop</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -46,7 +46,7 @@ const ESTADO_INICIAL: FormState = {
 export default function CalculadoraPage() {
   const [form, setForm] = useState<FormState>(ESTADO_INICIAL);
   const [resultado, setResultado] = useState<CalcularOutput | null>(null);
-  const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE'>('SHOPEE');
+  const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK'>('SHOPEE');
   const [erro, setErro] = useState<string | null>(null);
 
   const { data: filamentos } = useQuery({
@@ -233,8 +233,8 @@ function Resultado({
   onSalvar,
 }: {
   resultado: CalcularOutput | null;
-  canal: 'SHOPEE' | 'ML' | 'SITE';
-  onCanalChange: (c: 'SHOPEE' | 'ML' | 'SITE') => void;
+  canal: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
+  onCanalChange: (c: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK') => void;
   thresholds: { verde: number; amarelo: number };
   onSalvar: () => void;
 }) {
@@ -244,21 +244,27 @@ function Resultado({
       ? resultado.liquidoShopeeCentavos
       : canal === 'ML'
         ? resultado.liquidoMlCentavos
-        : resultado.liquidoSiteCentavos;
+        : canal === 'TIKTOK'
+          ? resultado.liquidoTikTokCentavos
+          : resultado.liquidoSiteCentavos;
   const margem = !resultado
     ? undefined
     : canal === 'SHOPEE'
       ? resultado.margemShopee
       : canal === 'ML'
         ? resultado.margemMl
-        : resultado.margemSite;
+        : canal === 'TIKTOK'
+          ? resultado.margemTikTok
+          : resultado.margemSite;
   const lucroHora = !resultado
     ? undefined
     : canal === 'SHOPEE'
       ? resultado.lucroPorHoraShopeeCentavos
       : canal === 'ML'
         ? resultado.lucroPorHoraMlCentavos
-        : resultado.lucroPorHoraSiteCentavos;
+        : canal === 'TIKTOK'
+          ? resultado.lucroPorHoraTikTokCentavos
+          : resultado.lucroPorHoraSiteCentavos;
 
   const variantBadge: 'success' | 'warning' | 'danger' | 'outline' =
     margem == null
@@ -284,7 +290,7 @@ function Resultado({
           {label}
         </Badge>
         <div className="flex gap-2">
-          {(['SHOPEE', 'ML', 'SITE'] as const).map((c) => (
+          {(['SHOPEE', 'ML', 'SITE', 'TIKTOK'] as const).map((c) => (
             <Button
               key={c}
               size="sm"
@@ -307,6 +313,9 @@ function Resultado({
         )}
         {canal === 'ML' && (
           <Linha rotulo="Taxa ML" valor={valorOuVazio(resultado?.taxaMlCentavos)} />
+        )}
+        {canal === 'TIKTOK' && (
+          <Linha rotulo="Taxa TikTok" valor={valorOuVazio(resultado?.taxaTikTokCentavos)} />
         )}
         <Linha rotulo="Líquido" valor={valorOuVazio(liquido)} destaque />
         <Linha rotulo="Margem" valor={margem == null ? VAZIO : pct(margem)} destaque />

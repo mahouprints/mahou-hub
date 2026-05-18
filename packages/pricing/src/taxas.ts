@@ -91,3 +91,17 @@ export function taxaMercadoLivreCentavos(
   const fixaOuAlternativo = Math.max(faixa.custoFixoCentavos, alternativo);
   return arredondarCentavos(comissao + fixaOuAlternativo);
 }
+
+/**
+ * Taxa total do TikTok Shop: soma dos 4 percentuais (comissão plataforma + SFP +
+ * comissão afiliado + processamento de pagamento) aplicados sobre o preço.
+ * Sem faixa por preço — todos os percentuais vêm direto de ParametrosGlobais.
+ */
+export function taxaTikTokCentavos(precoCentavos: number, parametros: ParametrosGlobais): number {
+  const pctTotal =
+    parametros.tiktokComissaoPlataformaPct +
+    parametros.tiktokTaxaSfpPct +
+    parametros.tiktokComissaoAfiliadoPct +
+    parametros.tiktokTaxaPagamentoPct;
+  return arredondarCentavos(precoCentavos * (pctTotal / 100));
+}

@@ -46,7 +46,7 @@ export class FinanceiroService {
       taxasMarketplaceCentavos: 0,
       lucroLiquidoCentavos: 0,
       margem: 0,
-      porCanal: { SHOPEE: 0, ML: 0, SITE: 0 },
+      porCanal: { SHOPEE: 0, ML: 0, SITE: 0, TIKTOK: 0 },
       qtdVendas: vendas.length,
       qtdItensVendidos: 0,
     };
@@ -82,7 +82,9 @@ export class FinanceiroService {
           ? calc.taxaShopeeCentavos
           : v.canal === 'ML'
             ? calc.taxaMlCentavos
-            : 0;
+            : v.canal === 'TIKTOK'
+              ? calc.taxaTikTokCentavos
+              : 0;
 
       // custoTotalProducao já inclui insumos — subtraímos pra não duplicar.
       const custoVariavelUnit = calc.custoTotalProducaoCentavos - custoInsumosUnit;
@@ -125,6 +127,10 @@ export class FinanceiroService {
       comissaoMlPct: Number(p.comissaoMlPct),
       impostoAtivo: p.impostoAtivo,
       impostoPct: Number(p.impostoPct),
+      tiktokComissaoPlataformaPct: Number(p.tiktokComissaoPlataformaPct),
+      tiktokTaxaSfpPct: Number(p.tiktokTaxaSfpPct),
+      tiktokComissaoAfiliadoPct: Number(p.tiktokComissaoAfiliadoPct),
+      tiktokTaxaPagamentoPct: Number(p.tiktokTaxaPagamentoPct),
     };
   }
 

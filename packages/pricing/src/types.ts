@@ -42,6 +42,11 @@ export interface ParametrosGlobais {
   comissaoMlPct: number;
   impostoAtivo: boolean;
   impostoPct: number;
+  /** Taxas do TikTok Shop — todas percentuais simples, somam pra dar taxa total. */
+  tiktokComissaoPlataformaPct: number;
+  tiktokTaxaSfpPct: number;
+  tiktokComissaoAfiliadoPct: number;
+  tiktokTaxaPagamentoPct: number;
 }
 
 export interface CalculoEntrada {
@@ -65,13 +70,17 @@ export interface CalculoSaida {
   impostoCentavos: number;
   taxaShopeeCentavos: number;
   taxaMlCentavos: number;
+  taxaTikTokCentavos: number;
   liquidoShopeeCentavos: number;
   liquidoMlCentavos: number;
   liquidoSiteCentavos: number;
+  liquidoTikTokCentavos: number;
   margemShopee: number;
   margemMl: number;
   margemSite: number;
+  margemTikTok: number;
   lucroPorHoraShopeeCentavos: number;
   lucroPorHoraMlCentavos: number;
   lucroPorHoraSiteCentavos: number;
+  lucroPorHoraTikTokCentavos: number;
 }

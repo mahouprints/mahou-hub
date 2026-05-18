@@ -108,6 +108,10 @@ export class PricingService {
       comissaoMlPct: Number(p.comissaoMlPct),
       impostoAtivo: p.impostoAtivo,
       impostoPct: Number(p.impostoPct),
+      tiktokComissaoPlataformaPct: Number(p.tiktokComissaoPlataformaPct),
+      tiktokTaxaSfpPct: Number(p.tiktokTaxaSfpPct),
+      tiktokComissaoAfiliadoPct: Number(p.tiktokComissaoAfiliadoPct),
+      tiktokTaxaPagamentoPct: Number(p.tiktokTaxaPagamentoPct),
     };
   }
 

@@ -1,6 +1,6 @@
 import type { CalculoEntrada, CalculoSaida } from './types';
 import { custoEnergiaCentavos, custoFilamentoCentavos } from './custos';
-import { taxaMercadoLivreCentavos, taxaShopeeCentavos } from './taxas';
+import { taxaMercadoLivreCentavos, taxaShopeeCentavos, taxaTikTokCentavos } from './taxas';
 import { arredondarCentavos } from './money';
 
 /**
@@ -41,10 +41,12 @@ export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
 
   const taxaShopee = taxaShopeeCentavos(precoCentavos, parametros, entrada.tabelaShopee);
   const taxaMl = taxaMercadoLivreCentavos(precoCentavos, parametros, entrada.tabelaMercadoLivre);
+  const taxaTikTok = taxaTikTokCentavos(precoCentavos, parametros);
 
   const liquidoShopee = precoCentavos - custoTotalProducao - imposto - taxaShopee;
   const liquidoMl = precoCentavos - custoTotalProducao - imposto - taxaMl;
   const liquidoSite = precoCentavos - custoTotalProducao - imposto;
+  const liquidoTikTok = precoCentavos - custoTotalProducao - imposto - taxaTikTok;
 
   return {
     custoFilamentoCentavos: custoFilamento,
@@ -53,14 +55,18 @@ export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
     impostoCentavos: imposto,
     taxaShopeeCentavos: taxaShopee,
     taxaMlCentavos: taxaMl,
+    taxaTikTokCentavos: taxaTikTok,
     liquidoShopeeCentavos: liquidoShopee,
     liquidoMlCentavos: liquidoMl,
     liquidoSiteCentavos: liquidoSite,
+    liquidoTikTokCentavos: liquidoTikTok,
     margemShopee: precoCentavos === 0 ? 0 : liquidoShopee / precoCentavos,
     margemMl: precoCentavos === 0 ? 0 : liquidoMl / precoCentavos,
     margemSite: precoCentavos === 0 ? 0 : liquidoSite / precoCentavos,
+    margemTikTok: precoCentavos === 0 ? 0 : liquidoTikTok / precoCentavos,
     lucroPorHoraShopeeCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoShopee / tempoH),
     lucroPorHoraMlCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoMl / tempoH),
     lucroPorHoraSiteCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoSite / tempoH),
+    lucroPorHoraTikTokCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoTikTok / tempoH),
   };
 }

@@ -14,6 +14,7 @@ export const ResumoFinanceiroSchema = z.object({
     SHOPEE: z.number().int(),
     ML: z.number().int(),
     SITE: z.number().int(),
+    TIKTOK: z.number().int(),
   }),
   qtdVendas: z.number().int().nonnegative(),
   qtdItensVendidos: z.number().int().nonnegative(),

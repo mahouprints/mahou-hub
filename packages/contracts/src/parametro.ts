@@ -10,6 +10,11 @@ export const ParametroSchema = z.object({
   comissaoMlPct: z.number().nonnegative(),
   impostoAtivo: z.boolean(),
   impostoPct: z.number().nonnegative(),
+  // Taxas do TikTok Shop são percentuais constantes (sem faixa por preço).
+  tiktokComissaoPlataformaPct: z.number().nonnegative().default(6),
+  tiktokTaxaSfpPct: z.number().nonnegative().default(6),
+  tiktokComissaoAfiliadoPct: z.number().nonnegative().default(30),
+  tiktokTaxaPagamentoPct: z.number().nonnegative().default(3),
   margemThresholdVerde: z.number().min(0).max(1).default(0.3),
   margemThresholdAmarelo: z.number().min(0).max(1).default(0.15),
 });
