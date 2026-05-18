@@ -4,7 +4,17 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Box, CheckSquare, ExternalLink, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  Box,
+  Check,
+  CheckSquare,
+  Circle,
+  ExternalLink,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import type { CalcularOutput, Filamento, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
@@ -69,7 +79,10 @@ type ColunaSort =
   | 'imposto'
   | 'liquido'
   | 'margem'
-  | 'lucroH';
+  | 'lucroH'
+  | 'anunciado';
+
+type FiltroAnunciado = 'todos' | 'sim' | 'nao';
 
 /**
  * Escolhe o canal entre marketplaces (Shopee × ML) com maior líquido por peça.
@@ -108,6 +121,7 @@ export default function ProdutosPage() {
   const [filtroFilamento, setFiltroFilamento] = useState(TODOS);
   const [filtroCanal, setFiltroCanal] = useState(TODOS);
   const [filtroImpressora, setFiltroImpressora] = useState(TODOS);
+  const [filtroAnunciado, setFiltroAnunciado] = useState<FiltroAnunciado>('todos');
 
   const sort = useTableSort<ProdutoComPricing, ColunaSort>({
     nome: (p) => p.nome,
@@ -119,6 +133,7 @@ export default function ProdutosPage() {
     liquido: (p) => melhorCanalMarketplace(p).liquidoCentavos,
     margem: (p) => melhorCanalMarketplace(p).margem,
     lucroH: (p) => melhorCanalMarketplace(p).lucroPorHoraCentavos,
+    anunciado: (p) => (p.anunciado ? 1 : 0),
   });
 
   const filtrados = useMemo(() => {
@@ -127,10 +142,12 @@ export default function ProdutosPage() {
       if (filtroFilamento !== TODOS && p.filamentoId !== filtroFilamento) return false;
       if (filtroCanal !== TODOS && p.canalPrincipal !== filtroCanal) return false;
       if (filtroImpressora !== TODOS && p.impressora !== filtroImpressora) return false;
+      if (filtroAnunciado === 'sim' && !p.anunciado) return false;
+      if (filtroAnunciado === 'nao' && p.anunciado) return false;
       return true;
     });
     return sort.ordenar(f);
-  }, [data, filtroFilamento, filtroCanal, filtroImpressora, sort]);
+  }, [data, filtroFilamento, filtroCanal, filtroImpressora, filtroAnunciado, sort]);
 
   const idsVisiveis = useMemo(() => filtrados.map((p) => p.id), [filtrados]);
   const sel = useTableSelection(idsVisiveis);
@@ -142,6 +159,20 @@ export default function ProdutosPage() {
       qc.invalidateQueries({ queryKey: ['produtos'] });
       sel.acoes.limpar();
       toast.success(`${resp.count} ${resp.count === 1 ? 'produto excluído' : 'produtos excluídos'}`);
+    },
+  });
+
+  const bulkAnunciar = useMutation({
+    mutationFn: (vars: { ids: string[]; anunciado: boolean }) =>
+      apiFetch<{ count: number }>('/produtos/bulk-anunciar', {
+        method: 'POST',
+        json: vars,
+      }),
+    onSuccess: (resp, vars) => {
+      qc.invalidateQueries({ queryKey: ['produtos'] });
+      sel.acoes.limpar();
+      const verbo = vars.anunciado ? 'anunciados' : 'pendentes';
+      toast.success(`${resp.count} produto(s) marcado(s) como ${verbo}`);
     },
   });
 
@@ -180,6 +211,8 @@ export default function ProdutosPage() {
         setFiltroCanal={setFiltroCanal}
         filtroImpressora={filtroImpressora}
         setFiltroImpressora={setFiltroImpressora}
+        filtroAnunciado={filtroAnunciado}
+        setFiltroAnunciado={setFiltroAnunciado}
       />
 
       <SelectionToolbar
@@ -188,6 +221,30 @@ export default function ProdutosPage() {
         excluindo={bulkDelete.isPending}
         onLimpar={sel.acoes.limpar}
         onExcluir={() => bulkDelete.mutateAsync([...sel.selecionados])}
+        acoesExtras={
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                bulkAnunciar.mutate({ ids: [...sel.selecionados], anunciado: true })
+              }
+              disabled={bulkAnunciar.isPending}
+            >
+              <Check className="h-3.5 w-3.5" /> Marcar anunciados
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                bulkAnunciar.mutate({ ids: [...sel.selecionados], anunciado: false })
+              }
+              disabled={bulkAnunciar.isPending}
+            >
+              <Circle className="h-3.5 w-3.5" /> Marcar pendentes
+            </Button>
+          </>
+        }
       />
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
@@ -288,6 +345,9 @@ export default function ProdutosPage() {
                 >
                   Lucro/h
                 </SortableHead>
+                <SortableHead chave="anunciado" estado={sort.estado} onClick={sort.alternar}>
+                  Status
+                </SortableHead>
                 <TableHead className="w-36 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -338,6 +398,11 @@ export default function ProdutosPage() {
                     <TableCell className="text-right tabular-nums font-medium">
                       {centavosParaReais(melhor.lucroPorHoraCentavos)}
                     </TableCell>
+                    <TableCell>
+                      <Badge variant={p.anunciado ? 'success' : 'default'} className="font-normal">
+                        {p.anunciado ? 'Anunciado' : 'Pendente'}
+                      </Badge>
+                    </TableCell>
                     <TableCell
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -355,7 +420,7 @@ export default function ProdutosPage() {
               {filtrados.length === 0 && data.length > 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={sel.modoSelecao ? 11 : 10}
+                    colSpan={sel.modoSelecao ? 12 : 11}
                     className="text-center text-sm text-muted-foreground"
                   >
                     Nenhum produto bate com os filtros atuais.
@@ -378,6 +443,8 @@ function FiltrosBar({
   setFiltroCanal,
   filtroImpressora,
   setFiltroImpressora,
+  filtroAnunciado,
+  setFiltroAnunciado,
 }: {
   filamentos: Filamento[];
   filtroFilamento: string;
@@ -386,9 +453,11 @@ function FiltrosBar({
   setFiltroCanal: (v: string) => void;
   filtroImpressora: string;
   setFiltroImpressora: (v: string) => void;
+  filtroAnunciado: FiltroAnunciado;
+  setFiltroAnunciado: (v: FiltroAnunciado) => void;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <div className="space-y-1.5">
         <Label className="text-xs uppercase text-muted-foreground">Filamento</Label>
         <Select value={filtroFilamento} onValueChange={setFiltroFilamento}>
@@ -430,6 +499,22 @@ function FiltrosBar({
             <SelectItem value={TODOS}>Todas as impressoras</SelectItem>
             <SelectItem value="A1">A1</SelectItem>
             <SelectItem value="H2C">H2C</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs uppercase text-muted-foreground">Anunciado</Label>
+        <Select
+          value={filtroAnunciado}
+          onValueChange={(v) => setFiltroAnunciado(v as FiltroAnunciado)}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="nao">Pendentes</SelectItem>
+            <SelectItem value="sim">Anunciados</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -26,6 +26,7 @@ import { FilamentoDialog } from '@/components/filamento-dialog';
 import { TaxaShopeeDialog } from '@/components/taxa-shopee-dialog';
 import { TaxaMlDialog } from '@/components/taxa-ml-dialog';
 import { ParametrosDialog } from '@/components/parametros-dialog';
+import { ApiTokenCard } from '@/components/api-token-card';
 
 export default function ConfiguracoesPage() {
   const parametros = useQuery({
@@ -252,6 +253,8 @@ export default function ConfiguracoesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <ApiTokenCard />
 
       <ParametrosDialog
         open={paramsDialog}

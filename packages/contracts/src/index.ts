@@ -1,6 +1,7 @@
 export * from './common';
 export * from './enums';
 export * from './filamento';
+export * from './imagem';
 export * from './insumo';
 export * from './produto';
 export * from './parametro';

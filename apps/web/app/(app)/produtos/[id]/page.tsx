@@ -2,11 +2,14 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   Box,
   Calendar,
+  Check,
+  Circle,
   ExternalLink,
   Factory,
   Pencil,
@@ -19,6 +22,7 @@ import type {
   EstatisticasProduto,
   Parametro,
   Produto,
+  ProdutoImagem,
 } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
@@ -32,6 +36,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { ImagensSection } from '@/components/imagens-section';
 
 type ProdutoComFilamento = Produto & {
   filamento: { id: string; nome: string };
@@ -41,6 +46,7 @@ type ProdutoComFilamento = Produto & {
     qtd: number | string;
     insumo: { id: string; nome: string; unidade: string; custoUnitarioCentavos: number };
   }>;
+  imagens: ProdutoImagem[];
 };
 type Canal = 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
 const CANAL_LABEL: Record<Canal, string> = {
@@ -52,10 +58,21 @@ const CANAL_LABEL: Record<Canal, string> = {
 
 export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const qc = useQueryClient();
 
   const { data: produto, isLoading } = useQuery({
     queryKey: ['produto', id],
     queryFn: () => apiFetch<ProdutoComFilamento>(`/produtos/${id}`),
+  });
+
+  const toggleAnunciado = useMutation({
+    mutationFn: (anunciado: boolean) =>
+      apiFetch(`/produtos/${id}`, { method: 'PATCH', json: { anunciado } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['produto', id] });
+      qc.invalidateQueries({ queryKey: ['produtos'] });
+      toast.success(produto?.anunciado ? 'Marcado como pendente' : 'Marcado como anunciado');
+    },
   });
 
   const custoInsumosCentavos =
@@ -109,19 +126,52 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
             <Badge variant="default">{produto.filamento.nome}</Badge>
             <Badge variant="default">{produto.impressora}</Badge>
             <Badge variant="default">{CANAL_LABEL[produto.canalPrincipal]}</Badge>
+            <Badge variant={produto.anunciado ? 'success' : 'default'}>
+              {produto.anunciado ? 'Anunciado' : 'Pendente'}
+            </Badge>
           </div>
         </div>
-        <Button asChild>
-          <Link href={`/produtos/${id}/editar`}>
-            <Pencil className="h-4 w-4" /> Editar
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={produto.anunciado ? 'outline' : 'default'}
+            onClick={() => toggleAnunciado.mutate(!produto.anunciado)}
+            disabled={toggleAnunciado.isPending}
+          >
+            {produto.anunciado ? (
+              <>
+                <Circle className="h-4 w-4" /> Marcar como pendente
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" /> Marcar como anunciado
+              </>
+            )}
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={`/produtos/${id}/editar`}>
+              <Pencil className="h-4 w-4" /> Editar
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <EspecificacoesCard produto={produto} />
         <EstatisticasCard stats={stats} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Imagens</CardTitle>
+          <CardDescription>
+            Referências usadas no fluxo de geração de imagem ({produto.imagens.length}{' '}
+            {produto.imagens.length === 1 ? 'imagem' : 'imagens'})
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ImagensSection produtoId={id} imagens={produto.imagens} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

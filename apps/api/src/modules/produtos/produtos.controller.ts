@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { z } from 'zod';
 import {
   BulkDeleteSchema,
   ProdutoCreateSchema,
@@ -11,14 +22,21 @@ import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { ProdutosService } from './produtos.service';
 
+const BulkAnunciarSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(500),
+  anunciado: z.boolean(),
+});
+type BulkAnunciar = z.infer<typeof BulkAnunciarSchema>;
+
 @UseGuards(JwtAuthGuard)
 @Controller('produtos')
 export class ProdutosController {
   constructor(private readonly service: ProdutosService) {}
 
   @Get()
-  list() {
-    return this.service.list();
+  list(@Query('anunciado') anunciado?: string) {
+    const filtro = anunciado === 'true' ? true : anunciado === 'false' ? false : undefined;
+    return this.service.list({ anunciado: filtro });
   }
 
   @Get(':id')
@@ -52,5 +70,10 @@ export class ProdutosController {
   @Post('bulk-delete')
   bulkDelete(@Body(new ZodValidationPipe(BulkDeleteSchema)) data: BulkDelete) {
     return this.service.desativarMuitos(data.ids);
+  }
+
+  @Post('bulk-anunciar')
+  bulkAnunciar(@Body(new ZodValidationPipe(BulkAnunciarSchema)) data: BulkAnunciar) {
+    return this.service.marcarAnunciados(data.ids, data.anunciado);
   }
 }

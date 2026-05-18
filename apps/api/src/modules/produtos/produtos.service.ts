@@ -8,17 +8,32 @@ import {
 } from '@mahou-hub/pricing';
 import type { ProdutoCreate, ProdutoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ImagensService } from '../imagens/imagens.service';
 
 @Injectable()
 export class ProdutosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly imagens: ImagensService,
+  ) {}
 
-  /** Lista produtos com o breakdown completo de pricing já calculado. */
-  async list() {
+  /**
+   * Lista produtos com pricing já calculado. Filtros opcionais:
+   * - `anunciado`: false retorna só pendentes (fluxo de geração de imagem
+   *   consume isso pra processar só o que ainda não foi publicado)
+   */
+  async list(filtros?: { anunciado?: boolean }) {
     const produtos = await this.prisma.produto.findMany({
-      where: { ativo: true },
+      where: {
+        ativo: true,
+        ...(filtros?.anunciado != null ? { anunciado: filtros.anunciado } : {}),
+      },
       orderBy: { criadoEm: 'desc' },
-      include: { filamento: true, insumos: { include: { insumo: true } } },
+      include: {
+        filamento: true,
+        insumos: { include: { insumo: true } },
+        imagens: { orderBy: { ordem: 'asc' } },
+      },
     });
     if (produtos.length === 0) return [];
 
@@ -31,6 +46,7 @@ export class ProdutosService {
       pesoG: Number(p.pesoG),
       tempoH: Number(p.tempoH),
       custoInsumosCentavos: somarCustoInsumos(p.insumos),
+      imagens: p.imagens.map((img) => this.imagens.paraDto(img)),
       pricing: calcularProduto({
         pesoG: Number(p.pesoG),
         tempoH: Number(p.tempoH),
@@ -54,10 +70,14 @@ export class ProdutosService {
   async get(id: string) {
     const p = await this.prisma.produto.findUnique({
       where: { id },
-      include: { filamento: true, insumos: { include: { insumo: true } } },
+      include: {
+        filamento: true,
+        insumos: { include: { insumo: true } },
+        imagens: { orderBy: { ordem: 'asc' } },
+      },
     });
     if (!p) throw new NotFoundException(`Produto ${id} não existe`);
-    return p;
+    return { ...p, imagens: p.imagens.map((img) => this.imagens.paraDto(img)) };
   }
 
   async create(data: ProdutoCreate) {
@@ -103,6 +123,18 @@ export class ProdutosService {
     const r = await this.prisma.produto.updateMany({
       where: { id: { in: ids } },
       data: { ativo: false },
+    });
+    return { ok: true, count: r.count };
+  }
+
+  /**
+   * Marca/desmarca produtos como anunciados em massa. Útil pro fluxo externo
+   * de geração de imagem confirmar publicações em batch.
+   */
+  async marcarAnunciados(ids: string[], anunciado: boolean) {
+    const r = await this.prisma.produto.updateMany({
+      where: { id: { in: ids } },
+      data: { anunciado },
     });
     return { ok: true, count: r.count };
   }

@@ -18,10 +18,16 @@ export const ProdutoSchema = z.object({
   precoCentavos: z.number().int().positive(),
   canalPrincipal: CanalEnum,
   ativo: z.boolean(),
+  anunciado: z.boolean(),
 });
 
-export const ProdutoCreateSchema = ProdutoSchema.omit({ id: true, ativo: true }).extend({
+export const ProdutoCreateSchema = ProdutoSchema.omit({
+  id: true,
+  ativo: true,
+  anunciado: true,
+}).extend({
   ativo: z.boolean().default(true),
+  anunciado: z.boolean().default(false),
   insumos: z.array(ProdutoInsumoInputSchema).optional(),
 });
 

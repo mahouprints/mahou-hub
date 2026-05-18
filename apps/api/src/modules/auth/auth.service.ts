@@ -32,4 +32,16 @@ export class AuthService {
     const senhaHash = await argon2.hash(senhaInicial);
     await this.prisma.usuario.create({ data: { email, senhaHash } });
   }
+
+  /**
+   * Gera JWT de longa duração pra fluxos automáticos (n8n, scripts).
+   * Mesmo payload do login normal — funciona em todos os endpoints protegidos.
+   * Sem rastreio/revogação: pra revogar, troque o JWT_SECRET (invalida tudo).
+   */
+  gerarApiToken(usuarioId: string, email: string, ttlDias: number): { token: string; expiraEm: Date } {
+    const payload: TokenPayload = { sub: usuarioId, email };
+    const token = this.jwt.sign(payload, { expiresIn: `${ttlDias}d` });
+    const expiraEm = new Date(Date.now() + ttlDias * 24 * 60 * 60 * 1000);
+    return { token, expiraEm };
+  }
 }

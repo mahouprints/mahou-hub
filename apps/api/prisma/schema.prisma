@@ -42,6 +42,13 @@ enum JobStatus {
   CANCELADO
 }
 
+enum OrigemImagem {
+  INSPIRACAO
+  MODELO_3D
+  GERADA
+  OUTRA
+}
+
 enum CategoriaCusto {
   ALUGUEL
   ENERGIA
@@ -91,9 +98,13 @@ model Produto {
   precoCentavos     Int
   canalPrincipal    Canal
   ativo             Boolean         @default(true)
+  /// Indica se o produto já foi publicado no marketplace.
+  /// Fluxo externo de geração de imagem só processa produtos com anunciado=false.
+  anunciado         Boolean         @default(false)
   jobs              JobProducao[]
   vendas            Venda[]
   insumos           ProdutoInsumo[]
+  imagens           ProdutoImagem[]
   criadoEm          DateTime        @default(now())
   atualizadoEm      DateTime        @updatedAt
 }
@@ -123,6 +134,24 @@ model ProdutoInsumo {
   qtd       Decimal @db.Decimal(10, 3)
 
   @@unique([produtoId, insumoId])
+}
+
+/// Imagem de referência do produto (inspiração, modelo 3D, foto manual ou gerada).
+/// `arquivo` é path relativo a STORAGE_DIR: "<produtoId>/<imagemId>.jpg".
+/// Sharp normaliza tudo pra JPG max 2000px na hora do upload — original não fica.
+model ProdutoImagem {
+  id        String       @id @default(cuid())
+  produtoId String
+  produto   Produto      @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  arquivo   String
+  origem    OrigemImagem @default(OUTRA)
+  ordem     Int          @default(0)
+  larguraPx Int?
+  alturaPx  Int?
+  bytes     Int?
+  criadoEm  DateTime     @default(now())
+
+  @@index([produtoId])
 }
 
 model Venda {

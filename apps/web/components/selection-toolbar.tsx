@@ -20,13 +20,22 @@ interface Props {
   onExcluir: () => Promise<unknown> | void;
   onLimpar: () => void;
   excluindo?: boolean;
+  /** Botões extras renderizados antes do "Excluir". Útil pra ações de batch específicas. */
+  acoesExtras?: React.ReactNode;
 }
 
 /**
  * Aparece quando há itens selecionados na tabela. Mostra contagem +
  * botão de excluir em massa (com confirmação) + botão de limpar seleção.
  */
-export function SelectionToolbar({ count, itemLabel, onExcluir, onLimpar, excluindo }: Props) {
+export function SelectionToolbar({
+  count,
+  itemLabel,
+  onExcluir,
+  onLimpar,
+  excluindo,
+  acoesExtras,
+}: Props) {
   const [confirmando, setConfirmando] = useState(false);
   if (count === 0) return null;
 
@@ -46,15 +55,18 @@ export function SelectionToolbar({ count, itemLabel, onExcluir, onLimpar, exclui
           {count === 1 ? 'selecionado' : 'selecionados'}
         </span>
       </div>
-      <Button
-        size="sm"
-        variant="destructive"
-        onClick={() => setConfirmando(true)}
-        disabled={excluindo}
-      >
-        <Trash2 className="h-4 w-4" />
-        Excluir selecionados
-      </Button>
+      <div className="flex items-center gap-2">
+        {acoesExtras}
+        <Button
+          size="sm"
+          variant="destructive"
+          onClick={() => setConfirmando(true)}
+          disabled={excluindo}
+        >
+          <Trash2 className="h-4 w-4" />
+          Excluir selecionados
+        </Button>
+      </div>
 
       <Dialog open={confirmando} onOpenChange={setConfirmando}>
         <DialogContent>

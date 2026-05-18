@@ -198,6 +198,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
         precoCentavos: parseDecimalParaCentavos(form.precoReais),
         canalPrincipal: form.canalPrincipal,
         ativo: true,
+        anunciado: produto?.anunciado ?? false,
         insumos: form.insumos
           .filter((l) => l.insumoId && Number.isFinite(parseDecimalBr(l.qtdStr)) && parseDecimalBr(l.qtdStr) > 0)
           .map((l) => ({ insumoId: l.insumoId, qtd: parseDecimalBr(l.qtdStr) })),

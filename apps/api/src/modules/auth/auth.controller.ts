@@ -1,8 +1,15 @@
-import { Body, Controller, Post, Res, UsePipes } from '@nestjs/common';
-import type { Response } from 'express';
-import { LoginInputSchema, type LoginInput } from '@mahou-hub/contracts';
+import { Body, Controller, Post, Req, Res, UseGuards, UsePipes } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import {
+  ApiTokenInputSchema,
+  LoginInputSchema,
+  type ApiTokenInput,
+  type ApiTokenOutput,
+  type LoginInput,
+} from '@mahou-hub/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -29,5 +36,19 @@ export class AuthController {
   logout(@Res({ passthrough: true }) res: Response): { ok: true } {
     res.clearCookie('mahou_token', { path: '/' });
     return { ok: true };
+  }
+
+  /**
+   * Gera token JWT de longa duração pra uso em fluxos externos (n8n, scripts).
+   * Resposta é exibida UMA vez na UI — usuário precisa copiar e guardar.
+   */
+  @Post('api-token')
+  @UseGuards(JwtAuthGuard)
+  apiToken(
+    @Req() req: Request,
+    @Body(new ZodValidationPipe(ApiTokenInputSchema)) body: ApiTokenInput,
+  ): ApiTokenOutput {
+    const user = req.user as { sub: string; email: string };
+    return this.auth.gerarApiToken(user.sub, user.email, body.ttlDias);
   }
 }
