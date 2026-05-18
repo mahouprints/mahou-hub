@@ -40,6 +40,12 @@ export class VendasService {
     await this.prisma.venda.delete({ where: { id } });
     return { ok: true };
   }
+
+  /** Hard-delete em massa — vendas erradas precisam sumir do agregado. */
+  async removeMuitos(ids: string[]) {
+    const r = await this.prisma.venda.deleteMany({ where: { id: { in: ids } } });
+    return { ok: true, count: r.count };
+  }
 }
 
 /** Devolve { gte, lt } cobrindo o mês inteiro a partir de string YYYY-MM. */

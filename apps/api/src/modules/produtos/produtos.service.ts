@@ -98,6 +98,15 @@ export class ProdutosService {
     return { ok: true };
   }
 
+  /** Soft-delete em massa (ativo=false) — preserva histórico de vendas. */
+  async desativarMuitos(ids: string[]) {
+    const r = await this.prisma.produto.updateMany({
+      where: { id: { in: ids } },
+      data: { ativo: false },
+    });
+    return { ok: true, count: r.count };
+  }
+
   /**
    * Estatísticas agregadas pra exibir no detalhe do produto:
    * - vendidos = soma de qtd nas Vendas

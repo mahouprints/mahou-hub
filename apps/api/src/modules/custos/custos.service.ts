@@ -60,6 +60,11 @@ export class CustosService {
     await this.prisma.custo.delete({ where: { id } });
     return { ok: true };
   }
+
+  async removeMuitos(ids: string[]) {
+    const r = await this.prisma.custo.deleteMany({ where: { id: { in: ids } } });
+    return { ok: true, count: r.count };
+  }
 }
 
 function rangeDoMes(mes: string) {

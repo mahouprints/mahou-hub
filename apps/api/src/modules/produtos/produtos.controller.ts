@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import {
+  BulkDeleteSchema,
   ProdutoCreateSchema,
   ProdutoUpdateSchema,
+  type BulkDelete,
   type ProdutoCreate,
   type ProdutoUpdate,
 } from '@mahou-hub/contracts';
@@ -45,5 +47,10 @@ export class ProdutosController {
   @Delete(':id')
   desativar(@Param('id') id: string) {
     return this.service.desativar(id);
+  }
+
+  @Post('bulk-delete')
+  bulkDelete(@Body(new ZodValidationPipe(BulkDeleteSchema)) data: BulkDelete) {
+    return this.service.desativarMuitos(data.ids);
   }
 }

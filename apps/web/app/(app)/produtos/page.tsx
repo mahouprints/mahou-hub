@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Box, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { CalcularOutput, Produto } from '@mahou-hub/contracts';
+import type { CalcularOutput, Filamento, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
+import { useTableSelection } from '@/lib/use-table-selection';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogClose,
@@ -21,6 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -29,9 +39,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SelectionToolbar } from '@/components/selection-toolbar';
 
 type ProdutoComPricing = Produto & {
-  filamento: { nome: string };
+  filamento: { id: string; nome: string };
   pesoG: number;
   tempoH: number;
   pricing: CalcularOutput;
@@ -43,6 +54,9 @@ interface MelhorCanal {
   margem: number;
   lucroPorHoraCentavos: number;
 }
+
+/** Sentinel pro Select do shadcn — value não pode ser ''. */
+const TODOS = '__todos__';
 
 /**
  * Escolhe o canal entre marketplaces (Shopee × ML) com maior líquido por peça.
@@ -66,9 +80,43 @@ function melhorCanalMarketplace(p: ProdutoComPricing): MelhorCanal {
 
 export default function ProdutosPage() {
   const router = useRouter();
+  const qc = useQueryClient();
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['produtos'],
     queryFn: () => apiFetch<ProdutoComPricing[]>('/produtos'),
+  });
+
+  const { data: filamentos } = useQuery({
+    queryKey: ['filamentos'],
+    queryFn: () => apiFetch<Filamento[]>('/filamentos'),
+  });
+
+  const [filtroFilamento, setFiltroFilamento] = useState(TODOS);
+  const [filtroCanal, setFiltroCanal] = useState(TODOS);
+  const [filtroImpressora, setFiltroImpressora] = useState(TODOS);
+
+  const filtrados = useMemo(() => {
+    if (!data) return [];
+    return data.filter((p) => {
+      if (filtroFilamento !== TODOS && p.filamentoId !== filtroFilamento) return false;
+      if (filtroCanal !== TODOS && p.canalPrincipal !== filtroCanal) return false;
+      if (filtroImpressora !== TODOS && p.impressora !== filtroImpressora) return false;
+      return true;
+    });
+  }, [data, filtroFilamento, filtroCanal, filtroImpressora]);
+
+  const idsVisiveis = useMemo(() => filtrados.map((p) => p.id), [filtrados]);
+  const sel = useTableSelection(idsVisiveis);
+
+  const bulkDelete = useMutation({
+    mutationFn: (ids: string[]) =>
+      apiFetch<{ count: number }>('/produtos/bulk-delete', { method: 'POST', json: { ids } }),
+    onSuccess: (resp) => {
+      qc.invalidateQueries({ queryKey: ['produtos'] });
+      sel.acoes.limpar();
+      toast.success(`${resp.count} ${resp.count === 1 ? 'produto excluído' : 'produtos excluídos'}`);
+    },
   });
 
   return (
@@ -77,7 +125,7 @@ export default function ProdutosPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Produtos</h1>
           <p className="text-sm text-muted-foreground">
-            {data?.length ?? 0} itens · clique numa linha para ver detalhes
+            {filtrados.length} de {data?.length ?? 0} itens · clique numa linha pra ver detalhes
           </p>
         </div>
         <Button asChild>
@@ -87,6 +135,24 @@ export default function ProdutosPage() {
         </Button>
       </header>
 
+      <FiltrosBar
+        filamentos={filamentos ?? []}
+        filtroFilamento={filtroFilamento}
+        setFiltroFilamento={setFiltroFilamento}
+        filtroCanal={filtroCanal}
+        setFiltroCanal={setFiltroCanal}
+        filtroImpressora={filtroImpressora}
+        setFiltroImpressora={setFiltroImpressora}
+      />
+
+      <SelectionToolbar
+        count={sel.count}
+        itemLabel="produto"
+        excluindo={bulkDelete.isPending}
+        onLimpar={sel.acoes.limpar}
+        onExcluir={() => bulkDelete.mutateAsync([...sel.selecionados])}
+      />
+
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
       {error && <p className="text-sm text-destructive">{(error as Error).message}</p>}
 
@@ -95,6 +161,19 @@ export default function ProdutosPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={
+                      sel.todosVisiveisMarcados
+                        ? true
+                        : sel.algumVisivelMarcado
+                          ? 'indeterminate'
+                          : false
+                    }
+                    onCheckedChange={() => sel.acoes.toggleTodos()}
+                    aria-label="Selecionar todos visíveis"
+                  />
+                </TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead className="text-right">Peso</TableHead>
                 <TableHead className="text-right">Tempo</TableHead>
@@ -108,14 +187,25 @@ export default function ProdutosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((p) => {
+              {filtrados.map((p) => {
                 const melhor = melhorCanalMarketplace(p);
+                const marcado = sel.selecionados.has(p.id);
                 return (
                   <TableRow
                     key={p.id}
                     onClick={() => router.push(`/produtos/${p.id}`)}
                     className="cursor-pointer"
                   >
+                    <TableCell
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <Checkbox
+                        checked={marcado}
+                        onCheckedChange={() => sel.acoes.toggle(p.id)}
+                        aria-label={`Selecionar ${p.nome}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       <span className="block truncate max-w-[260px]" title={p.nome}>
                         {p.nome}
@@ -155,10 +245,83 @@ export default function ProdutosPage() {
                   </TableRow>
                 );
               })}
+              {filtrados.length === 0 && data.length > 0 && (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center text-sm text-muted-foreground">
+                    Nenhum produto bate com os filtros atuais.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </Card>
       )}
+    </div>
+  );
+}
+
+function FiltrosBar({
+  filamentos,
+  filtroFilamento,
+  setFiltroFilamento,
+  filtroCanal,
+  setFiltroCanal,
+  filtroImpressora,
+  setFiltroImpressora,
+}: {
+  filamentos: Filamento[];
+  filtroFilamento: string;
+  setFiltroFilamento: (v: string) => void;
+  filtroCanal: string;
+  setFiltroCanal: (v: string) => void;
+  filtroImpressora: string;
+  setFiltroImpressora: (v: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <div className="space-y-1.5">
+        <Label className="text-xs uppercase text-muted-foreground">Filamento</Label>
+        <Select value={filtroFilamento} onValueChange={setFiltroFilamento}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os filamentos</SelectItem>
+            {filamentos.map((f) => (
+              <SelectItem key={f.id} value={f.id}>
+                {f.nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs uppercase text-muted-foreground">Canal principal</Label>
+        <Select value={filtroCanal} onValueChange={setFiltroCanal}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os canais</SelectItem>
+            <SelectItem value="SHOPEE">Shopee</SelectItem>
+            <SelectItem value="ML">Mercado Livre</SelectItem>
+            <SelectItem value="SITE">Site próprio</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs uppercase text-muted-foreground">Impressora</Label>
+        <Select value={filtroImpressora} onValueChange={setFiltroImpressora}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todas as impressoras</SelectItem>
+            <SelectItem value="A1">A1</SelectItem>
+            <SelectItem value="H2C">H2C</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }

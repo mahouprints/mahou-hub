@@ -10,8 +10,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  BulkDeleteSchema,
   CustoCreateSchema,
   CustoUpdateSchema,
+  type BulkDelete,
   type CustoCreate,
   type CustoUpdate,
 } from '@mahou-hub/contracts';
@@ -50,5 +52,10 @@ export class CustosController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(id);
+  }
+
+  @Post('bulk-delete')
+  bulkDelete(@Body(new ZodValidationPipe(BulkDeleteSchema)) data: BulkDelete) {
+    return this.service.removeMuitos(data.ids);
   }
 }

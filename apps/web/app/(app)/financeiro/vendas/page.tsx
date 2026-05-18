@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -8,9 +8,11 @@ import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Venda } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
+import { useTableSelection } from '@/lib/use-table-selection';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogClose,
@@ -22,6 +24,13 @@ import {
 } from '@/components/ui/dialog';
 import { MonthPicker } from '@/components/ui/month-picker';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Table,
   TableBody,
   TableCell,
@@ -30,21 +39,44 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { VendaDialog } from '@/components/venda-dialog';
+import { SelectionToolbar } from '@/components/selection-toolbar';
 
 type VendaListada = Venda & {
   produto: { nome: string; filamento: { nome: string } };
 };
 
 const CANAL_LABEL = { SHOPEE: 'Shopee', ML: 'Mercado Livre', SITE: 'Site próprio' };
+const TODOS = '__todos__';
 
 export default function VendasPage() {
-  const [mes, setMes] = useState(''); // vazio = todos
+  const qc = useQueryClient();
+  const [mes, setMes] = useState('');
+  const [filtroCanal, setFiltroCanal] = useState(TODOS);
   const [dialogAberto, setDialogAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<VendaListada | undefined>();
 
   const { data, isLoading } = useQuery({
     queryKey: ['vendas', mes],
     queryFn: () => apiFetch<VendaListada[]>(mes ? `/vendas?mes=${mes}` : '/vendas'),
+  });
+
+  const filtradas = useMemo(() => {
+    if (!data) return [];
+    return data.filter((v) => filtroCanal === TODOS || v.canal === filtroCanal);
+  }, [data, filtroCanal]);
+
+  const idsVisiveis = useMemo(() => filtradas.map((v) => v.id), [filtradas]);
+  const sel = useTableSelection(idsVisiveis);
+
+  const bulkDelete = useMutation({
+    mutationFn: (ids: string[]) =>
+      apiFetch<{ count: number }>('/vendas/bulk-delete', { method: 'POST', json: { ids } }),
+    onSuccess: (resp) => {
+      qc.invalidateQueries({ queryKey: ['vendas'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      sel.acoes.limpar();
+      toast.success(`${resp.count} ${resp.count === 1 ? 'venda excluída' : 'vendas excluídas'}`);
+    },
   });
 
   function abrirNova() {
@@ -56,10 +88,7 @@ export default function VendasPage() {
     setDialogAberto(true);
   }
 
-  const total = (data ?? []).reduce(
-    (acc, v) => acc + v.precoUnitarioCentavos * v.qtd,
-    0,
-  );
+  const total = filtradas.reduce((acc, v) => acc + v.precoUnitarioCentavos * v.qtd, 0);
 
   return (
     <div className="space-y-6">
@@ -73,10 +102,10 @@ export default function VendasPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Vendas</h1>
             <p className="text-sm text-muted-foreground">
-              {data?.length ?? 0} vendas · total {centavosParaReais(total)}
+              {filtradas.length} de {data?.length ?? 0} vendas · total {centavosParaReais(total)}
             </p>
           </div>
-          <div className="flex items-end gap-3">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
               <label className="text-xs uppercase text-muted-foreground">Filtrar por mês</label>
               <MonthPicker
@@ -87,12 +116,34 @@ export default function VendasPage() {
                 className="w-56"
               />
             </div>
+            <div className="space-y-1.5">
+              <label className="text-xs uppercase text-muted-foreground">Canal</label>
+              <Select value={filtroCanal} onValueChange={setFiltroCanal}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS}>Todos os canais</SelectItem>
+                  <SelectItem value="SHOPEE">Shopee</SelectItem>
+                  <SelectItem value="ML">Mercado Livre</SelectItem>
+                  <SelectItem value="SITE">Site próprio</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button onClick={abrirNova}>
               <Plus className="h-4 w-4" /> Nova venda
             </Button>
           </div>
         </div>
       </header>
+
+      <SelectionToolbar
+        count={sel.count}
+        itemLabel="venda"
+        excluindo={bulkDelete.isPending}
+        onLimpar={sel.acoes.limpar}
+        onExcluir={() => bulkDelete.mutateAsync([...sel.selecionados])}
+      />
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
@@ -101,6 +152,19 @@ export default function VendasPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={
+                      sel.todosVisiveisMarcados
+                        ? true
+                        : sel.algumVisivelMarcado
+                          ? 'indeterminate'
+                          : false
+                    }
+                    onCheckedChange={() => sel.acoes.toggleTodos()}
+                    aria-label="Selecionar todas visíveis"
+                  />
+                </TableHead>
                 <TableHead>Produto</TableHead>
                 <TableHead className="text-right">Qtd</TableHead>
                 <TableHead className="text-right">Preço unit.</TableHead>
@@ -111,8 +175,15 @@ export default function VendasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((v) => (
+              {filtradas.map((v) => (
                 <TableRow key={v.id}>
+                  <TableCell>
+                    <Checkbox
+                      checked={sel.selecionados.has(v.id)}
+                      onCheckedChange={() => sel.acoes.toggle(v.id)}
+                      aria-label={`Selecionar venda de ${v.produto.nome}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <span className="block truncate max-w-[260px]" title={v.produto.nome}>
                       {v.produto.nome}
@@ -146,10 +217,10 @@ export default function VendasPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {data.length === 0 && (
+              {filtradas.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground">
-                    Nenhuma venda no período.
+                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground">
+                    {data.length === 0 ? 'Nenhuma venda no período.' : 'Nenhuma venda bate com os filtros.'}
                   </TableCell>
                 </TableRow>
               )}
