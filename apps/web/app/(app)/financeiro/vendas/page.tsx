@@ -9,6 +9,8 @@ import type { Venda } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { useTableSort } from '@/lib/use-table-sort';
+import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -53,6 +55,8 @@ const CANAL_LABEL = {
 };
 const TODOS = '__todos__';
 
+type ColunaSortVenda = 'produto' | 'qtd' | 'preco' | 'total' | 'canal' | 'data';
+
 export default function VendasPage() {
   const qc = useQueryClient();
   const [mes, setMes] = useState('');
@@ -65,10 +69,20 @@ export default function VendasPage() {
     queryFn: () => apiFetch<VendaListada[]>(mes ? `/vendas?mes=${mes}` : '/vendas'),
   });
 
+  const sort = useTableSort<VendaListada, ColunaSortVenda>({
+    produto: (v) => v.produto.nome,
+    qtd: (v) => v.qtd,
+    preco: (v) => v.precoUnitarioCentavos,
+    total: (v) => v.precoUnitarioCentavos * v.qtd,
+    canal: (v) => v.canal,
+    data: (v) => new Date(v.dataVenda),
+  });
+
   const filtradas = useMemo(() => {
     if (!data) return [];
-    return data.filter((v) => filtroCanal === TODOS || v.canal === filtroCanal);
-  }, [data, filtroCanal]);
+    const f = data.filter((v) => filtroCanal === TODOS || v.canal === filtroCanal);
+    return sort.ordenar(f);
+  }, [data, filtroCanal, sort]);
 
   const idsVisiveis = useMemo(() => filtradas.map((v) => v.id), [filtradas]);
   const sel = useTableSelection(idsVisiveis);
@@ -182,12 +196,42 @@ export default function VendasPage() {
                     />
                   </TableHead>
                 )}
-                <TableHead>Produto</TableHead>
-                <TableHead className="text-right">Qtd</TableHead>
-                <TableHead className="text-right">Preço unit.</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Canal</TableHead>
-                <TableHead>Data</TableHead>
+                <SortableHead chave="produto" estado={sort.estado} onClick={sort.alternar}>
+                  Produto
+                </SortableHead>
+                <SortableHead
+                  chave="qtd"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Qtd
+                </SortableHead>
+                <SortableHead
+                  chave="preco"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Preço unit.
+                </SortableHead>
+                <SortableHead
+                  chave="total"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Total
+                </SortableHead>
+                <SortableHead chave="canal" estado={sort.estado} onClick={sort.alternar}>
+                  Canal
+                </SortableHead>
+                <SortableHead chave="data" estado={sort.estado} onClick={sort.alternar}>
+                  Data
+                </SortableHead>
                 <TableHead className="w-20 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>

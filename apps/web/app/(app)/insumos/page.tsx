@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Insumo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
+import { useTableSort } from '@/lib/use-table-sort';
+import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,6 +32,7 @@ import {
 import { InsumoDialog } from '@/components/insumo-dialog';
 
 type InsumoListado = Insumo & { _count?: { produtos: number } };
+type ColunaSortInsumo = 'nome' | 'unidade' | 'custo' | 'usos';
 
 export default function InsumosPage() {
   const [dialogAberto, setDialogAberto] = useState(false);
@@ -39,6 +42,15 @@ export default function InsumosPage() {
     queryKey: ['insumos'],
     queryFn: () => apiFetch<InsumoListado[]>('/insumos'),
   });
+
+  const sort = useTableSort<InsumoListado, ColunaSortInsumo>({
+    nome: (i) => i.nome,
+    unidade: (i) => i.unidade,
+    custo: (i) => i.custoUnitarioCentavos,
+    usos: (i) => i._count?.produtos ?? 0,
+  });
+
+  const ordenados = useMemo(() => (data ? sort.ordenar(data) : []), [data, sort]);
 
   function abrirNovo() {
     setEmEdicao(undefined);
@@ -70,15 +82,35 @@ export default function InsumosPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Unidade</TableHead>
-                <TableHead className="text-right">Custo por unidade</TableHead>
-                <TableHead className="text-right">Produtos</TableHead>
+                <SortableHead chave="nome" estado={sort.estado} onClick={sort.alternar}>
+                  Nome
+                </SortableHead>
+                <SortableHead chave="unidade" estado={sort.estado} onClick={sort.alternar}>
+                  Unidade
+                </SortableHead>
+                <SortableHead
+                  chave="custo"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Custo por unidade
+                </SortableHead>
+                <SortableHead
+                  chave="usos"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Produtos
+                </SortableHead>
                 <TableHead className="w-20 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.map((i) => (
+              {ordenados.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.nome}</TableCell>
                   <TableCell>

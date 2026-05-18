@@ -10,6 +10,8 @@ import type { CalcularOutput, Filamento, Produto } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { useTableSort } from '@/lib/use-table-sort';
+import { SortableHead } from '@/components/sortable-head';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -58,6 +60,17 @@ interface MelhorCanal {
 /** Sentinel pro Select do shadcn — value não pode ser ''. */
 const TODOS = '__todos__';
 
+type ColunaSort =
+  | 'nome'
+  | 'pesoG'
+  | 'tempoH'
+  | 'custoTotal'
+  | 'preco'
+  | 'imposto'
+  | 'liquido'
+  | 'margem'
+  | 'lucroH';
+
 /**
  * Escolhe o canal entre marketplaces (Shopee × ML) com maior líquido por peça.
  * Site fica de fora porque não paga taxa e sempre venceria — não é decisão útil.
@@ -96,15 +109,28 @@ export default function ProdutosPage() {
   const [filtroCanal, setFiltroCanal] = useState(TODOS);
   const [filtroImpressora, setFiltroImpressora] = useState(TODOS);
 
+  const sort = useTableSort<ProdutoComPricing, ColunaSort>({
+    nome: (p) => p.nome,
+    pesoG: (p) => p.pesoG,
+    tempoH: (p) => p.tempoH,
+    custoTotal: (p) => p.pricing.custoTotalProducaoCentavos,
+    preco: (p) => p.precoCentavos,
+    imposto: (p) => p.pricing.impostoCentavos,
+    liquido: (p) => melhorCanalMarketplace(p).liquidoCentavos,
+    margem: (p) => melhorCanalMarketplace(p).margem,
+    lucroH: (p) => melhorCanalMarketplace(p).lucroPorHoraCentavos,
+  });
+
   const filtrados = useMemo(() => {
     if (!data) return [];
-    return data.filter((p) => {
+    const f = data.filter((p) => {
       if (filtroFilamento !== TODOS && p.filamentoId !== filtroFilamento) return false;
       if (filtroCanal !== TODOS && p.canalPrincipal !== filtroCanal) return false;
       if (filtroImpressora !== TODOS && p.impressora !== filtroImpressora) return false;
       return true;
     });
-  }, [data, filtroFilamento, filtroCanal, filtroImpressora]);
+    return sort.ordenar(f);
+  }, [data, filtroFilamento, filtroCanal, filtroImpressora, sort]);
 
   const idsVisiveis = useMemo(() => filtrados.map((p) => p.id), [filtrados]);
   const sel = useTableSelection(idsVisiveis);
@@ -187,15 +213,81 @@ export default function ProdutosPage() {
                     />
                   </TableHead>
                 )}
-                <TableHead>Nome</TableHead>
-                <TableHead className="text-right">Peso</TableHead>
-                <TableHead className="text-right">Tempo</TableHead>
-                <TableHead className="text-right">Custo total</TableHead>
-                <TableHead className="text-right">Preço</TableHead>
-                <TableHead className="text-right">Imposto</TableHead>
-                <TableHead className="text-right">Líquido</TableHead>
-                <TableHead className="text-right">Margem</TableHead>
-                <TableHead className="text-right">Lucro/h</TableHead>
+                <SortableHead chave="nome" estado={sort.estado} onClick={sort.alternar}>
+                  Nome
+                </SortableHead>
+                <SortableHead
+                  chave="pesoG"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Peso
+                </SortableHead>
+                <SortableHead
+                  chave="tempoH"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Tempo
+                </SortableHead>
+                <SortableHead
+                  chave="custoTotal"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Custo total
+                </SortableHead>
+                <SortableHead
+                  chave="preco"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Preço
+                </SortableHead>
+                <SortableHead
+                  chave="imposto"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Imposto
+                </SortableHead>
+                <SortableHead
+                  chave="liquido"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Líquido
+                </SortableHead>
+                <SortableHead
+                  chave="margem"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Margem
+                </SortableHead>
+                <SortableHead
+                  chave="lucroH"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Lucro/h
+                </SortableHead>
                 <TableHead className="w-36 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>

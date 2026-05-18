@@ -9,6 +9,8 @@ import type { CategoriaCusto, Custo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
+import { useTableSort } from '@/lib/use-table-sort';
+import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -55,6 +57,7 @@ const CATEGORIA_LABEL: Record<CategoriaCusto, string> = {
 
 const TODOS = '__todos__';
 type FiltroOrigem = 'todos' | 'manual' | 'recorrencia';
+type ColunaSortCusto = 'descricao' | 'categoria' | 'valor' | 'competencia';
 
 export default function CustosPage() {
   const qc = useQueryClient();
@@ -69,15 +72,23 @@ export default function CustosPage() {
     queryFn: () => apiFetch<Custo[]>(mes ? `/custos?mes=${mes}` : '/custos'),
   });
 
+  const sort = useTableSort<Custo, ColunaSortCusto>({
+    descricao: (c) => c.descricao,
+    categoria: (c) => c.categoria,
+    valor: (c) => c.valorCentavos,
+    competencia: (c) => new Date(c.dataCompetencia),
+  });
+
   const filtrados = useMemo(() => {
     if (!data) return [];
-    return data.filter((c) => {
+    const f = data.filter((c) => {
       if (filtroCategoria !== TODOS && c.categoria !== filtroCategoria) return false;
       if (filtroOrigem === 'manual' && c.geradoAutomatico) return false;
       if (filtroOrigem === 'recorrencia' && !c.geradoAutomatico) return false;
       return true;
     });
-  }, [data, filtroCategoria, filtroOrigem]);
+    return sort.ordenar(f);
+  }, [data, filtroCategoria, filtroOrigem, sort]);
 
   const idsVisiveis = useMemo(() => filtrados.map((c) => c.id), [filtrados]);
   const sel = useTableSelection(idsVisiveis);
@@ -208,10 +219,24 @@ export default function CustosPage() {
                     />
                   </TableHead>
                 )}
-                <TableHead>Descrição</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Competência</TableHead>
+                <SortableHead chave="descricao" estado={sort.estado} onClick={sort.alternar}>
+                  Descrição
+                </SortableHead>
+                <SortableHead chave="categoria" estado={sort.estado} onClick={sort.alternar}>
+                  Categoria
+                </SortableHead>
+                <SortableHead
+                  chave="valor"
+                  estado={sort.estado}
+                  onClick={sort.alternar}
+                  align="right"
+                  className="text-right"
+                >
+                  Valor
+                </SortableHead>
+                <SortableHead chave="competencia" estado={sort.estado} onClick={sort.alternar}>
+                  Competência
+                </SortableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead className="w-20 text-right">Ações</TableHead>
               </TableRow>
