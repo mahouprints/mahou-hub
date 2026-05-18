@@ -1,23 +1,41 @@
 # Mahou Hub
 
-Hub de gerenciamento da **Mahou Prints**. Substitui a planilha `Farm 3D` por uma aplicação web com cálculo de custo/margem, simulador, plano de produção (kanban) e gestão de catálogo.
+Hub de gerenciamento da **Mahou Prints**. Substitui a planilha `Farm 3D` por uma aplicação web com cálculo de custo/margem, simulador, plano de produção, gestão de catálogo, controle de vendas, custos e insumos.
 
 - **Frontend:** Next.js 15 em `hub.mahouprints.com` (Vercel)
-- **Backend:** NestJS + Prisma + PostgreSQL em `api.mahouprints.com` (VPS)
+- **Backend:** NestJS + Prisma + PostgreSQL em `api.mahouprints.com` (VPS Hetzner)
 
 ## Estrutura
 
 ```
 apps/
-  web/         Next.js 15 (App Router)
-  api/         NestJS + Prisma
+  web/         Next.js 15 (App Router) — UI completa do Hub
+  api/         NestJS + Prisma — REST API protegida por JWT
 packages/
-  pricing/     Cálculos de custo/margem (puros, testáveis)
-  contracts/   Schemas Zod compartilhados
+  pricing/    Cálculos de custo/margem (puros, testáveis)
+  contracts/  Schemas Zod compartilhados entre front e back
 infra/
-  docker-compose.yml
-  Caddyfile
+  docker-compose.yml   Postgres local + perfil prod (api via GHCR)
+  .env.prod.example    Template das envs de produção
+.github/workflows/
+  ci.yml             Typecheck + testes em todo push/PR
+  deploy-api.yml     Build da imagem no GitHub Actions → push GHCR → pull na VPS
 ```
+
+## Módulos
+
+| Módulo | Rota web | Endpoints API | O que faz |
+| --- | --- | --- | --- |
+| **Calculadora** | `/calculadora` | `POST /pricing/calcular` | Cálculo stateless de viabilidade de produto hipotético |
+| **Produtos** | `/produtos` | `/produtos`, `/produtos/:id/estatisticas` | Catálogo CRUD + detalhe com pricing breakdown + histórico de vendas/produção |
+| **Insumos** | `/insumos` | `/insumos` | Cadastro mestre de componentes (caixa, fita, etiqueta). Cada produto referencia N insumos com qtd |
+| **Simulador** | `/simulador` | `POST /pricing/simular` | Projeta produção mensal (horas × utilização) → faturamento/lucro |
+| **Produção** | `/producao` | `/producao` | Kanban de jobs de impressão (FILA → IMPRIMINDO → CONCLUIDO …) |
+| **Financeiro** | `/financeiro` | `/financeiro/resumo?mes=YYYY-MM` | Dashboard com faturamento, custos gerais, custos com insumos, lucro líquido + margem |
+| · Vendas | `/financeiro/vendas` | `/vendas` | Lançamento de vendas (produto, qtd, preço real, canal, data) |
+| · Custos | `/financeiro/custos` | `/custos` | Custos gerais lançados manualmente. Marca `recorrente` gera 12 cópias futuras |
+| **Concorrentes** | `/concorrentes` | `/concorrentes`, `/concorrentes/:id/precos` | Tracking de preços de concorrentes |
+| **Configurações** | `/configuracoes` | `/parametros`, `/filamentos`, `/parametros/taxas/{shopee,ml}` | Parâmetros globais, filamentos, tabelas de taxa Shopee/ML |
 
 ## Pré-requisitos
 
@@ -56,6 +74,20 @@ Web: http://localhost:3001 · API: http://localhost:3000
 
 O seed é idempotente (usa `upsert`), pode rodar várias vezes sem duplicar registros. Os dados ficam congelados em `apps/api/prisma/seed/*.ts` — não dependem do XLSX original.
 
+## Deploy
+
+Push na `main` dispara dois workflows do GitHub Actions:
+
+1. **`ci.yml`** — builda `@mahou-hub/contracts` e `@mahou-hub/pricing`, depois roda typecheck no `api` e `web` (Postgres ephemeral via service container).
+2. **`deploy-api.yml`** (só se mudou `apps/api/**`, `packages/**`, `infra/**` ou o próprio workflow):
+   - Builda a imagem Docker no runner do GitHub (1.5GB de pico, fora da VPS).
+   - Publica em `ghcr.io/mahouprints/mahou-hub-api:latest`.
+   - SSH na VPS: `docker pull` + `docker compose up -d` + `prisma migrate deploy`.
+
+Vercel rebuilda o frontend automaticamente em todo push. O Ignored Build Step (configurado no painel Vercel) pula o build quando só `apps/api/**` ou `infra/**` mudaram.
+
+VPS já tem `Insumo` e `Custo` em produção desde 2026-05-17. Segredos vivem em `.env.prod` no diretório `/opt/mahou-hub/infra` da VPS — **não comitado** e excluído do rsync.
+
 ## Comandos úteis
 
 | Comando | O que faz |
@@ -69,13 +101,17 @@ O seed é idempotente (usa `upsert`), pode rodar várias vezes sem duplicar regi
 | `pnpm --filter api exec prisma db seed` | repopula dados base |
 | `pnpm --filter api run seed:admin` | recria só o usuário admin |
 
-## Roadmap
+## Status
 
-- [x] Fase 0 — Bootstrap do monorepo
-- [ ] Fase 1 — Backend mínimo (CRUD + pricing)
-- [ ] Fase 2 — Frontend MVP (login, calculadora, produtos, simulador)
-- [ ] Fase 3 — Produção retrabalhada (kanban + consumo mensal)
-- [ ] Fase 4 — Deploy (Vercel + VPS)
+- [x] Bootstrap do monorepo + setup de dev
+- [x] Backend core (auth, produtos, filamentos, parâmetros, taxas, pricing)
+- [x] Frontend MVP (login, calculadora, produtos, simulador, configurações)
+- [x] Módulo Financeiro (vendas, custos manuais, dashboard)
+- [x] Módulo Insumos (cadastro + integração ao pricing dos produtos)
+- [x] Deploy automatizado (CI/CD GHCR → VPS Hetzner + Vercel)
+- [ ] Módulo Produção retrabalhado (kanban + consumo mensal)
+- [ ] Testes E2E completos (Playwright)
+- [ ] Filtros avançados e relatórios anuais no financeiro
 
 ## Para agentes de IA
 
