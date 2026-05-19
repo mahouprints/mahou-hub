@@ -51,6 +51,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SelectionToolbar } from '@/components/selection-toolbar';
 
 type ProdutoComPricing = Produto & {
@@ -359,13 +360,7 @@ export default function ProdutosPage() {
                     )}
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <span
-                          aria-label={p.anunciado ? 'Anunciado' : 'Pendente'}
-                          title={p.anunciado ? 'Anunciado' : 'Pendente'}
-                          className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-                            p.anunciado ? 'bg-emerald-500' : 'bg-amber-500'
-                          }`}
-                        />
+                        <StatusBolinha anunciado={p.anunciado} />
                         <span className="block truncate max-w-[260px]" title={p.nome}>
                           {p.nome}
                         </span>
@@ -504,6 +499,23 @@ function FiltrosBar({
         </Select>
       </div>
     </div>
+  );
+}
+
+function StatusBolinha({ anunciado }: { anunciado: boolean }) {
+  const label = anunciado ? 'Anunciado' : 'Pendente';
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          aria-label={label}
+          className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+            anunciado ? 'bg-emerald-500' : 'bg-amber-500'
+          }`}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }
 
