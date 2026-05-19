@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { Trash2 } from 'lucide-react';
 import type { OrigemImagem, ProdutoImagem } from '@mahou-hub/contracts';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -89,15 +88,10 @@ export function ImagensSection({ produtoId, imagens }: Props) {
       )}
 
       <div className="space-y-3 rounded-lg border border-border/60 bg-card/30 p-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Origem padrão
-          </Label>
-          <Select
-            value={origemPadrao}
-            onValueChange={(v) => setOrigemPadrao(v as OrigemImagem)}
-          >
-            <SelectTrigger>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="uppercase tracking-wide text-muted-foreground">Origem</span>
+          <Select value={origemPadrao} onValueChange={(v) => setOrigemPadrao(v as OrigemImagem)}>
+            <SelectTrigger className="h-8 w-40 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

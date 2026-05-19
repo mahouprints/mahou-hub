@@ -639,15 +639,13 @@ function ImagensInicialSecao({
         )}
       </div>
 
-      <div className="space-y-1.5">
-        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-          Origem padrão
-        </Label>
+      <div className="flex items-center gap-3 text-xs">
+        <span className="uppercase tracking-wide text-muted-foreground">Origem</span>
         <Select
           value={origem}
           onValueChange={(v) => onOrigemChange(v as 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA')}
         >
-          <SelectTrigger>
+          <SelectTrigger className="h-8 w-40 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
