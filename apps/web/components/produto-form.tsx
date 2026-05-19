@@ -251,8 +251,59 @@ export function ProdutoForm({ produto, inicial }: Props) {
   const thresholdAmarelo = Number(parametros?.margemThresholdAmarelo ?? 0.15);
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="grid gap-6 lg:grid-cols-2">
+      {/* Coluna esquerda: imagens (só em criar) + preview de preço */}
+      <div className="space-y-6 lg:order-1">
+        {!editando && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Imagens</CardTitle>
+              <CardDescription>
+                Opcional · enviadas após criar o produto
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ImagensInicialSecao
+                arquivos={imagensPendentes}
+                onArquivos={setImagensPendentes}
+                origem={origemImagens}
+                onOrigemChange={setOrigemImagens}
+                desabilitado={salvando}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Preview de preço</CardTitle>
+            <CardDescription>Recalculado ao vivo enquanto você digita</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {preview ? (
+              <Preview
+                preview={preview}
+                thresholdVerde={thresholdVerde}
+                thresholdAmarelo={thresholdAmarelo}
+                canal={form.canalPrincipal}
+                embalagemCentavos={(() => {
+                  const v = parseDecimalParaCentavos(form.embalagemReais);
+                  return Number.isFinite(v) ? v : 0;
+                })()}
+                custoInsumosCentavos={custoInsumosCentavos}
+                precoCentavos={parseDecimalParaCentavos(form.precoReais) || 0}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Preencha filamento, peso, tempo e preço para ver o cálculo.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Coluna direita: form principal */}
+      <Card className="lg:order-2">
         <CardHeader>
           <CardTitle>{editando ? 'Editar produto' : 'Novo produto'}</CardTitle>
           <CardDescription>Dados que vão para o catálogo</CardDescription>
@@ -412,16 +463,6 @@ export function ProdutoForm({ produto, inicial }: Props) {
               </div>
             </div>
 
-            {!editando && (
-              <ImagensInicialSecao
-                arquivos={imagensPendentes}
-                onArquivos={setImagensPendentes}
-                origem={origemImagens}
-                onOrigemChange={setOrigemImagens}
-                desabilitado={salvando}
-              />
-            )}
-
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={() => router.push('/produtos')}>
                 Cancelar
@@ -431,33 +472,6 @@ export function ProdutoForm({ produto, inicial }: Props) {
               </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Preview de preço</CardTitle>
-          <CardDescription>Recalculado ao vivo enquanto você digita</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {preview ? (
-            <Preview
-              preview={preview}
-              thresholdVerde={thresholdVerde}
-              thresholdAmarelo={thresholdAmarelo}
-              canal={form.canalPrincipal}
-              embalagemCentavos={(() => {
-                const v = parseDecimalParaCentavos(form.embalagemReais);
-                return Number.isFinite(v) ? v : 0;
-              })()}
-              custoInsumosCentavos={custoInsumosCentavos}
-              precoCentavos={parseDecimalParaCentavos(form.precoReais) || 0}
-            />
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Preencha filamento, peso, tempo e preço para ver o cálculo.
-            </p>
-          )}
         </CardContent>
       </Card>
     </div>
