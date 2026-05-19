@@ -78,8 +78,7 @@ type ColunaSort =
   | 'preco'
   | 'liquido'
   | 'margem'
-  | 'lucroH'
-  | 'anunciado';
+  | 'lucroH';
 
 type FiltroAnunciado = 'todos' | 'sim' | 'nao';
 
@@ -131,7 +130,6 @@ export default function ProdutosPage() {
     liquido: (p) => melhorCanalMarketplace(p).liquidoCentavos,
     margem: (p) => melhorCanalMarketplace(p).margem,
     lucroH: (p) => melhorCanalMarketplace(p).lucroPorHoraCentavos,
-    anunciado: (p) => (p.anunciado ? 1 : 0),
   });
 
   const filtrados = useMemo(() => {
@@ -334,9 +332,6 @@ export default function ProdutosPage() {
                 >
                   Lucro/h
                 </SortableHead>
-                <SortableHead chave="anunciado" estado={sort.estado} onClick={sort.alternar}>
-                  Status
-                </SortableHead>
                 <TableHead className="w-36 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -363,9 +358,18 @@ export default function ProdutosPage() {
                       </TableCell>
                     )}
                     <TableCell className="font-medium">
-                      <span className="block truncate max-w-[260px]" title={p.nome}>
-                        {p.nome}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          aria-label={p.anunciado ? 'Anunciado' : 'Pendente'}
+                          title={p.anunciado ? 'Anunciado' : 'Pendente'}
+                          className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                            p.anunciado ? 'bg-emerald-500' : 'bg-amber-500'
+                          }`}
+                        />
+                        <span className="block truncate max-w-[260px]" title={p.nome}>
+                          {p.nome}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{p.pesoG}g</TableCell>
                     <TableCell className="text-right tabular-nums">{p.tempoH}h</TableCell>
@@ -384,11 +388,6 @@ export default function ProdutosPage() {
                     <TableCell className="text-right tabular-nums font-medium">
                       {centavosParaReais(melhor.lucroPorHoraCentavos)}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={p.anunciado ? 'success' : 'default'} className="font-normal">
-                        {p.anunciado ? 'Anunciado' : 'Pendente'}
-                      </Badge>
-                    </TableCell>
                     <TableCell
                       onClick={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
@@ -406,7 +405,7 @@ export default function ProdutosPage() {
               {filtrados.length === 0 && data.length > 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={sel.modoSelecao ? 11 : 10}
+                    colSpan={sel.modoSelecao ? 10 : 9}
                     className="text-center text-sm text-muted-foreground"
                   >
                     Nenhum produto bate com os filtros atuais.
