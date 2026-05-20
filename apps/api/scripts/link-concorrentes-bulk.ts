@@ -9,11 +9,9 @@
 //
 // Logamos com cookie do /auth/login e reusamos pras chamadas seguintes.
 import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const JSON_PATH = resolve(here, 'concorrentes-xlsx.json');
+const JSON_PATH = resolve(__dirname, 'concorrentes-xlsx.json');
 
 const args = process.argv.slice(2);
 const local = args.includes('--local');
