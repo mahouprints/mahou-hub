@@ -45,6 +45,10 @@ export const ConcorrenteCreateFromLinkSchema = z.object({
   ),
 });
 
+// Linka concorrente EXISTENTE (cadastro manual) a uma loja Shopee via URL,
+// populando shopId/username/urlOriginal e disparando o primeiro sync.
+export const ConcorrenteLinkShopeeSchema = ConcorrenteCreateFromLinkSchema;
+
 export const ConcorrenteUpdateSchema = ConcorrenteCreateSchema.partial();
 
 // PrecoConcorrente é o cadastro manual antigo de preços de concorrência. Convive com
@@ -100,6 +104,7 @@ export const ConcorrenteSnapshotProdutoSchema = z.object({
 export type Concorrente = z.infer<typeof ConcorrenteSchema>;
 export type ConcorrenteCreate = z.infer<typeof ConcorrenteCreateSchema>;
 export type ConcorrenteCreateFromLink = z.infer<typeof ConcorrenteCreateFromLinkSchema>;
+export type ConcorrenteLinkShopee = z.infer<typeof ConcorrenteLinkShopeeSchema>;
 export type ConcorrenteUpdate = z.infer<typeof ConcorrenteUpdateSchema>;
 export type PrecoConcorrente = z.infer<typeof PrecoConcorrenteSchema>;
 export type PrecoConcorrenteCreate = z.infer<typeof PrecoConcorrenteCreateSchema>;

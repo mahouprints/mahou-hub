@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, SyncOrigem } from '@prisma/client';
 import type {
   ConcorrenteCreate,
@@ -101,6 +101,30 @@ export class ConcorrentesService {
     });
     await this.syncFromShopee(created.id, SyncOrigem.MANUAL);
     return this.get(created.id);
+  }
+
+  // Linka um Concorrente existente (cadastro manual) a uma loja Shopee.
+  // Reutilizado pelo backfill em massa (script) e pelo botão "Linkar Shopee" na UI.
+  async linkShopee(id: string, url: string) {
+    const concorrente = await this.prisma.concorrente.findUnique({ where: { id }, select: { id: true, loja: true } });
+    if (!concorrente) throw new NotFoundException(`Concorrente ${id} não existe`);
+    const { shopId, detail } = await this.shopee.resolveShopFromUrl(url);
+    // Garante que esse shopId ainda não foi vinculado a outro concorrente — o UNIQUE
+    // do schema também protegeria, mas aqui devolvemos mensagem útil em vez de 500.
+    const conflito = await this.prisma.concorrente.findUnique({ where: { shopId: BigInt(shopId) }, select: { id: true, loja: true } });
+    if (conflito && conflito.id !== id) {
+      throw new ConflictException(`shopId ${shopId} já está vinculado ao concorrente "${conflito.loja}"`);
+    }
+    await this.prisma.concorrente.update({
+      where: { id },
+      data: {
+        shopId: BigInt(shopId),
+        username: detail.account?.username ?? null,
+        urlOriginal: url,
+      },
+    });
+    await this.syncFromShopee(id, SyncOrigem.MANUAL);
+    return this.get(id);
   }
 
   async update(id: string, data: ConcorrenteUpdate) {

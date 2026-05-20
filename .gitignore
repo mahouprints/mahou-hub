@@ -34,3 +34,6 @@ apps/api/prisma/*.db-journal
 
 # Diretório que o Playwright MCP cria com snapshots/logs locais.
 .playwright-mcp/
+
+# Dados intermediários gerados por scripts de manutenção (read-xlsx → JSON).
+apps/api/scripts/*.json

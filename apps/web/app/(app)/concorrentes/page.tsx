@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckSquare, ExternalLink, Plus, RefreshCw, Star, X } from 'lucide-react';
+import { CheckSquare, ExternalLink, Link2, Plus, RefreshCw, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api-client';
 import { pct, tempoRelativo } from '@/lib/format';
@@ -15,6 +15,17 @@ import { ConcorrenteLinkDialog } from '@/components/concorrente-link-dialog';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -48,6 +59,8 @@ type ColunaSort = 'loja' | 'rating' | 'comissao' | 'produtos' | 'sync';
 export default function ConcorrentesPage() {
   const qc = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  // Quando o user clica "Linkar Shopee" numa loja sem shopId, abrimos o modal com o id+url editável.
+  const [linkando, setLinkando] = useState<{ id: string; loja: string; url: string } | null>(null);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['concorrentes'],
@@ -71,6 +84,16 @@ export default function ConcorrentesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['concorrentes'] });
       toast.success('Sincronização concluída');
+    },
+  });
+
+  const linkar = useMutation({
+    mutationFn: ({ id, url }: { id: string; url: string }) =>
+      apiFetch(`/concorrentes/${id}/link-shopee`, { method: 'POST', json: { url } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['concorrentes'] });
+      toast.success('Loja linkada e sincronizada');
+      setLinkando(null);
     },
   });
 
@@ -110,6 +133,52 @@ export default function ConcorrentesPage() {
       </header>
 
       <ConcorrenteLinkDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      <Dialog open={!!linkando} onOpenChange={(v) => !v && setLinkando(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Linkar &quot;{linkando?.loja}&quot; à Shopee</DialogTitle>
+            <DialogDescription>
+              Cole a URL da loja Shopee. Vou resolver o shopId, marcar essa entrada como linkada e
+              sincronizar os produtos.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!linkando) return;
+              const url = linkando.url.trim();
+              if (!/^https?:\/\/.+shopee\.com\.br/.test(url)) {
+                toast.error('URL precisa ser de shopee.com.br');
+                return;
+              }
+              linkar.mutate({ id: linkando.id, url });
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="shopee-url">URL da loja</Label>
+              <Input
+                id="shopee-url"
+                value={linkando?.url ?? ''}
+                onChange={(e) => linkando && setLinkando({ ...linkando, url: e.target.value })}
+                placeholder="https://shopee.com.br/nome-da-loja"
+                autoFocus
+              />
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={linkar.isPending}>
+                  Cancelar
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={linkar.isPending}>
+                {linkar.isPending ? 'Sincronizando…' : 'Linkar e sincronizar'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <SelectionToolbar
         count={sel.count}
@@ -236,7 +305,7 @@ export default function ConcorrentesPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {c.shopId && (
+                    {c.shopId ? (
                       <>
                         <Button
                           variant="ghost"
@@ -257,6 +326,15 @@ export default function ConcorrentesPage() {
                           </a>
                         </Button>
                       </>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setLinkando({ id: c.id, loja: c.loja, url: '' })}
+                        title="Linkar à loja Shopee"
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </Button>
                     )}
                   </TableCell>
                 </TableRow>

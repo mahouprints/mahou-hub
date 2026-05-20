@@ -13,10 +13,12 @@ import {
   BulkDeleteSchema,
   ConcorrenteCreateFromLinkSchema,
   ConcorrenteCreateSchema,
+  ConcorrenteLinkShopeeSchema,
   ConcorrenteUpdateSchema,
   type BulkDelete,
   type ConcorrenteCreate,
   type ConcorrenteCreateFromLink,
+  type ConcorrenteLinkShopee,
   type ConcorrenteUpdate,
 } from '@mahou-hub/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
@@ -63,6 +65,14 @@ export class ConcorrentesController {
   @Post(':id/sync')
   sync(@Param('id') id: string) {
     return this.service.syncFromShopee(id, SyncOrigem.MANUAL);
+  }
+
+  @Post(':id/link-shopee')
+  linkShopee(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(ConcorrenteLinkShopeeSchema)) data: ConcorrenteLinkShopee,
+  ) {
+    return this.service.linkShopee(id, data.url);
   }
 
   @Patch(':id')
