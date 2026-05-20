@@ -61,6 +61,11 @@ enum CategoriaCusto {
   OUTROS
 }
 
+enum SyncOrigem {
+  MANUAL
+  CRON
+}
+
 model Usuario {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -226,14 +231,28 @@ model TaxaMercadoLivre {
   comissaoCategoriaPct Decimal @db.Decimal(5, 2)
 }
 
+/// Concorrente monitorado. Pode ser puramente manual (campos antigos: loja/instagram/website)
+/// ou linkado a uma loja Shopee via shopId — nesse caso os campos shopee* são preenchidos
+/// pelo último sync e o histórico de snapshots fica em ConcorrenteSnapshot.
 model Concorrente {
-  id         String             @id @default(cuid())
-  loja       String
-  instagram  String?
-  website    String?
-  observacao String?
-  precos     PrecoConcorrente[]
-  criadoEm   DateTime           @default(now())
+  id                   String                @id @default(cuid())
+  loja                 String
+  instagram            String?
+  website              String?
+  observacao           String?
+  // Campos opcionais quando a loja é Shopee (rastreio via API de afiliados).
+  shopId               BigInt?               @unique
+  username             String?
+  urlOriginal          String?
+  imageUrl             String?
+  ratingStar           Decimal?              @db.Decimal(3, 2)
+  commissionRatePadrao Decimal?              @db.Decimal(5, 4)
+  sellerCommCoveRatio  Decimal?              @db.Decimal(5, 4)
+  ultimoSyncEm         DateTime?
+  precos               PrecoConcorrente[]
+  snapshots            ConcorrenteSnapshot[]
+  criadoEm             DateTime              @default(now())
+  atualizadoEm         DateTime              @updatedAt
 }
 
 model PrecoConcorrente {
@@ -244,6 +263,49 @@ model PrecoConcorrente {
   precoCentavos  Int
   capturadoEm    DateTime    @default(now())
   fonteUrl       String?
+}
+
+/// Snapshot de um sync da Shopee (manual ou cron). Cada execução cria uma nova linha
+/// e os produtos retornados vão pra ConcorrenteSnapshotProduto vinculados a ela.
+/// Sync com erro grava erroMensagem e qtdProdutos=0.
+model ConcorrenteSnapshot {
+  id              String                        @id @default(cuid())
+  concorrenteId   String
+  concorrente     Concorrente                   @relation(fields: [concorrenteId], references: [id], onDelete: Cascade)
+  sincronizadoEm  DateTime                      @default(now())
+  origem          SyncOrigem
+  qtdProdutos     Int                           @default(0)
+  erroMensagem    String?
+  produtos        ConcorrenteSnapshotProduto[]
+  criadoEm        DateTime                      @default(now())
+
+  @@index([concorrenteId, sincronizadoEm(sort: Desc)])
+}
+
+/// Produto retornado pela Shopee Affiliate naquele sync. Cópia imutável dos campos
+/// expostos pela API (19 campos confirmados). Pra ver "estado atual" basta o último snapshot.
+model ConcorrenteSnapshotProduto {
+  id                String              @id @default(cuid())
+  snapshotId        String
+  snapshot          ConcorrenteSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  itemId            BigInt
+  productName       String
+  priceMinCentavos  Int
+  priceMaxCentavos  Int
+  priceDiscountRate Int
+  sales             Int
+  commissionRate    Decimal             @db.Decimal(5, 4)
+  commissionCentavos Int
+  imageUrl          String
+  productLink       String
+  offerLink         String
+  productCatIds     Int[]
+  shopType          Int[]
+  ratingStar        Decimal?            @db.Decimal(3, 2)
+  periodStartTime   DateTime
+  periodEndTime     DateTime
+
+  @@index([snapshotId, itemId])
 }
 
 model JobProducao {

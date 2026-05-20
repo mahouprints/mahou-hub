@@ -4,6 +4,12 @@ import { Logger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
+// Serializa BigInt como string no JSON. Necessário pra modelos como ConcorrenteSnapshotProduto
+// (itemId Int64) e Concorrente.shopId — sem isso, JSON.stringify joga TypeError.
+(BigInt.prototype as unknown as { toJSON: () => string }).toJSON = function (this: bigint) {
+  return this.toString();
+};
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));

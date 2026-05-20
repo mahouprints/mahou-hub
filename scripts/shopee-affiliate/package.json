@@ -1,0 +1,15 @@
+{
+  "name": "shopee-affiliate-explore",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scripts ad-hoc para explorar a Shopee Affiliate Open Platform (GraphQL). Isolado do monorepo Turborepo de propósito — só pra reconhecimento de campos antes de decidir o que persistir.",
+  "scripts": {
+    "explore": "npx -y tsx src/explore.ts",
+    "categorias": "npx -y tsx src/explore.ts categorias",
+    "produtos": "npx -y tsx src/explore.ts produtos",
+    "loja": "npx -y tsx src/explore.ts loja",
+    "keyword": "npx -y tsx src/explore.ts keyword",
+    "schema": "npx -y tsx src/explore.ts schema"
+  }
+}

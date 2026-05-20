@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { LoggerModule } from 'nestjs-pino';
 import { join } from 'path';
@@ -14,11 +15,13 @@ import { PricingModule } from './modules/pricing/pricing.module';
 import { VendasModule } from './modules/vendas/vendas.module';
 import { CustosModule } from './modules/custos/custos.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
+import { ConcorrentesModule } from './modules/concorrentes/concorrentes.module';
 import { HealthController } from './modules/health/health.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     LoggerModule.forRoot({
       pinoHttp: {
         transport:
@@ -46,6 +49,7 @@ import { HealthController } from './modules/health/health.controller';
     VendasModule,
     CustosModule,
     FinanceiroModule,
+    ConcorrentesModule,
   ],
   controllers: [HealthController],
 })

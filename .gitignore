@@ -10,6 +10,9 @@ coverage/
 .env
 .env.local
 .env.*.local
+scripts/**/.env
+scripts/**/out/
+scripts/**/*.local.*
 
 .vscode/
 .idea/
@@ -25,3 +28,9 @@ pnpm-debug.log*
 
 apps/api/prisma/*.db
 apps/api/prisma/*.db-journal
+
+# Autogerado pelo TS incremental — não deve ir pro commit.
+*.tsbuildinfo
+
+# Diretório que o Playwright MCP cria com snapshots/logs locais.
+.playwright-mcp/
