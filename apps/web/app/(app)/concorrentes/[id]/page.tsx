@@ -84,14 +84,23 @@ type SnapshotProduto = {
 
 type SnapshotDetail = SnapshotMeta & { produtos: SnapshotProduto[] };
 
-type ColunaSort = 'name' | 'preco' | 'sales' | 'comissao' | 'rating' | 'projecao';
+type ColunaSort = 'name' | 'preco' | 'sales' | 'rating' | 'estimado';
 
-// Vendas estimadas/mês via afiliado: `sales` é janela ~30 dias; normalizamos pra base mensal exata.
-function estimarProjecaoMes(p: SnapshotProduto): number {
+// Fração das vendas atribuídas ao programa de afiliados.
+// Derivada da amostragem em 6 produtos da 3DTECH: ratios variaram de 1.6% a 7.3%,
+// média ~5%. É aproximação grosseira — varia por loja, categoria e idade do produto.
+const TAXA_AFILIADO = 0.05;
+
+// Estimativa de vendas TOTAIS por mês:
+//   1. Normaliza `sales` (vendas via afiliado na janela de campanha) pra base mensal.
+//   2. Divide pela taxa estimada de afiliado → vendas totais (incl. orgânicas).
+function estimarVendasTotaisMes(p: SnapshotProduto): number {
   const diasJanela =
     (new Date(p.periodEndTime).getTime() - new Date(p.periodStartTime).getTime()) / 86_400_000;
-  if (!Number.isFinite(diasJanela) || diasJanela <= 0) return p.sales;
-  return Math.round((p.sales / diasJanela) * 30);
+  const salesNoMes = Number.isFinite(diasJanela) && diasJanela > 0
+    ? (p.sales / diasJanela) * 30
+    : p.sales;
+  return Math.round(salesNoMes / TAXA_AFILIADO);
 }
 
 export default function ConcorrenteDetailPage(props: { params: Promise<{ id: string }> }) {
@@ -124,11 +133,10 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
       name: (p) => p.productName.toLowerCase(),
       preco: (p) => p.priceMinCentavos,
       sales: (p) => p.sales,
-      comissao: (p) => Number(p.commissionRate),
       rating: (p) => Number(p.ratingStar ?? 0),
-      projecao: (p) => estimarProjecaoMes(p),
+      estimado: (p) => estimarVendasTotaisMes(p),
     },
-    { chave: 'sales', direcao: 'desc' },
+    { chave: 'estimado', direcao: 'desc' },
   );
 
   const produtos = useMemo(
@@ -154,12 +162,8 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
     return <div className="p-6 text-destructive">Concorrente não encontrado</div>;
   }
 
-  const totalSalesSnapshot = produtos.reduce((s, p) => s + p.sales, 0);
-  const totalProjMes = produtos.reduce((s, p) => s + estimarProjecaoMes(p), 0);
-  const totalComissaoMes = produtos.reduce(
-    (s, p) => s + estimarProjecaoMes(p) * p.commissionCentavos,
-    0,
-  );
+  const totalSalesAfiliado = produtos.reduce((s, p) => s + p.sales, 0);
+  const totalVendasEstimadasMes = produtos.reduce((s, p) => s + estimarVendasTotaisMes(p), 0);
 
   return (
     <div className="space-y-4">
@@ -193,11 +197,6 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
                     <Star className="h-3.5 w-3.5 fill-amber-400 stroke-amber-500" />
                     {Number(concorrente.ratingStar).toFixed(2)}
                   </span>
-                )}
-                {concorrente.commissionRatePadrao && (
-                  <Badge variant="secondary">
-                    Comissão padrão {pct(Number(concorrente.commissionRatePadrao), 0)}
-                  </Badge>
                 )}
                 {concorrente.shopId && (
                   <a
@@ -262,36 +261,27 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
       </Card>
 
       {produtos.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Vendas (afiliado) na janela</CardTitle>
+              <CardTitle className="text-sm">Vendas via afiliado (janela)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{totalSalesSnapshot}</div>
-              <p className="text-xs text-muted-foreground">Soma de sales de todos os produtos</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Projeção vendas/mês</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-semibold">{totalProjMes}</div>
+              <div className="text-2xl font-semibold">{totalSalesAfiliado}</div>
               <p className="text-xs text-muted-foreground">
-                Normalizada via periodStartTime/EndTime
+                Soma de `sales` da Shopee Affiliate API neste snapshot
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Comissão projetada/mês</CardTitle>
+              <CardTitle className="text-sm">Vendas totais estimadas/mês</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">
-                {centavosParaReais(totalComissaoMes)}
-              </div>
-              <p className="text-xs text-muted-foreground">Σ projVendas × commission</p>
+              <div className="text-2xl font-semibold">{totalVendasEstimadasMes}</div>
+              <p className="text-xs text-muted-foreground">
+                Assumindo 5% das vendas via afiliado
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -311,11 +301,8 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
               <SortableHead chave="sales" estado={sort.estado} onClick={sort.alternar}>
                 Vendas (afiliado)
               </SortableHead>
-              <SortableHead chave="projecao" estado={sort.estado} onClick={sort.alternar}>
-                Proj. mensal
-              </SortableHead>
-              <SortableHead chave="comissao" estado={sort.estado} onClick={sort.alternar}>
-                Comissão
+              <SortableHead chave="estimado" estado={sort.estado} onClick={sort.alternar}>
+                Vendas est. /mês
               </SortableHead>
               <SortableHead chave="rating" estado={sort.estado} onClick={sort.alternar}>
                 Rating
@@ -326,20 +313,20 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
           <TableBody>
             {loadingSnap && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   Carregando snapshot…
                 </TableCell>
               </TableRow>
             )}
             {!loadingSnap && produtos.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   Sem produtos neste snapshot
                 </TableCell>
               </TableRow>
             )}
             {produtos.map((p) => {
-              const projMes = estimarProjecaoMes(p);
+              const estMes = estimarVendasTotaisMes(p);
               const precoStr =
                 p.priceMinCentavos === p.priceMaxCentavos
                   ? centavosParaReais(p.priceMinCentavos)
@@ -371,13 +358,7 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
                   </TableCell>
                   <TableCell className="tabular-nums">{precoStr}</TableCell>
                   <TableCell className="tabular-nums">{p.sales}</TableCell>
-                  <TableCell className="tabular-nums">{projMes}</TableCell>
-                  <TableCell className="tabular-nums">
-                    {pct(Number(p.commissionRate), 0)} ·{' '}
-                    <span className="text-muted-foreground">
-                      {centavosParaReais(p.commissionCentavos)}
-                    </span>
-                  </TableCell>
+                  <TableCell className="tabular-nums font-medium">{estMes}</TableCell>
                   <TableCell>
                     {p.ratingStar ? (
                       <span className="inline-flex items-center gap-1">

@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckSquare, ExternalLink, Link2, Plus, RefreshCw, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api-client';
-import { pct, tempoRelativo } from '@/lib/format';
+import { tempoRelativo } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
 import { SortableHead } from '@/components/sortable-head';
@@ -54,7 +54,7 @@ type ConcorrenteListItem = {
   } | null;
 };
 
-type ColunaSort = 'loja' | 'rating' | 'comissao' | 'produtos' | 'sync';
+type ColunaSort = 'loja' | 'rating' | 'produtos' | 'sync';
 
 export default function ConcorrentesPage() {
   const qc = useQueryClient();
@@ -70,7 +70,6 @@ export default function ConcorrentesPage() {
   const sort = useTableSort<ConcorrenteListItem, ColunaSort>({
     loja: (c) => c.loja.toLowerCase(),
     rating: (c) => Number(c.ratingStar ?? 0),
-    comissao: (c) => Number(c.commissionRatePadrao ?? 0),
     produtos: (c) => c.ultimoSnapshot?.qtdProdutos ?? -1,
     sync: (c) => (c.ultimoSyncEm ? new Date(c.ultimoSyncEm).getTime() : 0),
   });
@@ -206,9 +205,6 @@ export default function ConcorrentesPage() {
               <SortableHead chave="rating" estado={sort.estado} onClick={sort.alternar}>
                 Rating
               </SortableHead>
-              <SortableHead chave="comissao" estado={sort.estado} onClick={sort.alternar}>
-                Comissão
-              </SortableHead>
               <SortableHead chave="produtos" estado={sort.estado} onClick={sort.alternar}>
                 Produtos
               </SortableHead>
@@ -221,21 +217,21 @@ export default function ConcorrentesPage() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   Carregando…
                 </TableCell>
               </TableRow>
             )}
             {error && (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-destructive">
+                <TableCell colSpan={6} className="py-10 text-center text-destructive">
                   Erro ao carregar
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && lista.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   Nenhum concorrente. Adicione via link.
                 </TableCell>
               </TableRow>
@@ -288,9 +284,6 @@ export default function ConcorrentesPage() {
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {c.commissionRatePadrao ? pct(Number(c.commissionRatePadrao), 0) : '—'}
                   </TableCell>
                   <TableCell>{snap?.qtdProdutos ?? '—'}</TableCell>
                   <TableCell>
