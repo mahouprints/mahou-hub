@@ -61,6 +61,9 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Dashboard financeiro separa **custos variáveis** (filamento+energia+embalagem) de **custos com insumos** (consumo via `ProdutoInsumo`) de **custos gerais** (Custo manual). Não juntar — são apresentados em cards distintos. Lucro líquido desconta todos + impostos + taxas marketplace.
 - Canais de venda: SHOPEE, ML, SITE, TIKTOK. Shopee/ML têm tabelas de faixa por preço; TIKTOK tem 4 percentuais fixos em `Parametro` (sem faixa); SITE não tem taxa.
 - Sync de coleção filha (`ProdutoInsumo`, `PrecoConcorrente`): `deleteMany` + `createMany` dentro de transação. Não tente diff incremental — o ganho não compensa a complexidade.
+- `Concorrente` tem dois modos coexistindo: **manual** (só `loja/instagram/website`, sem `shopId`) e **linkado Shopee** (com `shopId BigInt UNIQUE` + sync via Affiliate API). Botão "Linkar Shopee" na UI promove um manual a linkado. Cada sync (manual ou cron domingo 03h America/Sao_Paulo) cria um `ConcorrenteSnapshot` + N `ConcorrenteSnapshotProduto` (histórico, não sobrescreve).
+- Shopee Affiliate API expõe **só 19 campos** em `ProductOfferV2`. `sales` é janela de campanha (~30 dias via afiliado), NÃO histórico total. Vendas totais estimadas usam a heurística `(sales/dias)*30 / 0.05` (assumindo 5% das vendas via afiliado — média observada na 3DTECH). Não tente puxar histórico real via mobile-web `/api/v4/pdp/get_pc` — bloqueado por anti-fraud `x-sap-sec`.
+- Comissão da Shopee (`commissionRate`, `commission`) é IRRELEVANTE pra Mahou (não recebemos como afiliado). UI esconde esses campos — métrica útil é vendas estimadas.
 
 ## Imagens e storage
 - `ProdutoImagem.arquivo` é path relativo a `STORAGE_DIR`: `produtos/<produtoId>/<uuid>.jpg`. Cascade na deleção do produto via Prisma `onDelete: Cascade`.
