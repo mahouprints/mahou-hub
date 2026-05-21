@@ -42,12 +42,12 @@ infra/
 
 ## API pública (integrações externas)
 
-A API REST do Hub é pensada pra consumo por automações (n8n, Make, Zapier, scripts). Base: `https://api.mahouprints.com/api` (prod) ou `http://localhost:3000/api` (dev).
+A API REST do Hub é pensada pra consumo por automações (n8n, Make, Zapier, scripts). Base: `https://api.mahouprints.com/api/v1` (prod) ou `http://localhost:3000/api/v1` (dev). Versionada — quando precisar quebrar contrato, sobe um `/api/v2` em paralelo e mantém `v1` por um período.
 
 ### Documentação interativa
 
-- **Swagger UI**: `https://api.mahouprints.com/api/docs` — UI navegável, "Try it out" embutido. Clica em **Authorize** e cola o token Bearer.
-- **OpenAPI spec (JSON)**: `https://api.mahouprints.com/api/docs-json` — alimentação direta de geradores de client (Postman, n8n, OpenAPI Generator).
+- **Swagger UI**: `https://api.mahouprints.com/api/v1/docs` — UI navegável, "Try it out" embutido. Clica em **Authorize** e cola o token Bearer.
+- **OpenAPI spec (JSON)**: `https://api.mahouprints.com/api/v1/docs-json` — alimentação direta de geradores de client (Postman, n8n, OpenAPI Generator).
 
 ### Autenticação
 
@@ -59,7 +59,7 @@ A API REST do Hub é pensada pra consumo por automações (n8n, Make, Zapier, sc
 
 | Caso de uso | Endpoint | Notas |
 |---|---|---|
-| Listar produtos do catálogo | `GET /produtos` | Filtro opcional `?anunciado=true\|false` |
+| Listar produtos do catálogo | `GET /produtos` | Filtros: `anunciado`, `canal`, `q`, `page`, `pageSize`, `sortBy`, `sortDir`. Headers: `X-Total-Count` etc. |
 | Produto específico + imagens + insumos | `GET /produtos/:id` | URLs absolutas via `media.mahouprints.com` |
 | Marcar produtos como publicados | `POST /produtos/bulk-anunciar` | Body: `{ ids: string[], anunciado: boolean }` |
 | Listar lojas concorrentes (com vendas estimadas/mês) | `GET /concorrentes` | Inclui `vendasEstimadasMesTotal` agregado |
@@ -67,6 +67,26 @@ A API REST do Hub é pensada pra consumo por automações (n8n, Make, Zapier, sc
 | Histórico de snapshots de uma loja | `GET /concorrentes/:id/snapshots` | Pra séries temporais |
 | Resumo financeiro mensal | `GET /financeiro/resumo?mes=2026-05` | Lucro líquido + breakdown de custos |
 | Health check | `GET /healthz` | Sem `/api` no caminho, sem auth |
+
+### Paginação e busca em `/produtos`
+
+Sem query params, comportamento histórico: devolve **array completo** dos produtos ativos. Com paginação, devolve só a fatia pedida.
+
+Query params:
+- `q` — busca textual case-insensitive em `nome` + `inspiracao`
+- `canal` — `SHOPEE | ML | SITE | TIKTOK`
+- `anunciado` — `true | false`
+- `page` (≥1), `pageSize` (≤200, default 50 se só `page` for passado)
+- `sortBy` — `criadoEm | atualizadoEm | nome | precoCentavos` (default `criadoEm`)
+- `sortDir` — `asc | desc` (default `desc`)
+
+Headers de resposta (sempre presentes):
+- `X-Total-Count` — total absoluto que casa com o filtro (independente da página).
+- `X-Page`, `X-Page-Size` — só quando paginou.
+
+### Rate limit
+
+Padrão global: **100 requests/min por IP**. Resposta 429 quando excede. `/healthz` está isento (uptime checkers podem espumar).
 
 ### Convenções de serialização
 
@@ -82,16 +102,21 @@ TOKEN=eyJhbGc...
 
 # 1) Listar produtos não-anunciados
 curl -H "Authorization: Bearer $TOKEN" \
-  https://api.mahouprints.com/api/produtos?anunciado=false
+  "https://api.mahouprints.com/api/v1/produtos?anunciado=false"
+
+# 1b) Buscar produtos com "vaso" no nome, paginado
+curl -i -H "Authorization: Bearer $TOKEN" \
+  "https://api.mahouprints.com/api/v1/produtos?q=vaso&page=1&pageSize=20&sortBy=nome&sortDir=asc"
+# resposta inclui X-Total-Count: 47 no header
 
 # 2) Produtos do snapshot mais recente da loja concorrente abc123
 curl -H "Authorization: Bearer $TOKEN" \
-  https://api.mahouprints.com/api/concorrentes/abc123/produtos
+  https://api.mahouprints.com/api/v1/concorrentes/abc123/produtos
 
 # 3) Marcar produtos como anunciados após publicar
 curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"ids":["p1","p2"],"anunciado":true}' \
-  https://api.mahouprints.com/api/produtos/bulk-anunciar
+  https://api.mahouprints.com/api/v1/produtos/bulk-anunciar
 ```
 
 ### Exemplo: fluxo de geração de imagem (n8n)
@@ -99,8 +124,8 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/jso
 Caso real em produção pra publicar produtos no Shopee/ML com imagens geradas via Gemini 2.5 Flash:
 
 1. Pré-upload das imagens de referência em `/produtos/<id>` (card Imagens) — origem `INSPIRACAO` ou `MODELO_3D`. Sharp normaliza pra JPG 90% max 2000px no upload.
-2. Consumer chama `GET /api/produtos?anunciado=false`. Resposta traz imagens com URLs absolutas, filamento, insumos, dimensões — tudo num único request.
-3. Após processar e publicar, `POST /api/produtos/bulk-anunciar { ids: [...], anunciado: true }` tira do pool.
+2. Consumer chama `GET /api/v1/produtos?anunciado=false`. Resposta traz imagens com URLs absolutas, filamento, insumos, dimensões — tudo num único request.
+3. Após processar e publicar, `POST /api/v1/produtos/bulk-anunciar { ids: [...], anunciado: true }` tira do pool.
 
 ## Pré-requisitos
 

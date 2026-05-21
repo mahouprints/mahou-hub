@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,9 +8,12 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Canal } from '@prisma/client';
+import type { Response } from 'express';
 import { z } from 'zod';
 import {
   BulkDeleteSchema,
@@ -29,6 +33,19 @@ const BulkAnunciarSchema = z.object({
 });
 type BulkAnunciar = z.infer<typeof BulkAnunciarSchema>;
 
+// Whitelist explícita pra evitar SQL injection via orderBy.
+const SORTABLE_FIELDS = ['criadoEm', 'atualizadoEm', 'nome', 'precoCentavos'] as const;
+
+const ListQuerySchema = z.object({
+  anunciado: z.enum(['true', 'false']).optional(),
+  canal: z.nativeEnum(Canal).optional(),
+  q: z.string().trim().min(1).max(200).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(200).optional(),
+  sortBy: z.enum(SORTABLE_FIELDS).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
+});
+
 @ApiTags('produtos')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
@@ -37,16 +54,47 @@ export class ProdutosController {
   constructor(private readonly service: ProdutosService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Lista todos os produtos ativos' })
-  @ApiQuery({
-    name: 'anunciado',
-    required: false,
-    enum: ['true', 'false'],
-    description: 'Filtra por flag `anunciado`. Omitir traz todos.',
+  @ApiOperation({
+    summary: 'Lista produtos ativos com filtros, busca e paginação',
+    description:
+      'Sem `page`/`pageSize` devolve todos os resultados (legado). Com paginação, ' +
+      'devolve a página solicitada. Em ambos os casos, o total absoluto vai no header ' +
+      '`X-Total-Count`. Headers expostos: `X-Total-Count`, `X-Page`, `X-Page-Size`.',
   })
-  list(@Query('anunciado') anunciado?: string) {
-    const filtro = anunciado === 'true' ? true : anunciado === 'false' ? false : undefined;
-    return this.service.list({ anunciado: filtro });
+  @ApiQuery({ name: 'anunciado', required: false, enum: ['true', 'false'], description: 'Filtra por flag anunciado' })
+  @ApiQuery({ name: 'canal', required: false, enum: Canal, description: 'Filtra por canal principal' })
+  @ApiQuery({ name: 'q', required: false, description: 'Busca textual (case-insensitive) em nome + inspiração' })
+  @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1 } })
+  @ApiQuery({ name: 'pageSize', required: false, schema: { type: 'integer', minimum: 1, maximum: 200 } })
+  @ApiQuery({ name: 'sortBy', required: false, enum: SORTABLE_FIELDS })
+  @ApiQuery({ name: 'sortDir', required: false, enum: ['asc', 'desc'] })
+  async list(@Query() query: unknown, @Res({ passthrough: true }) res: Response) {
+    const parsed = ListQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '));
+    }
+    const { anunciado, canal, q, page, pageSize, sortBy, sortDir } = parsed.data;
+    // Se passou page sem pageSize (ou vice-versa), preenche o outro com default
+    // sensato — evita armadilha "page=2 sozinho" que devolveria a página inteira.
+    const pageNorm = page ?? (pageSize ? 1 : undefined);
+    const pageSizeNorm = pageSize ?? (page ? 50 : undefined);
+
+    const { items, total } = await this.service.list({
+      anunciado: anunciado === 'true' ? true : anunciado === 'false' ? false : undefined,
+      canal,
+      q,
+      page: pageNorm,
+      pageSize: pageSizeNorm,
+      sortBy,
+      sortDir,
+    });
+
+    res.setHeader('X-Total-Count', String(total));
+    if (pageNorm && pageSizeNorm) {
+      res.setHeader('X-Page', String(pageNorm));
+      res.setHeader('X-Page-Size', String(pageSizeNorm));
+    }
+    return items;
   }
 
   @Get(':id')

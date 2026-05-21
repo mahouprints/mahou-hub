@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Canal } from '@prisma/client';
 import {
   calcularProduto,
   type CalculoSaida,
@@ -10,6 +11,18 @@ import type { ProdutoCreate, ProdutoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImagensService } from '../imagens/imagens.service';
 
+export type ProdutoListSortBy = 'criadoEm' | 'atualizadoEm' | 'nome' | 'precoCentavos';
+export type ProdutoListSortDir = 'asc' | 'desc';
+export type ProdutoListOpts = {
+  anunciado?: boolean;
+  canal?: Canal;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+  sortBy?: ProdutoListSortBy;
+  sortDir?: ProdutoListSortDir;
+};
+
 @Injectable()
 export class ProdutosService {
   constructor(
@@ -18,30 +31,53 @@ export class ProdutosService {
   ) {}
 
   /**
-   * Lista produtos com pricing já calculado. Filtros opcionais:
-   * - `anunciado`: false retorna só pendentes (fluxo de geração de imagem
-   *   consume isso pra processar só o que ainda não foi publicado)
+   * Lista produtos com pricing já calculado. Filtros e paginação opcionais.
+   *
+   * Sem `page`/`pageSize` devolve todos os produtos que casam — comportamento
+   * histórico que o frontend e o fluxo de geração de imagem dependem.
+   * Com paginação, o consumer faz N requests menores e usa `total` pra saber
+   * quando parar.
    */
-  async list(filtros?: { anunciado?: boolean }) {
-    const produtos = await this.prisma.produto.findMany({
-      where: {
-        ativo: true,
-        ...(filtros?.anunciado != null ? { anunciado: filtros.anunciado } : {}),
-      },
-      orderBy: { criadoEm: 'desc' },
-      include: {
-        filamento: true,
-        insumos: { include: { insumo: true } },
-        imagens: { orderBy: { ordem: 'asc' } },
-      },
-    });
-    if (produtos.length === 0) return [];
+  async list(opts?: ProdutoListOpts) {
+    const { anunciado, canal, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
+    const where = {
+      ativo: true,
+      ...(anunciado != null ? { anunciado } : {}),
+      ...(canal ? { canalPrincipal: canal } : {}),
+      ...(q && q.trim()
+        ? {
+            OR: [
+              { nome: { contains: q, mode: 'insensitive' as const } },
+              { inspiracao: { contains: q, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
+    const skip = page != null && pageSize != null ? (page - 1) * pageSize : undefined;
+    const take = pageSize ?? undefined;
+
+    const [produtos, total] = await Promise.all([
+      this.prisma.produto.findMany({
+        where,
+        orderBy: { [sortBy]: sortDir },
+        skip,
+        take,
+        include: {
+          filamento: true,
+          insumos: { include: { insumo: true } },
+          imagens: { orderBy: { ordem: 'asc' } },
+        },
+      }),
+      this.prisma.produto.count({ where }),
+    ]);
+
+    if (produtos.length === 0) return { items: [], total };
 
     const parametros = await this.carregarParametros();
     const tabelaShopee = await this.carregarTabelaShopee();
     const tabelaMl = await this.carregarTabelaMl();
 
-    return produtos.map((p) => ({
+    const items = produtos.map((p) => ({
       ...p,
       pesoG: Number(p.pesoG),
       tempoH: Number(p.tempoH),
@@ -65,6 +101,7 @@ export class ProdutosService {
         tabelaMercadoLivre: tabelaMl,
       }),
     }));
+    return { items, total };
   }
 
   async get(id: string) {
@@ -234,7 +271,7 @@ export class ProdutosService {
   }
 }
 
-export type ProdutoComPricing = Awaited<ReturnType<ProdutosService['list']>>[number];
+export type ProdutoComPricing = Awaited<ReturnType<ProdutosService['list']>>['items'][number];
 export type { CalculoSaida };
 
 /**

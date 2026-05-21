@@ -19,30 +19,33 @@ async function bootstrap() {
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:3001',
     credentials: true,
+    // Sem isso, browser não deixa o JS consumer ler nossos headers customizados.
+    exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Page-Size'],
   });
 
-  app.setGlobalPrefix('api', { exclude: ['healthz'] });
+  // Prefixo versionado. Quando precisar quebrar contrato, monta `/api/v2` em
+  // paralelo e mantém `/api/v1` por um período de deprecation.
+  app.setGlobalPrefix('api/v1', { exclude: ['healthz'] });
 
-  // OpenAPI/Swagger em /api/docs (UI) e /api/docs-json (spec). Bearer auth é o
-  // caminho pra consumers externos — token gerado via POST /api/auth/api-token.
+  // OpenAPI/Swagger em /api/v1/docs (UI) e /api/v1/docs-json (spec).
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Mahou Hub API')
     .setDescription(
-      'Backend do Mahou Hub. Use POST /api/auth/api-token (autenticado) pra ' +
+      'Backend do Mahou Hub. Use POST /api/v1/auth/api-token (autenticado) pra ' +
         'gerar um JWT de longa duração e cole no botão "Authorize" abaixo.',
     )
-    .setVersion('0.1.0')
+    .setVersion('1.0.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
     .addCookieAuth('mahou_token', { type: 'apiKey', in: 'cookie', name: 'mahou_token' }, 'cookie')
     .build();
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document, {
+  SwaggerModule.setup('api/v1/docs', app, document, {
     swaggerOptions: { persistAuthorization: true },
   });
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
-  console.log(`api ouvindo em :${port} (docs em /api/docs)`);
+  console.log(`api ouvindo em :${port} (docs em /api/v1/docs)`);
 }
 
 void bootstrap();

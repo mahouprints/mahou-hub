@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { join } from 'path';
 import { PrismaModule } from './prisma/prisma.module';
@@ -31,6 +33,10 @@ import { HealthController } from './modules/health/health.controller';
         redact: ['req.headers.authorization', 'req.headers.cookie', '*.senha', '*.senhaHash'],
       },
     }),
+    // Rate-limit global: 100 req/min por IP. Defesa contra loop bug de consumer
+    // externo, não contra ataque coordenado (pra isso seria precoce — Cloudflare/
+    // WAF resolveriam melhor quando vier).
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     // Em prod, Nginx serve diretamente media.mahouprints.com → /var/mahou-storage.
     // Aqui no Nest é fallback útil pro dev (sem Nginx local).
     ServeStaticModule.forRoot({
@@ -52,5 +58,6 @@ import { HealthController } from './modules/health/health.controller';
     ConcorrentesModule,
   ],
   controllers: [HealthController],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
