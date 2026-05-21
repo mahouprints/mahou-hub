@@ -66,6 +66,28 @@ enum SyncOrigem {
   CRON
 }
 
+enum OportunidadeMarketplace {
+  SHOPEE
+  TIKTOK
+  ML
+  OUTRO
+}
+
+enum OportunidadeFonte {
+  CONCORRENTE
+  KEYWORD
+  CATEGORIA
+  TOP_VENDAS
+}
+
+enum OportunidadeStatus {
+  NOVO
+  EM_ANALISE
+  APROVADO
+  DESCARTADO
+  VIRARAM_PRODUTO
+}
+
 model Usuario {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -87,31 +109,36 @@ model Filamento {
 }
 
 model Produto {
-  id                String          @id @default(cuid())
+  id                String                @id @default(cuid())
   nome              String
   inspiracao        String?
   modelo3dUrl       String?
-  larguraCm         Decimal?        @db.Decimal(6, 1)
-  alturaCm          Decimal?        @db.Decimal(6, 1)
-  profundidadeCm    Decimal?        @db.Decimal(6, 1)
+  larguraCm         Decimal?              @db.Decimal(6, 1)
+  alturaCm          Decimal?              @db.Decimal(6, 1)
+  profundidadeCm    Decimal?              @db.Decimal(6, 1)
   filamentoId       String
-  filamento         Filamento       @relation(fields: [filamentoId], references: [id])
-  pesoG             Decimal         @db.Decimal(10, 2)
-  tempoH            Decimal         @db.Decimal(10, 2)
+  filamento         Filamento             @relation(fields: [filamentoId], references: [id])
+  pesoG             Decimal               @db.Decimal(10, 2)
+  tempoH            Decimal               @db.Decimal(10, 2)
   impressora        Impressora
   embalagemCentavos Int
   precoCentavos     Int
   canalPrincipal    Canal
-  ativo             Boolean         @default(true)
+  ativo             Boolean               @default(true)
   /// Indica se o produto já foi publicado no marketplace.
   /// Fluxo externo de geração de imagem só processa produtos com anunciado=false.
-  anunciado         Boolean         @default(false)
+  anunciado         Boolean               @default(false)
+  /// Produto incompleto (criado a partir de Oportunidade sem preencher tudo).
+  /// Quando true: alguns campos podem estar zerados (peso/tempo) e ativo=false.
+  /// Usuário precisa completar antes de anunciar.
+  rascunho          Boolean               @default(false)
   jobs              JobProducao[]
   vendas            Venda[]
   insumos           ProdutoInsumo[]
   imagens           ProdutoImagem[]
-  criadoEm          DateTime        @default(now())
-  atualizadoEm      DateTime        @updatedAt
+  oportunidades     ProdutoOportunidade[]
+  criadoEm          DateTime              @default(now())
+  atualizadoEm      DateTime              @updatedAt
 }
 
 /// Insumo reutilizável usado em vários produtos (caixa, fita, etiqueta).
@@ -164,7 +191,7 @@ model Venda {
   produtoId             String
   produto               Produto  @relation(fields: [produtoId], references: [id])
   qtd                   Int
-  precoUnitarioCentavos Int      // pode diferir de Produto.precoCentavos
+  precoUnitarioCentavos Int // pode diferir de Produto.precoCentavos
   canal                 Canal
   dataVenda             DateTime
   observacao            String?
@@ -194,23 +221,23 @@ model Custo {
 
 /// Singleton: sempre id=1. Configurações globais do Hub.
 model Parametro {
-  id                     Int                @id @default(1)
-  tarifaKwhCentavos      Int
-  vendedorShopee         VendedorShopeeTipo
-  emCampanhaShopee       Boolean            @default(false)
-  adicionalCampanhaPct   Decimal            @db.Decimal(5, 2)
-  comissaoMlPct          Decimal            @db.Decimal(5, 2)
-  impostoAtivo           Boolean            @default(false)
-  impostoPct             Decimal            @db.Decimal(5, 2)
+  id                          Int                @id @default(1)
+  tarifaKwhCentavos           Int
+  vendedorShopee              VendedorShopeeTipo
+  emCampanhaShopee            Boolean            @default(false)
+  adicionalCampanhaPct        Decimal            @db.Decimal(5, 2)
+  comissaoMlPct               Decimal            @db.Decimal(5, 2)
+  impostoAtivo                Boolean            @default(false)
+  impostoPct                  Decimal            @db.Decimal(5, 2)
   // Taxas do TikTok Shop são percentuais simples (sem faixa por preço).
   // Defaults batem com a estrutura padrão (jul/2026): comissão+SFP+afiliado+pagamento.
-  tiktokComissaoPlataformaPct Decimal       @default(6.00) @db.Decimal(5, 2)
-  tiktokTaxaSfpPct            Decimal       @default(6.00) @db.Decimal(5, 2)
-  tiktokComissaoAfiliadoPct   Decimal       @default(30.00) @db.Decimal(5, 2)
-  tiktokTaxaPagamentoPct      Decimal       @default(3.00) @db.Decimal(5, 2)
-  margemThresholdVerde   Decimal            @default(0.30) @db.Decimal(4, 3)
-  margemThresholdAmarelo Decimal            @default(0.15) @db.Decimal(4, 3)
-  atualizadoEm           DateTime           @updatedAt
+  tiktokComissaoPlataformaPct Decimal            @default(6.00) @db.Decimal(5, 2)
+  tiktokTaxaSfpPct            Decimal            @default(6.00) @db.Decimal(5, 2)
+  tiktokComissaoAfiliadoPct   Decimal            @default(30.00) @db.Decimal(5, 2)
+  tiktokTaxaPagamentoPct      Decimal            @default(3.00) @db.Decimal(5, 2)
+  margemThresholdVerde        Decimal            @default(0.30) @db.Decimal(4, 3)
+  margemThresholdAmarelo      Decimal            @default(0.15) @db.Decimal(4, 3)
+  atualizadoEm                DateTime           @updatedAt
 }
 
 model TaxaShopee {
@@ -251,6 +278,7 @@ model Concorrente {
   ultimoSyncEm         DateTime?
   precos               PrecoConcorrente[]
   snapshots            ConcorrenteSnapshot[]
+  oportunidades        ProdutoOportunidade[]
   criadoEm             DateTime              @default(now())
   atualizadoEm         DateTime              @updatedAt
 }
@@ -269,15 +297,15 @@ model PrecoConcorrente {
 /// e os produtos retornados vão pra ConcorrenteSnapshotProduto vinculados a ela.
 /// Sync com erro grava erroMensagem e qtdProdutos=0.
 model ConcorrenteSnapshot {
-  id              String                        @id @default(cuid())
-  concorrenteId   String
-  concorrente     Concorrente                   @relation(fields: [concorrenteId], references: [id], onDelete: Cascade)
-  sincronizadoEm  DateTime                      @default(now())
-  origem          SyncOrigem
-  qtdProdutos     Int                           @default(0)
-  erroMensagem    String?
-  produtos        ConcorrenteSnapshotProduto[]
-  criadoEm        DateTime                      @default(now())
+  id             String                       @id @default(cuid())
+  concorrenteId  String
+  concorrente    Concorrente                  @relation(fields: [concorrenteId], references: [id], onDelete: Cascade)
+  sincronizadoEm DateTime                     @default(now())
+  origem         SyncOrigem
+  qtdProdutos    Int                          @default(0)
+  erroMensagem   String?
+  produtos       ConcorrenteSnapshotProduto[]
+  criadoEm       DateTime                     @default(now())
 
   @@index([concorrenteId, sincronizadoEm(sort: Desc)])
 }
@@ -285,27 +313,99 @@ model ConcorrenteSnapshot {
 /// Produto retornado pela Shopee Affiliate naquele sync. Cópia imutável dos campos
 /// expostos pela API (19 campos confirmados). Pra ver "estado atual" basta o último snapshot.
 model ConcorrenteSnapshotProduto {
-  id                String              @id @default(cuid())
-  snapshotId        String
-  snapshot          ConcorrenteSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-  itemId            BigInt
-  productName       String
-  priceMinCentavos  Int
-  priceMaxCentavos  Int
-  priceDiscountRate Int
-  sales             Int
-  commissionRate    Decimal             @db.Decimal(5, 4)
+  id                 String                @id @default(cuid())
+  snapshotId         String
+  snapshot           ConcorrenteSnapshot   @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  itemId             BigInt
+  productName        String
+  priceMinCentavos   Int
+  priceMaxCentavos   Int
+  priceDiscountRate  Int
+  sales              Int
+  commissionRate     Decimal               @db.Decimal(5, 4)
   commissionCentavos Int
-  imageUrl          String
-  productLink       String
-  offerLink         String
-  productCatIds     Int[]
-  shopType          Int[]
-  ratingStar        Decimal?            @db.Decimal(3, 2)
-  periodStartTime   DateTime
-  periodEndTime     DateTime
+  imageUrl           String
+  productLink        String
+  offerLink          String
+  productCatIds      Int[]
+  shopType           Int[]
+  ratingStar         Decimal?              @db.Decimal(3, 2)
+  periodStartTime    DateTime
+  periodEndTime      DateTime
+  oportunidades      ProdutoOportunidade[]
 
   @@index([snapshotId, itemId])
+}
+
+/// Candidato a virar produto na Mahou. Materializado a partir de busca/varredura
+/// em marketplaces (Shopee hoje; TikTok/ML no futuro via provider pattern).
+/// Dedup por (marketplace, externalId) — mesma oportunidade é upsertada com dados frescos.
+model ProdutoOportunidade {
+  id String @id @default(cuid())
+
+  marketplace OportunidadeMarketplace
+  /// itemId Shopee, productId TikTok etc. String pra acomodar BigInt/UUID/etc.
+  externalId  String
+
+  productName        String
+  priceMinCentavos   Int
+  priceMaxCentavos   Int
+  imageUrl           String
+  productLink        String
+  /// Vendas estimadas/mês via heurística do provider (Shopee=5%, outros TBD).
+  vendasEstimadasMes Int
+  ratingStar         Decimal? @db.Decimal(3, 2)
+  /// IDs de categoria no marketplace (genérico — Shopee usa productCatIds).
+  categoriaIds       Int[]
+  lojaExternalId     String?
+  lojaNome           String?
+
+  fonte             OportunidadeFonte
+  /// keyword, catId ou outro parâmetro que originou a oportunidade.
+  fonteParam        String?
+  concorrenteId     String?
+  concorrente       Concorrente?                @relation(fields: [concorrenteId], references: [id], onDelete: SetNull)
+  snapshotProdutoId String?
+  snapshotProduto   ConcorrenteSnapshotProduto? @relation(fields: [snapshotProdutoId], references: [id], onDelete: SetNull)
+
+  status    OportunidadeStatus @default(NOVO)
+  /// 0..100, definido por Claude/manual após avaliação.
+  score     Decimal?           @db.Decimal(5, 2)
+  /// Análise livre (Claude preenche com justificativa estruturada).
+  notas     String?
+  produtoId String?            @unique
+  produto   Produto?           @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime          @default(now())
+  atualizadoEm DateTime          @updatedAt
+  logs         OportunidadeLog[]
+
+  @@unique([marketplace, externalId])
+  @@index([status, score(sort: Desc)])
+  @@index([criadoEm(sort: Desc)])
+}
+
+enum OportunidadeLogAcao {
+  CREATED
+  STATUS_CHANGE
+  SCORE_CHANGE
+  NOTAS_CHANGE
+  VIRARAM_PRODUTO
+}
+
+/// Audit trail das mudanças em ProdutoOportunidade. Append-only.
+/// `detalhes` é JSON com payload da mudança (status: { de, para }, score: { de, para }, etc.).
+/// `usuarioId` é null pra mudanças vindas do cron/sistema.
+model OportunidadeLog {
+  id             String              @id @default(cuid())
+  oportunidadeId String
+  oportunidade   ProdutoOportunidade @relation(fields: [oportunidadeId], references: [id], onDelete: Cascade)
+  acao           OportunidadeLogAcao
+  detalhes       Json
+  usuarioId      String?
+  criadoEm       DateTime            @default(now())
+
+  @@index([oportunidadeId, criadoEm(sort: Desc)])
 }
 
 model JobProducao {

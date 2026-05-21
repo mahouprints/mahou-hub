@@ -8,6 +8,7 @@ export * from './parametro';
 export * from './pricing';
 export * from './producao';
 export * from './concorrente';
+export * from './oportunidade';
 export * from './auth';
 export * from './venda';
 export * from './custo';

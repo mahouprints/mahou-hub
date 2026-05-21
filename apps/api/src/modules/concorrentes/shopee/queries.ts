@@ -33,6 +33,36 @@ export const PRODUCT_OFFER_BY_SHOP = /* GraphQL */ `
   }
 `;
 
+// Busca por palavra-chave — usada pelo módulo Oportunidades (descoberta direcionada).
+export const PRODUCT_OFFER_BY_KEYWORD = /* GraphQL */ `
+  query ProdutosPorKeyword($keyword: String, $limit: Int, $page: Int, $sortType: Int) {
+    productOfferV2(keyword: $keyword, limit: $limit, page: $page, sortType: $sortType) {
+      nodes { ${PRODUCT_NODE_FIELDS} }
+      pageInfo { page limit hasNextPage scrollId }
+    }
+  }
+`;
+
+// Busca por categoria Shopee (productCatId no singular, descoberto via erro do servidor).
+export const PRODUCT_OFFER_BY_CATEGORY = /* GraphQL */ `
+  query ProdutosPorCategoria($productCatId: Int, $limit: Int, $page: Int, $sortType: Int) {
+    productOfferV2(productCatId: $productCatId, limit: $limit, page: $page, sortType: $sortType) {
+      nodes { ${PRODUCT_NODE_FIELDS} }
+      pageInfo { page limit hasNextPage scrollId }
+    }
+  }
+`;
+
+// Top global sem filtro — usado no modo brainstorm. Filtros de qualidade (vendas, preço) são aplicados no provider.
+export const PRODUCT_OFFER_TOP = /* GraphQL */ `
+  query ProdutosTop($limit: Int, $page: Int, $sortType: Int) {
+    productOfferV2(limit: $limit, page: $page, sortType: $sortType) {
+      nodes { ${PRODUCT_NODE_FIELDS} }
+      pageInfo { page limit hasNextPage scrollId }
+    }
+  }
+`;
+
 export const SHOP_OFFER = /* GraphQL */ `
   query Loja($shopId: Int64, $limit: Int, $page: Int) {
     shopOfferV2(shopId: $shopId, limit: $limit, page: $page) {

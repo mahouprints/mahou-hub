@@ -9,12 +9,11 @@ import {
   ExternalLink,
   RefreshCw,
   Star,
-  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { estimarVendasTotaisMes } from '@mahou-hub/pricing';
 import { apiFetch } from '@/lib/api-client';
-import { centavosParaReais, pct, tempoRelativo } from '@/lib/format';
+import { centavosParaReais } from '@/lib/format';
 import { useTableSort } from '@/lib/use-table-sort';
 import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';

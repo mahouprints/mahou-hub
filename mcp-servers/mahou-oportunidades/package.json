@@ -1,0 +1,26 @@
+{
+  "name": "@mahou-hub/mcp-oportunidades",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server que expõe o módulo de Inteligência de Oportunidades da Mahou Hub como tools pro Claude.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "mahou-mcp-oportunidades": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.23.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3"
+  }
+}

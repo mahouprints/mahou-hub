@@ -5,11 +5,22 @@ import {
   type GraphQLResponse,
 } from './shopee/affiliate.client';
 import {
+  PRODUCT_OFFER_BY_CATEGORY,
+  PRODUCT_OFFER_BY_KEYWORD,
   PRODUCT_OFFER_BY_SHOP,
+  PRODUCT_OFFER_TOP,
   SHOP_OFFER,
   type AffiliateProductNode,
   type AffiliateShopNode,
 } from './shopee/queries';
+
+export type PaginateOpts = {
+  limit?: number;
+  pageSize?: number;
+  sortType?: number;
+  maxPages?: number;
+  filter?: (node: AffiliateProductNode) => boolean;
+};
 import { resolveShop, type ShopDetailMobileWeb } from './shopee/username-resolver';
 
 /**
@@ -70,6 +81,63 @@ export class ShopeeAffiliateService {
       if (!hasNext || nodes.length === 0) break;
     }
     return all;
+  }
+
+  // Opts comuns das buscas paginadas. `filter` aplica por-página, parando quando bater limit
+  // de produtos APROVADOS — evita devolver poucos itens quando o filtro é restritivo.
+  // `maxPages` é cap defensivo (default 20 = até 1000 produtos brutos / loja).
+  // Sem filter, mantém comportamento antigo (`all.length >= limit` corta).
+  // Atenção: filter restritivo + maxPages baixo pode devolver menos que `limit`.
+  // Aumente maxPages OU relaxe o filter quando isso acontecer.
+  // Default sortType=2 (comissão alta) é melhor que sem ordenação pra qualidade percebida.
+
+  // Busca direcionada por keyword (módulo Oportunidades — modo "buscar").
+  async searchByKeyword(
+    keyword: string,
+    opts?: PaginateOpts,
+  ): Promise<AffiliateProductNode[]> {
+    return this.paginateProductOffer(PRODUCT_OFFER_BY_KEYWORD, { keyword }, opts);
+  }
+
+  // Busca direcionada por categoria Shopee. productCatId é Int (singular, conforme schema).
+  async searchByCategory(
+    productCatId: number,
+    opts?: PaginateOpts,
+  ): Promise<AffiliateProductNode[]> {
+    return this.paginateProductOffer(PRODUCT_OFFER_BY_CATEGORY, { productCatId }, opts);
+  }
+
+  // Top vendas global (modo brainstorm). sortType=4 = mais vendidos (relevância pra brainstorm).
+  async fetchTopOffers(opts?: PaginateOpts): Promise<AffiliateProductNode[]> {
+    return this.paginateProductOffer(PRODUCT_OFFER_TOP, {}, { sortType: 4, ...opts });
+  }
+
+  // Paginação genérica de productOfferV2 com early-exit ao bater `limit` de aprovados (pós-filter).
+  private async paginateProductOffer(
+    query: string,
+    extraVars: Record<string, unknown>,
+    opts?: PaginateOpts,
+  ): Promise<AffiliateProductNode[]> {
+    const limit = opts?.limit ?? 200;
+    const pageSize = opts?.pageSize ?? 50;
+    const sortType = opts?.sortType ?? 2;
+    const maxPages = opts?.maxPages ?? 20;
+    const filter = opts?.filter;
+    const matched: AffiliateProductNode[] = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const res = await this.client.query<{
+        productOfferV2: { nodes: AffiliateProductNode[]; pageInfo: { hasNextPage: boolean } };
+      }>(query, { ...extraVars, limit: pageSize, page, sortType });
+      this.warnIfErrors('productOfferV2', res);
+      const nodes = res.data?.productOfferV2?.nodes ?? [];
+      for (const n of nodes) {
+        if (!filter || filter(n)) matched.push(n);
+        if (matched.length >= limit) return matched;
+      }
+      const hasNext = res.data?.productOfferV2?.pageInfo?.hasNextPage;
+      if (!hasNext || nodes.length === 0) break;
+    }
+    return matched;
   }
 
   private warnIfErrors(label: string, res: GraphQLResponse<unknown>): void {

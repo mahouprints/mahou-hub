@@ -94,10 +94,17 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - **Hooks de tabela**: `useTableSelection` (modo seleção opcional + Set<id>) e `useTableSort` (asc/desc/idle) em `apps/web/lib/`. Aplicar nas tabelas longas (produtos, vendas, custos, insumos).
 - **Componentes de UI**: `SortableHead`, `SelectionToolbar`, `Checkbox` (shadcn), `DatePicker`, `MonthPicker`, `UploadDropzone`, `ImagensSection`. Reusar; não criar variantes paralelas.
 
+## Setup Windows (dev)
+- **Antivirus EPERM no Prisma generate**: Windows Defender (e similares) bloqueiam o rename do `query_engine-windows.dll.node` durante `prisma generate`. Adicione exclusão no PowerShell **como admin** (uma vez por máquina):
+  ```powershell
+  Add-MpPreference -ExclusionPath "$(Resolve-Path .\node_modules)"
+  ```
+  Em Linux/Docker (prod) não acontece.
+
 ## Comandos úteis
 - `pnpm dev` — sobe web + api em modo dev.
-- `pnpm test` — roda testes do pricing (único módulo testado por enquanto).
-- `pnpm lint` — ESLint + Prettier check.
+- `pnpm test` — roda testes do pricing + api (Vitest).
+- `pnpm lint` — ESLint v9 flat config (raiz) + Prettier check.
 - `pnpm typecheck` — typecheck em todos os pacotes (rode antes de commitar mudanças que cruzam contracts/pricing/api/web).
 - `pnpm --filter api exec prisma migrate dev` — nova migration.
 - `pnpm --filter api exec prisma studio` — UI do banco.

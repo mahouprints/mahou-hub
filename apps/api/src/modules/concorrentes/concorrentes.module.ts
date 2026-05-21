@@ -7,6 +7,7 @@ import { ShopeeAffiliateService } from './shopee-affiliate.service';
 @Module({
   controllers: [ConcorrentesController],
   providers: [ConcorrentesService, ShopeeAffiliateService, ConcorrentesCron],
-  exports: [ConcorrentesService],
+  // Exporta ShopeeAffiliateService pra reuso no módulo Oportunidades (ShopeeProvider).
+  exports: [ConcorrentesService, ShopeeAffiliateService],
 })
 export class ConcorrentesModule {}

@@ -10,6 +10,7 @@ import {
   Factory,
   Crosshair,
   DollarSign,
+  Lightbulb,
   Settings,
   Sparkles,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ const NAV_PRINCIPAL = [
   { href: '/producao', label: 'Produção', icon: Factory },
   { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { href: '/concorrentes', label: 'Concorrentes', icon: Crosshair },
+  { href: '/oportunidades', label: 'Oportunidades', icon: Lightbulb },
 ];
 
 const NAV_RODAPE = [{ href: '/configuracoes', label: 'Configurações', icon: Settings }];

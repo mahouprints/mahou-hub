@@ -18,6 +18,7 @@ import { VendasModule } from './modules/vendas/vendas.module';
 import { CustosModule } from './modules/custos/custos.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { ConcorrentesModule } from './modules/concorrentes/concorrentes.module';
+import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { HealthController } from './modules/health/health.controller';
 
 @Module({
@@ -56,6 +57,7 @@ import { HealthController } from './modules/health/health.controller';
     CustosModule,
     FinanceiroModule,
     ConcorrentesModule,
+    OportunidadesModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

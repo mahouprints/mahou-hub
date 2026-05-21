@@ -82,6 +82,7 @@ type ColunaSort =
   | 'lucroH';
 
 type FiltroAnunciado = 'todos' | 'sim' | 'nao';
+type FiltroStatus = 'todos' | 'completos' | 'rascunhos';
 
 /**
  * Escolhe o canal entre marketplaces (Shopee × ML) com maior líquido por peça.
@@ -121,6 +122,7 @@ export default function ProdutosPage() {
   const [filtroCanal, setFiltroCanal] = useState(TODOS);
   const [filtroImpressora, setFiltroImpressora] = useState(TODOS);
   const [filtroAnunciado, setFiltroAnunciado] = useState<FiltroAnunciado>('todos');
+  const [filtroStatus, setFiltroStatus] = useState<FiltroStatus>('todos');
 
   const sort = useTableSort<ProdutoComPricing, ColunaSort>({
     nome: (p) => p.nome,
@@ -141,10 +143,12 @@ export default function ProdutosPage() {
       if (filtroImpressora !== TODOS && p.impressora !== filtroImpressora) return false;
       if (filtroAnunciado === 'sim' && !p.anunciado) return false;
       if (filtroAnunciado === 'nao' && p.anunciado) return false;
+      if (filtroStatus === 'completos' && p.rascunho) return false;
+      if (filtroStatus === 'rascunhos' && !p.rascunho) return false;
       return true;
     });
     return sort.ordenar(f);
-  }, [data, filtroFilamento, filtroCanal, filtroImpressora, filtroAnunciado, sort]);
+  }, [data, filtroFilamento, filtroCanal, filtroImpressora, filtroAnunciado, filtroStatus, sort]);
 
   const idsVisiveis = useMemo(() => filtrados.map((p) => p.id), [filtrados]);
   const sel = useTableSelection(idsVisiveis);
@@ -210,6 +214,8 @@ export default function ProdutosPage() {
         setFiltroImpressora={setFiltroImpressora}
         filtroAnunciado={filtroAnunciado}
         setFiltroAnunciado={setFiltroAnunciado}
+        filtroStatus={filtroStatus}
+        setFiltroStatus={setFiltroStatus}
       />
 
       <SelectionToolbar
@@ -364,6 +370,11 @@ export default function ProdutosPage() {
                         <span className="block truncate max-w-[260px]" title={p.nome}>
                           {p.nome}
                         </span>
+                        {p.rascunho && (
+                          <Badge variant="warning" className="shrink-0 font-normal">
+                            Rascunho
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{p.pesoG}g</TableCell>
@@ -425,6 +436,8 @@ function FiltrosBar({
   setFiltroImpressora,
   filtroAnunciado,
   setFiltroAnunciado,
+  filtroStatus,
+  setFiltroStatus,
 }: {
   filamentos: Filamento[];
   filtroFilamento: string;
@@ -435,9 +448,11 @@ function FiltrosBar({
   setFiltroImpressora: (v: string) => void;
   filtroAnunciado: FiltroAnunciado;
   setFiltroAnunciado: (v: FiltroAnunciado) => void;
+  filtroStatus: FiltroStatus;
+  setFiltroStatus: (v: FiltroStatus) => void;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <div className="space-y-1.5">
         <Label className="text-xs uppercase text-muted-foreground">Filamento</Label>
         <Select value={filtroFilamento} onValueChange={setFiltroFilamento}>
@@ -495,6 +510,19 @@ function FiltrosBar({
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="nao">Pendentes</SelectItem>
             <SelectItem value="sim">Anunciados</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs uppercase text-muted-foreground">Status</Label>
+        <Select value={filtroStatus} onValueChange={(v) => setFiltroStatus(v as FiltroStatus)}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="completos">Apenas completos</SelectItem>
+            <SelectItem value="rascunhos">Apenas rascunhos</SelectItem>
           </SelectContent>
         </Select>
       </div>

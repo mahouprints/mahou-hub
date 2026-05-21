@@ -22,6 +22,7 @@ export const config = {
     '/simulador/:path*',
     '/producao/:path*',
     '/concorrentes/:path*',
+    '/oportunidades/:path*',
     '/configuracoes/:path*',
   ],
 };

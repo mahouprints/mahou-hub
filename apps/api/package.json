@@ -16,6 +16,8 @@
     "prisma:studio": "prisma studio",
     "import:xlsx": "tsx scripts/import-xlsx.ts",
     "seed:admin": "tsx scripts/seed-admin.ts",
+    "smoke:oportunidades": "tsx scripts/smoke-oportunidades.ts",
+    "shopee:discover-categories": "tsx scripts/discover-shopee-categories.ts",
     "db:seed": "prisma db seed"
   },
   "prisma": {

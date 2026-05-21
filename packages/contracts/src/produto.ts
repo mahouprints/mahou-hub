@@ -11,21 +11,29 @@ export const ProdutoSchema = z.object({
   alturaCm: z.number().positive().nullable(),
   profundidadeCm: z.number().positive().nullable(),
   filamentoId: z.string(),
-  pesoG: z.number().positive(),
-  tempoH: z.number().positive(),
+  // pesoG/tempoH precisam ser >0 num produto completo; rascunhos podem ter 0.
+  pesoG: z.number().nonnegative(),
+  tempoH: z.number().nonnegative(),
   impressora: ImpressoraEnum,
   embalagemCentavos: z.number().int().nonnegative(),
   precoCentavos: z.number().int().positive(),
   canalPrincipal: CanalEnum,
   ativo: z.boolean(),
   anunciado: z.boolean(),
+  // Rascunho = produto incompleto (criado via virar-produto sem todos os campos).
+  // Bloqueia o fluxo de anunciar até o usuário completar.
+  rascunho: z.boolean(),
 });
 
 export const ProdutoCreateSchema = ProdutoSchema.omit({
   id: true,
   ativo: true,
   anunciado: true,
+  rascunho: true,
 }).extend({
+  // No create normal (UI manual), peso e tempo voltam a ser obrigatórios positivos.
+  pesoG: z.number().positive(),
+  tempoH: z.number().positive(),
   ativo: z.boolean().default(true),
   anunciado: z.boolean().default(false),
   insumos: z.array(ProdutoInsumoInputSchema).optional(),
