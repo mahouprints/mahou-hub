@@ -101,6 +101,11 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
   ```
   Em Linux/Docker (prod) não acontece.
 
+## MCP server (Claude Code/Desktop)
+- `mcp-servers/mahou-hub/` expõe 21 tools pro Claude (oportunidades + catálogo).
+- Onboarding completo em `mcp-servers/mahou-hub/README.md` (passo-a-passo 5min: gerar token → .env.local → build → abre Claude no repo).
+- Pra adicionar novas áreas de tools: criar `tools-<area>.ts`, importar em `src/index.ts`. Schemas Zod replicados localmente (sem dep em contracts) pra manter o MCP server publicável standalone.
+
 ## Comandos úteis
 - `pnpm dev` — sobe web + api em modo dev.
 - `pnpm test` — roda testes do pricing + api (Vitest).
