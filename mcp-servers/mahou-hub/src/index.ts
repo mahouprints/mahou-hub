@@ -22,7 +22,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: tools.map((t) => ({
     name: t.name,
     description: t.description,
-    inputSchema: zodToJsonSchema(t.inputSchema, { target: 'openApi3' }) as Record<string, unknown>,
+    // jsonSchema7 (default) é compatível com JSON Schema draft 2020-12 que a API
+    // da Anthropic exige. `openApi3` gera `nullable: true` em vez de `type: [..., 'null']`
+    // e quebra com 400 "JSON schema is invalid".
+    inputSchema: zodToJsonSchema(t.inputSchema) as Record<string, unknown>,
   })),
 }));
 

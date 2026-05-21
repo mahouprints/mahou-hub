@@ -2,11 +2,10 @@
   "mcpServers": {
     "mahou-hub": {
       "command": "node",
-      "args": ["./mcp-servers/mahou-hub/dist/index.js"],
-      "env": {
-        "MAHOU_API_URL": "${MAHOU_API_URL:-https://api.mahouprints.com}",
-        "MAHOU_API_TOKEN": "${MAHOU_API_TOKEN}"
-      }
+      "args": [
+        "--env-file=./mcp-servers/mahou-hub/.env.local",
+        "./mcp-servers/mahou-hub/dist/index.js"
+      ]
     }
   }
 }
