@@ -47,9 +47,11 @@ export const tools = [
   {
     name: 'buscar_oportunidades',
     description:
-      'Busca direcionada de produtos no marketplace (keyword, categoria ou concorrente monitorado). ' +
+      'Busca direcionada de produtos no marketplace (keyword, categoria ou concorrente). ' +
       'Não persiste — devolve candidatos enriquecidos com vendasEstimadasMes. Use ' +
-      '`salvar_oportunidades_em_lote` depois pra adicionar ao backlog os que valem a pena.',
+      '`salvar_oportunidades_em_lote` depois pra adicionar ao backlog os que valem a pena. ' +
+      'Pro tipo `concorrente`: passe `concorrenteId` (interno) pra ler snapshot local rápido, ' +
+      'OU `lojaExternalId` (shopId Shopee) pra investigar loja não cadastrada via Affiliate API on-demand.',
     inputSchema: z.object({
       marketplace: MarketplaceSchema,
       tipo: z.enum(['keyword', 'categoria', 'concorrente']),
@@ -58,8 +60,9 @@ export const tools = [
           keyword: z.string().optional(),
           categoryId: z.string().optional(),
           concorrenteId: z.string().optional(),
+          lojaExternalId: z.string().optional(),
         })
-        .describe('keyword|categoryId|concorrenteId conforme o tipo'),
+        .describe('keyword|categoryId|concorrenteId|lojaExternalId conforme o tipo'),
       filtros: FiltrosSchema,
     }),
     handler: async (input: unknown) => {

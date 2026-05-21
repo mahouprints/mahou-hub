@@ -38,6 +38,9 @@ export interface MarketplaceProvider {
   listFromMonitored(
     opts: SearchOpts & { concorrenteId?: string },
   ): Promise<OportunidadeCandidato[]>;
+  // Investigação ad-hoc de loja externa não cadastrada — chama Affiliate API on-demand.
+  // Opcional: providers sem essa capacidade podem omitir (caller faz fallback).
+  listByShopIdLive?(shopId: string, opts: SearchOpts): Promise<OportunidadeCandidato[]>;
 }
 
 // DI token usado pra registrar providers via multi-inject.

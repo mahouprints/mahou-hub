@@ -95,6 +95,23 @@ export class ShopeeProvider implements MarketplaceProvider {
     return this.applyFiltersToMaterialized(candidatos, opts).slice(0, opts.limit ?? 200);
   }
 
+  // Chama Affiliate API on-demand pra um shopId arbitrário (sem cadastro/snapshot).
+  // Usado pelo fluxo "investigar loja descoberta numa busca antes de cadastrar":
+  // - Custo: 1..N requests à Affiliate API (paginação) → respeita rate-limit Shopee.
+  // - Sem persistência: nada vai pro DB. Pra histórico, cadastrar como Concorrente.
+  async listByShopIdLive(
+    shopId: string,
+    opts: SearchOpts,
+  ): Promise<OportunidadeCandidato[]> {
+    const numericShopId = Number(shopId);
+    if (!Number.isFinite(numericShopId)) {
+      throw new Error(`lojaExternalId Shopee precisa ser numérico, recebido "${shopId}"`);
+    }
+    const nodes = await this.shopee.fetchAllProducts(numericShopId);
+    const candidatos = nodes.map((n) => this.materializeNode(n));
+    return this.applyFiltersToMaterialized(candidatos, opts).slice(0, opts.limit ?? 200);
+  }
+
   // Materializa AffiliateProductNode → OportunidadeCandidato (sem filtrar — filter foi
   // aplicado durante a paginação pra cortar cedo e respeitar `limit` pós-filtro).
   private materializeNode(p: AffiliateProductNode): OportunidadeCandidato {

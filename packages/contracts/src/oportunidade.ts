@@ -63,8 +63,16 @@ export const OportunidadeBuscarSchema = z.discriminatedUnion('tipo', [
   z.object({
     marketplace: OportunidadeMarketplaceSchema.default('SHOPEE'),
     tipo: z.literal('concorrente'),
-    // Sem concorrenteId: agrega produtos de todas as lojas monitoradas.
-    params: z.object({ concorrenteId: z.string().min(1).optional() }).default({}),
+    // `concorrenteId` (interno) → lê snapshot local salvo pelo cron, sem custo de API.
+    // `lojaExternalId` (shopId Shopee) → chama Affiliate API on-demand, sem persistir.
+    //   Útil pra investigar uma loja descoberta numa busca antes de cadastrar.
+    // Nenhum dos dois → agrega produtos de todas as lojas monitoradas (do snapshot).
+    params: z
+      .object({
+        concorrenteId: z.string().min(1).optional(),
+        lojaExternalId: z.string().min(1).optional(),
+      })
+      .default({}),
     filtros: FiltrosSchema,
   }),
 ]);
