@@ -107,6 +107,13 @@ export const CATEGORIAS_SHOPEE_3D: CategoriaShopee3D[] = [
     notas: 'Chaveiros temáticos (Patrulha, Pokebola), estojos de cartão/controle.',
   },
   {
+    // Detectada via gap analysis em 2026-05-21: 158 ocorrências em GAPs. Categoria dominante
+    // de "cantinho do café decorativo" da 3DTECH e outras lojas 3D. Volume gigante de mercado.
+    id: 100717,
+    nome: 'Cozinha decoração / cantinho do café',
+    notas: 'Cantinho café Bob com plantas + xícara flutuante, suportes vinho/pimenta, kits utensílios decorativos.',
+  },
+  {
     id: 100284,
     nome: 'Organizadores de cabo / celular',
     notas: 'Gancho cabo gerenciador de fios, suporte fio adesivo, organizador cabo gancho.',
