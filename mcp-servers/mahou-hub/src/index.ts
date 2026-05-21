@@ -6,10 +6,15 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { tools } from './tools.js';
+import { tools as oportunidadesTools } from './tools-oportunidades.js';
+import { tools as catalogoTools } from './tools-catalogo.js';
+
+// Tools de oportunidades e catálogo ficam em arquivos separados pra organização
+// — combinadas aqui pra exposição única ao Claude.
+const tools = [...oportunidadesTools, ...catalogoTools];
 
 const server = new Server(
-  { name: 'mahou-oportunidades', version: '0.1.0' },
+  { name: 'mahou-hub', version: '0.2.0' },
   { capabilities: { tools: {} } },
 );
 

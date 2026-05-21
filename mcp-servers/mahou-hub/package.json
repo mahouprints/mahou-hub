@@ -1,12 +1,12 @@
 {
-  "name": "@mahou-hub/mcp-oportunidades",
-  "version": "0.1.0",
+  "name": "@mahou-hub/mcp-hub",
+  "version": "0.2.0",
   "private": true,
-  "description": "MCP server que expõe o módulo de Inteligência de Oportunidades da Mahou Hub como tools pro Claude.",
+  "description": "MCP server da Mahou Hub: oportunidades de mercado (Shopee) + catálogo (produtos/filamentos/insumos/pricing) como tools pro Claude.",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "mahou-mcp-oportunidades": "dist/index.js"
+    "mahou-mcp-hub": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
