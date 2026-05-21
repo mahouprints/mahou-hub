@@ -62,11 +62,13 @@ export const tools = [
       'Lista produtos cadastrados na Mahou com filtros e paginação. ' +
       'Devolve produto + pricing calculado (custos, margem, lucro por canal). ' +
       'Use `q` pra busca textual (nome+inspiração), `anunciado` pra filtrar publicados, ' +
-      '`canal` pra filtrar canal principal, `temImagens` pra filtrar por presença de imagens.',
+      '`canal` pra filtrar canal principal, `temImagens` pra filtrar por presença de foto final, ' +
+      '`temReferencia` pra filtrar por presença de inspiração/modelo3dUrl.',
     inputSchema: z.object({
       anunciado: z.enum(['true', 'false']).optional(),
       canal: CanalSchema.optional(),
       temImagens: z.enum(['true', 'false']).optional(),
+      temReferencia: z.enum(['true', 'false']).optional(),
       q: z.string().min(1).max(200).optional(),
       page: z.number().int().positive().optional(),
       pageSize: z.number().int().min(1).max(200).optional(),
@@ -87,15 +89,19 @@ export const tools = [
     name: 'listar_produtos_pendentes_imagem',
     description:
       'Atalho pro fluxo da skill de geração de imagem: lista produtos `anunciado=false` ' +
-      'que JÁ TÊM imagens de referência anexadas (inspiração / modelo 3D) e precisam ' +
-      'da imagem final gerada antes de anunciar. Cada item vem com `imagens[]` (URLs ' +
-      'públicas em media.mahouprints.com — baixe direto via fetch/curl, sem auth).',
+      'que JÁ TÊM material de referência (inspiração ou modelo3dUrl) MAS AINDA NÃO TÊM ' +
+      'foto final hospedada. Esses são os candidatos imediatos pro gerador de imagem. ' +
+      'Use `inspiracao` / `modelo3dUrl` de cada item como input pro gerador.',
     inputSchema: z.object({
       page: z.number().int().positive().optional(),
       pageSize: z.number().int().min(1).max(200).optional(),
     }),
     handler: async (input: unknown) => {
-      const params = new URLSearchParams({ anunciado: 'false', temImagens: 'true' });
+      const params = new URLSearchParams({
+        anunciado: 'false',
+        temReferencia: 'true',
+        temImagens: 'false',
+      });
       for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
         if (v !== undefined && v !== null) params.set(k, String(v));
       }
