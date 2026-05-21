@@ -16,6 +16,8 @@ export type ProdutoListSortDir = 'asc' | 'desc';
 export type ProdutoListOpts = {
   anunciado?: boolean;
   canal?: Canal;
+  /** Quando definido, filtra por presença (`true`) ou ausência (`false`) de ProdutoImagem. */
+  temImagens?: boolean;
   q?: string;
   page?: number;
   pageSize?: number;
@@ -39,11 +41,14 @@ export class ProdutosService {
    * quando parar.
    */
   async list(opts?: ProdutoListOpts) {
-    const { anunciado, canal, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
-    const where = {
+    const { anunciado, canal, temImagens, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
+    const where: Prisma.ProdutoWhereInput = {
       ativo: true,
       ...(anunciado != null ? { anunciado } : {}),
       ...(canal ? { canalPrincipal: canal } : {}),
+      // `imagens: { some: {} }` → tem pelo menos 1; `none: {} }` → não tem nenhuma.
+      ...(temImagens === true ? { imagens: { some: {} } } : {}),
+      ...(temImagens === false ? { imagens: { none: {} } } : {}),
       ...(q && q.trim()
         ? {
             OR: [

@@ -39,6 +39,10 @@ const SORTABLE_FIELDS = ['criadoEm', 'atualizadoEm', 'nome', 'precoCentavos'] as
 const ListQuerySchema = z.object({
   anunciado: z.enum(['true', 'false']).optional(),
   canal: z.nativeEnum(Canal).optional(),
+  // temImagens=true filtra produtos com >=1 ProdutoImagem (qualquer origem).
+  // Combinado com anunciado=false dá o set "pendentes de geração de imagem":
+  // têm referência (inspiração/modelo 3D) pra alimentar o gerador.
+  temImagens: z.enum(['true', 'false']).optional(),
   q: z.string().trim().min(1).max(200).optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(200).optional(),
@@ -63,6 +67,7 @@ export class ProdutosController {
   })
   @ApiQuery({ name: 'anunciado', required: false, enum: ['true', 'false'], description: 'Filtra por flag anunciado' })
   @ApiQuery({ name: 'canal', required: false, enum: Canal, description: 'Filtra por canal principal' })
+  @ApiQuery({ name: 'temImagens', required: false, enum: ['true', 'false'], description: 'Filtra por presença de pelo menos 1 ProdutoImagem' })
   @ApiQuery({ name: 'q', required: false, description: 'Busca textual (case-insensitive) em nome + inspiração' })
   @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1 } })
   @ApiQuery({ name: 'pageSize', required: false, schema: { type: 'integer', minimum: 1, maximum: 200 } })
@@ -73,7 +78,7 @@ export class ProdutosController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '));
     }
-    const { anunciado, canal, q, page, pageSize, sortBy, sortDir } = parsed.data;
+    const { anunciado, canal, temImagens, q, page, pageSize, sortBy, sortDir } = parsed.data;
     // Se passou page sem pageSize (ou vice-versa), preenche o outro com default
     // sensato — evita armadilha "page=2 sozinho" que devolveria a página inteira.
     const pageNorm = page ?? (pageSize ? 1 : undefined);
@@ -82,6 +87,7 @@ export class ProdutosController {
     const { items, total } = await this.service.list({
       anunciado: anunciado === 'true' ? true : anunciado === 'false' ? false : undefined,
       canal,
+      temImagens: temImagens === 'true' ? true : temImagens === 'false' ? false : undefined,
       q,
       page: pageNorm,
       pageSize: pageSizeNorm,
