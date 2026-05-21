@@ -37,6 +37,9 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Frontend segue App Router: `app/(grupo)/<rota>/page.tsx`, `components/` ao lado.
 - Caminhos previsíveis: se existe `Produto` no backend, existe `apps/web/app/(app)/produtos/` no front.
 - Migrations Prisma versionadas em `apps/api/prisma/migrations/`. Nunca editar migration aplicada.
+- API prefixo `api/v1` (setGlobalPrefix em `main.ts`). Frontend chama `/api/<path>` e o Next rewrite traduz pra `/api/v1/<path>` — UI fica alheia à versão. Consumer externo usa `/api/v1/...`. `/healthz` segue fora do prefixo.
+- Swagger UI em `/api/v1/docs`, spec em `/api/v1/docs-json` — agrupado por `@ApiTags` por controller. Ao adicionar endpoint, manter o padrão (`@ApiOperation` em endpoints que consumer externo usa).
+- Rate-limit global: 100 req/min por IP via `@nestjs/throttler` + `APP_GUARD`. Pra endpoint mais permissivo ou mais restrito, usar `@Throttle({ default: { limit, ttl } })`. `@SkipThrottle()` pra isentar.
 
 ## Formatação
 - `prettier` + `eslint --fix` rodam em pre-commit (lefthook).
@@ -74,7 +77,7 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 
 ## Auth e API tokens
 - JWT vai por cookie (`mahou_token`, HttpOnly, SameSite=Lax) ou header `Authorization: Bearer`. JwtStrategy aceita os dois.
-- `POST /auth/api-token` (autenticado) gera JWT de longa duração (TTL 1..365 dias) pra fluxos automáticos. Mesmo payload do login normal — funciona em todos os endpoints protegidos. Sem rastreio/revogação por token: pra invalidar emergencialmente, rotacionar `JWT_SECRET` no servidor (invalida TUDO, incluindo sessões ativas).
+- `POST /api/v1/auth/api-token` (autenticado) gera JWT de longa duração (TTL 1..365 dias) pra fluxos automáticos. Mesmo payload do login normal — funciona em todos os endpoints protegidos. Sem rastreio/revogação por token: pra invalidar emergencialmente, rotacionar `JWT_SECRET` no servidor (invalida TUDO, incluindo sessões ativas).
 - Token é exibido uma única vez na UI; consumer copia e cola no `.env`.
 
 ## O que NÃO fazer
