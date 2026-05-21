@@ -17,10 +17,13 @@ import {
   type CustoCreate,
   type CustoUpdate,
 } from '@mahou-hub/contracts';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CustosService } from './custos.service';
 
+@ApiTags('custos')
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('custos')
 export class CustosController {

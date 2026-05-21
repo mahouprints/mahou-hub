@@ -1,7 +1,10 @@
 import { BadRequestException, Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { FinanceiroService } from './financeiro.service';
 
+@ApiTags('financeiro')
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('financeiro')
 export class FinanceiroController {

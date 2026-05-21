@@ -11,10 +11,13 @@ import {
   type FaixaShopeeUpdate,
   type ParametroUpdate,
 } from '@mahou-hub/contracts';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { ParametrosService } from './parametros.service';
 
+@ApiTags('parametros')
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('parametros')
 export class ParametrosController {

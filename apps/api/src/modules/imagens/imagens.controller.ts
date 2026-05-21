@@ -17,10 +17,13 @@ import {
   type OrigemImagem,
   type ProdutoImagemUpdate,
 } from '@mahou-hub/contracts';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { ImagensService } from './imagens.service';
 
+@ApiTags('imagens')
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('produtos/:produtoId/imagens')
 export class ImagensController {

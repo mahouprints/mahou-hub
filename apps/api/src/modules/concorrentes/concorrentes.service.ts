@@ -89,6 +89,29 @@ export class ConcorrentesService {
     };
   }
 
+  /** Atalho: devolve produtos do snapshot mais recente. Evita 2 round-trips pro consumer externo. */
+  async getProdutosUltimoSnapshot(concorrenteId: string) {
+    await this.assertExists(concorrenteId);
+    const snap = await this.prisma.concorrenteSnapshot.findFirst({
+      where: { concorrenteId, erroMensagem: null },
+      orderBy: { sincronizadoEm: 'desc' },
+      include: { produtos: { orderBy: { sales: 'desc' } } },
+    });
+    if (!snap) {
+      return { snapshotId: null, sincronizadoEm: null, produtos: [] };
+    }
+    return {
+      snapshotId: snap.id,
+      sincronizadoEm: snap.sincronizadoEm,
+      produtos: snap.produtos.map((p) => ({
+        ...p,
+        itemId: p.itemId.toString(),
+        commissionRate: p.commissionRate.toString(),
+        ratingStar: p.ratingStar?.toString() ?? null,
+      })),
+    };
+  }
+
   async create(data: ConcorrenteCreate) {
     return this.prisma.concorrente.create({
       data: {

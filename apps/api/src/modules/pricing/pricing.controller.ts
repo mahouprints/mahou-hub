@@ -1,4 +1,5 @@
 import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CalcularInputSchema,
   SimularInputSchema,
@@ -9,6 +10,8 @@ import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { PricingService } from './pricing.service';
 
+@ApiTags('pricing')
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('pricing')
 export class PricingController {

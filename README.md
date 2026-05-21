@@ -40,14 +40,67 @@ infra/
 
 **Canais de venda suportados:** SHOPEE, ML, SITE, TIKTOK. Taxas TikTok são 4 percentuais configuráveis em `Parametro` (comissão plataforma, SFP, afiliado, processamento de pagamento).
 
-## Fluxo externo de geração de imagem
+## API pública (integrações externas)
 
-Pensado pra rodar em n8n ou script standalone. Esquema:
+A API REST do Hub é pensada pra consumo por automações (n8n, Make, Zapier, scripts). Base: `https://api.mahouprints.com/api` (prod) ou `http://localhost:3000/api` (dev).
 
-1. Em `/configuracoes` → card **Acesso por API** → "Gerar token" (TTL configurável até 365d). O token é exibido **uma única vez** — copia e cola no `.env` do consumidor.
-2. Pré-upload das imagens de referência em `/produtos/<id>` (card Imagens) — origem `INSPIRACAO` ou `MODELO_3D`. Sharp normaliza pra JPG 90% max 2000px na hora.
-3. Consumer chama `GET https://api.mahouprints.com/api/produtos?anunciado=false` com `Authorization: Bearer <token>`. Resposta inclui imagens com URLs absolutas via `media.mahouprints.com`, filamento, insumos, dimensões — tudo num único request.
-4. Após processar (Gemini 2.5 Flash / outra) e publicar: `POST /api/produtos/bulk-anunciar { ids: [...], anunciado: true }` tira do pool.
+### Documentação interativa
+
+- **Swagger UI**: `https://api.mahouprints.com/api/docs` — UI navegável, "Try it out" embutido. Clica em **Authorize** e cola o token Bearer.
+- **OpenAPI spec (JSON)**: `https://api.mahouprints.com/api/docs-json` — alimentação direta de geradores de client (Postman, n8n, OpenAPI Generator).
+
+### Autenticação
+
+1. Em `/configuracoes` → card **Acesso por API** → "Gerar token" (TTL 1..365d). Resposta é exibida **uma única vez** — copie e guarde.
+2. Cada request passa o header `Authorization: Bearer <token>`. Não precisa de cookies pra fluxos automáticos.
+3. Pra invalidar emergencialmente, rotacione `JWT_SECRET` no servidor — não há revogação por token.
+
+### Endpoints mais úteis pra consumers
+
+| Caso de uso | Endpoint | Notas |
+|---|---|---|
+| Listar produtos do catálogo | `GET /produtos` | Filtro opcional `?anunciado=true\|false` |
+| Produto específico + imagens + insumos | `GET /produtos/:id` | URLs absolutas via `media.mahouprints.com` |
+| Marcar produtos como publicados | `POST /produtos/bulk-anunciar` | Body: `{ ids: string[], anunciado: boolean }` |
+| Listar lojas concorrentes (com vendas estimadas/mês) | `GET /concorrentes` | Inclui `vendasEstimadasMesTotal` agregado |
+| Produtos de uma loja concorrente (snapshot mais recente) | `GET /concorrentes/:id/produtos` | Atalho que evita 3 round-trips |
+| Histórico de snapshots de uma loja | `GET /concorrentes/:id/snapshots` | Pra séries temporais |
+| Resumo financeiro mensal | `GET /financeiro/resumo?mes=2026-05` | Lucro líquido + breakdown de custos |
+| Health check | `GET /healthz` | Sem `/api` no caminho, sem auth |
+
+### Convenções de serialização
+
+- `BigInt` (ex: `Concorrente.shopId`, `ConcorrenteSnapshotProduto.itemId`) → **string** no JSON.
+- `Decimal` (ex: `ratingStar`, `commissionRate`) → **string** no JSON pra preservar precisão.
+- Valores monetários → **inteiros em centavos** (`Int`). Divida por 100 ao renderizar.
+- Datas → ISO 8601 UTC.
+
+### Exemplo curl
+
+```bash
+TOKEN=eyJhbGc...
+
+# 1) Listar produtos não-anunciados
+curl -H "Authorization: Bearer $TOKEN" \
+  https://api.mahouprints.com/api/produtos?anunciado=false
+
+# 2) Produtos do snapshot mais recente da loja concorrente abc123
+curl -H "Authorization: Bearer $TOKEN" \
+  https://api.mahouprints.com/api/concorrentes/abc123/produtos
+
+# 3) Marcar produtos como anunciados após publicar
+curl -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"ids":["p1","p2"],"anunciado":true}' \
+  https://api.mahouprints.com/api/produtos/bulk-anunciar
+```
+
+### Exemplo: fluxo de geração de imagem (n8n)
+
+Caso real em produção pra publicar produtos no Shopee/ML com imagens geradas via Gemini 2.5 Flash:
+
+1. Pré-upload das imagens de referência em `/produtos/<id>` (card Imagens) — origem `INSPIRACAO` ou `MODELO_3D`. Sharp normaliza pra JPG 90% max 2000px no upload.
+2. Consumer chama `GET /api/produtos?anunciado=false`. Resposta traz imagens com URLs absolutas, filamento, insumos, dimensões — tudo num único request.
+3. Após processar e publicar, `POST /api/produtos/bulk-anunciar { ids: [...], anunciado: true }` tira do pool.
 
 ## Pré-requisitos
 

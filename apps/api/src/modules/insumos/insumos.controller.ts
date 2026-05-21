@@ -15,10 +15,13 @@ import {
   type InsumoCreate,
   type InsumoUpdate,
 } from '@mahou-hub/contracts';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { InsumosService } from './insumos.service';
 
+@ApiTags('insumos')
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('insumos')
 export class InsumosController {

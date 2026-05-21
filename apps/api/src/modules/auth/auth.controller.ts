@@ -1,4 +1,5 @@
 import { Body, Controller, Post, Req, Res, UseGuards, UsePipes } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import {
   ApiTokenInputSchema,
@@ -11,11 +12,16 @@ import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt.guard';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('login')
+  @ApiOperation({
+    summary: 'Login por email/senha',
+    description: 'Devolve cookie httpOnly `mahou_token` (7d). Pra fluxos automáticos prefira `/auth/api-token`.',
+  })
   @UsePipes(new ZodValidationPipe(LoginInputSchema))
   async login(
     @Body() body: LoginInput,
@@ -33,6 +39,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @ApiOperation({ summary: 'Limpa o cookie de sessão' })
   logout(@Res({ passthrough: true }) res: Response): { ok: true } {
     res.clearCookie('mahou_token', { path: '/' });
     return { ok: true };
@@ -43,6 +50,14 @@ export class AuthController {
    * Resposta é exibida UMA vez na UI — usuário precisa copiar e guardar.
    */
   @Post('api-token')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Gera JWT de longa duração (1..365 dias) pra fluxos externos',
+    description:
+      'Use em vez do login por cookie quando integrar com n8n, Make, scripts, etc. ' +
+      'Token resultante vai no header `Authorization: Bearer <token>`. ' +
+      'Não há revogação por token — pra invalidar tudo, rotacione JWT_SECRET no servidor.',
+  })
   @UseGuards(JwtAuthGuard)
   apiToken(
     @Req() req: Request,

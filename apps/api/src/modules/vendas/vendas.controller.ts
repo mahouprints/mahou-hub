@@ -17,10 +17,13 @@ import {
   type VendaCreate,
   type VendaUpdate,
 } from '@mahou-hub/contracts';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { VendasService } from './vendas.service';
 
+@ApiTags('vendas')
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('vendas')
 export class VendasController {
