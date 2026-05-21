@@ -1,144 +1,276 @@
 # mahou-hub — MCP server
 
-Expõe o backend do Mahou Hub como tools MCP pro Claude (Desktop, Code, web). Cobre:
+Expõe o backend do Mahou Hub como tools MCP pro Claude (Desktop, Code, web).
 
-- **Inteligência de oportunidades** — descoberta e backlog de candidatos a virar produto (Shopee Affiliate).
-- **Catálogo** — leitura/escrita de produtos, filamentos, insumos + calculadora de pricing.
+22 tools que cobrem dois domínios:
+- **Inteligência de Oportunidades** — descoberta no Shopee Affiliate, gestão de backlog, geração de ideias autorais.
+- **Catálogo Mahou** — produtos, filamentos, insumos e calculadora de pricing.
 
 ---
 
-## 🚀 Onboarding pra novo integrante Mahou
+## 🚀 Onboarding (5 min)
 
-Pré-requisitos:
-- Login ativo no Hub (`https://hub.mahouprints.com`) — peça pro admin criar.
-- Node 22+, pnpm 9+.
-- Claude Code instalado (`https://claude.com/claude-code`).
-
-### Passo a passo (5 min)
+**Pré-requisitos**: login ativo no Hub (`https://hub.mahouprints.com`), Node 22+, pnpm 9+, [Claude Code](https://claude.com/claude-code).
 
 ```bash
-# 1) Clone o repo (se ainda não tem)
+# 1) Clone + deps + build
 git clone git@github.com:mahouprints/mahou-hub.git
 cd mahou-hub
-
-# 2) Instale deps + build do MCP
 pnpm install
 pnpm --filter @mahou-hub/mcp-hub build
 
-# 3) Gere seu token JWT longo (válido 365 dias)
-#    Faça login primeiro pra pegar o token curto:
+# 2) Token JWT longo (válido 365 dias)
 TOKEN_CURTO=$(curl -s -i -X POST https://api.mahouprints.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"SEU.EMAIL@mahouprints.com","senha":"SUA-SENHA"}' \
   | grep -i 'set-cookie: mahou_token=' \
   | sed -E 's/.*mahou_token=([^;]+).*/\1/' | tr -d '\r')
 
-#    Use o token curto pra pedir um longo (365d):
 curl -X POST https://api.mahouprints.com/api/v1/auth/api-token \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN_CURTO" \
   -d '{"ttlDias": 365}'
 # → copie o `token` da resposta
 
-# 4) Crie .env.local na raiz do repo (gitignored)
-cat > .env.local <<EOF
+# 3) Crie mcp-servers/mahou-hub/.env.local (gitignored)
+cat > mcp-servers/mahou-hub/.env.local <<EOF
 MAHOU_API_URL=https://api.mahouprints.com
-MAHOU_API_TOKEN=cole-aqui-o-token-do-passo-3
+MAHOU_API_TOKEN=cole-aqui-o-token-do-passo-2
 EOF
 
-# 5) Pronto. Abra o Claude Code dentro do repo:
+# 4) Pronto. Abra Claude Code dentro do repo:
 claude
 ```
 
-O `.mcp.json` na raiz do repo aponta pro MCP local. Na primeira mensagem, as 21 tools `mcp__mahou-hub__*` ficam disponíveis. Teste com:
+O `.mcp.json` na raiz aponta pro MCP local via `node --env-file=./mcp-servers/mahou-hub/.env.local`. As 22 tools `mcp__mahou-hub__*` ficam disponíveis na primeira mensagem. Teste com:
 
 > Quantas oportunidades temos no backlog?
 
 (Claude vai chamar `estatisticas_oportunidades`.)
 
-### Renovar token expirado (365 dias)
+### Renovar token
 
-Mesma sequência do passo 3 — gera token novo, substitui no `.env.local`. Não há revogação por token; pra invalidar todos os tokens (incidente de segurança), rotacionar `JWT_SECRET` na VPS.
+Mesma sequência do passo 2. Token novo substitui no `.env.local` + restart MCP (`/mcp` → reconnect). Sem revogação por token; pra invalidar tudo (incidente de segurança), rotacionar `JWT_SECRET` na VPS.
 
 ### Claude Desktop (alternativa)
 
-Edite `claude_desktop_config.json` (Windows: `%APPDATA%\Claude\`):
+`%APPDATA%\Claude\claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
     "mahou-hub": {
       "command": "node",
-      "args": ["C:/caminho/para/mahou-hub/mcp-servers/mahou-hub/dist/index.js"],
-      "env": {
-        "MAHOU_API_URL": "https://api.mahouprints.com",
-        "MAHOU_API_TOKEN": "cole-aqui"
-      }
+      "args": [
+        "--env-file=C:/caminho/para/mahou-hub/mcp-servers/mahou-hub/.env.local",
+        "C:/caminho/para/mahou-hub/mcp-servers/mahou-hub/dist/index.js"
+      ]
     }
   }
 }
 ```
-
-Reinicia o Desktop. Tools aparecem no menu de ferramentas.
+Reinicia o Desktop.
 
 ### Troubleshooting
 
 | Sintoma | Causa | Fix |
 |---|---|---|
-| `Mahou API GET ... → 401` | Token ausente/expirado | Gera novo, atualiza `.env.local`, reinicia Claude |
+| `Mahou API ... → 401` | Token ausente/expirado/inválido | Gera novo, atualiza `.env.local`, restart MCP |
 | `Cannot find module dist/index.js` | Sem build | `pnpm --filter @mahou-hub/mcp-hub build` |
-| Tools `mcp__mahou-hub__*` não aparecem | Claude Code aberto fora do repo | Abre dentro de `mahou-hub/` (lê `.mcp.json`) |
-| `MAHOU_API_TOKEN não setado` | `.env.local` não existe ou key errada | Confere arquivo |
+| Tools `mcp__mahou-hub__*` não aparecem | Claude aberto fora do repo | Abre dentro de `mahou-hub/` (lê `.mcp.json`) |
+| `Authorization: Bearer ${MAHOU_API_TOKEN}` literal | `${VAR}` no `.mcp.json` não interpola | Use `--env-file` (já configurado) — não vire pra `env` do shell |
+| `400 JSON schema invalid` | zodToJsonSchema com `target: 'openApi3'` (gera `nullable: true` inválido) | Já corrigido — não regredir |
 
 ---
 
-## Tools expostas (21 total)
+## 🧭 Conceitos do domínio
 
-### Oportunidades — descoberta + backlog (10)
-- `buscar_oportunidades` — busca direcionada (keyword / categoria Shopee / concorrente monitorado).
-- `explorar_top_vendas` — modo brainstorm: top vendas sem filtro de nicho.
-- `listar_oportunidades` — backlog persistido com filtros (status, score, fonte).
-- `salvar_oportunidade` / `salvar_oportunidades_em_lote` — salva candidatos no backlog.
-- `atualizar_oportunidade` — muda status / score / notas (registra audit log).
-- `descartar_oportunidade` — remove do backlog.
-- `virar_produto` — promove a Produto (completo ou rascunho).
-- `estatisticas_oportunidades` — counts por status / fonte / marketplace.
-- `categorias_shopee_3d` — 17 categorias curadas pra buscar via `tipo='categoria'`.
+Pra usar bem as tools, ajuda entender 5 conceitos:
 
-### Catálogo — produtos + insumos + pricing (11)
-- `listar_produtos` — lista com filtros (canal, anunciado, busca textual), paginada, com pricing por canal.
-- `obter_produto` — detalhe de 1 produto + filamento + insumos + pricing.
-- `estatisticas_produto` — vendas, faturamento, produzidos, em produção.
-- `criar_produto` — cria produto novo (todos os campos obrigatórios).
-- `atualizar_produto` — partial update (use pra completar rascunhos).
-- `desativar_produto` / `desativar_produtos_em_lote` — soft-delete (preserva histórico).
-- `marcar_produtos_anunciados` — bulk anunciado=true/false após publicar.
-- `listar_filamentos` — pra escolher `filamentoId` em `criar_produto`/`calcular_preco`.
-- `listar_insumos` — pra escolher `insumoId` em arrays de `criar_produto`/`calcular_preco`.
-- `calcular_preco` — calculadora avulsa, sem persistir: "vale a pena imprimir X por R$Y?".
+### 1. Concorrente
+Loja Shopee que a Mahou monitora. Cadastra-se via UI ou REST (`POST /concorrentes/from-link`). Cron domingo 03h sincroniza snapshot de todos. **40+ lojas cadastradas em prod**, predominantemente impressão 3D.
+
+### 2. Snapshot
+Fotografia semanal dos produtos de um concorrente (via Shopee Affiliate API). 1 snapshot por sync, histórico preservado. Gap analysis lê o snapshot mais recente.
+
+### 3. Oportunidade
+Candidato a virar produto no catálogo Mahou. Vive em `ProdutoOportunidade` com `status` (NOVO → EM_ANALISE → APROVADO/DESCARTADO → VIRARAM_PRODUTO) e `fonte`:
+- `TOP_VENDAS` — descoberto via `explorar_top_vendas` (brainstorm marketplace).
+- `KEYWORD` — descoberto via `buscar_oportunidades` tipo keyword.
+- `CATEGORIA` — descoberto via `buscar_oportunidades` tipo categoria.
+- `CONCORRENTE` — descoberto via `buscar_oportunidades` tipo concorrente.
+- `IDEIA_GERADA` — **autoria Mahou**, inspirada no mercado. `externalId` é cuid local prefixado `IG-` (não Shopee item). Usa pra propostas autorais que diferenciam Mahou dos copiadores.
+
+### 4. Gap analysis
+Cruza catálogo Mahou × snapshot agregado dos concorrentes. Cada produto Shopee vira:
+- **MATCH** — Mahou já tem similar (auto via jaccard nome+preço).
+- **VARIAÇÃO** — Mahou tem espírito mas em forma/tema diferente.
+- **GAP** — Mahou não tem nada parecido.
+- **MATCH_MANUAL** / **DESCARTADO** — usuário marcou na UI; sobrescreve auto.
+
+Disponível em `hub.mahouprints.com/oportunidades/gaps` (UI completa) e endpoints `/api/v1/oportunidades/gaps` (REST). **Não há tool MCP dedicada de gaps — Claude usa via REST se precisar**, ou orienta o usuário a abrir a UI.
+
+### 5. Produto rascunho
+`Produto.rascunho=true` é o limbo entre Oportunidade aprovada e Produto vendável. Peso/tempo podem estar zerados. Vem de:
+- `virar_produto` aplicado a Oportunidade (preenche o que dá; resto rascunho).
+- `POST /oportunidades/gaps/:marketplace/:externalId/copiar-rascunho` (cópia direta do produto concorrente).
+
+Usuário completa via UI Produtos.
 
 ---
 
-## Dev
+## 🛠️ Tools (22)
+
+### Oportunidades — descoberta (4)
+
+| Tool | Quando usar |
+|---|---|
+| `buscar_oportunidades` | Busca direcionada. 4 modos via `tipo`: `keyword` / `categoria` (catId Shopee) / `concorrente` (passa `concorrenteId` interno OU `lojaExternalId` shopId Shopee — este último chama Affiliate API ao vivo, sem precisar cadastrar). |
+| `explorar_top_vendas` | Modo brainstorm: top vendas Shopee sem filtro de nicho. **Rate-limit 10/min**. Use 1× por sessão. |
+| `categorias_shopee_3d` | Lista as 22 categorias Shopee curadas como 3D-friendly (id + nome + notas). Use pra escolher `categoryId` em `buscar_oportunidades`. |
+| `estatisticas_oportunidades` | Counts por status/fonte/marketplace. Use no início pra contexto do backlog. |
+
+### Oportunidades — gestão de backlog (6)
+
+| Tool | Quando usar |
+|---|---|
+| `listar_oportunidades` | Backlog persistido. Filtros: status, scoreMin, fonte, marketplace, q. |
+| `salvar_oportunidade` / `salvar_oportunidades_em_lote` | Persiste candidato(s). Upsert por `(marketplace, externalId)` — rodar 2× preserva workflow (status/score/notas). |
+| `atualizar_oportunidade` | Muda status / score / notas. Registra audit log automaticamente. |
+| `descartar_oportunidade` | Atalho pra `status=DESCARTADO`. |
+| `virar_produto` | Promove oportunidade aprovada a `Produto` (completa ou rascunho conforme campos preenchidos). |
+
+### Catálogo — leitura (6)
+
+| Tool | Quando usar |
+|---|---|
+| `listar_produtos` | Catálogo paginado com pricing por canal já calculado. Filtros: canal, anunciado, temImagens (foto final), temReferencia (inspiração/modelo3dUrl), q. |
+| `listar_produtos_pendentes_imagem` | Atalho do fluxo da skill `gerar-imagem-produto`: `anunciado=false` + `temReferencia=true` + `temImagens=false`. |
+| `obter_produto` | Detalhe de 1 produto + filamento + insumos + imagens + pricing. |
+| `estatisticas_produto` | Vendas, faturamento, produzidos, em produção. |
+| `listar_filamentos` | Pra escolher `filamentoId` ao criar produto / calcular preço. |
+| `listar_insumos` | Pra escolher `insumoId` em arrays. |
+
+### Catálogo — escrita (5)
+
+| Tool | Quando usar |
+|---|---|
+| `criar_produto` | Cria produto novo (todos campos obrigatórios). Pra rascunho use `virar_produto` ou endpoint de copiar gap. |
+| `atualizar_produto` | Partial update (use pra completar peso/tempo de rascunhos). |
+| `desativar_produto` / `desativar_produtos_em_lote` | Soft-delete (`ativo=false`). Preserva referências em vendas/jobs históricos. |
+| `marcar_produtos_anunciados` | Bulk `anunciado=true|false` após publicar no marketplace. |
+
+### Pricing (1)
+
+| Tool | Quando usar |
+|---|---|
+| `calcular_preco` | Calculadora stateless: "vale a pena imprimir X em Y filamento com Z preço?". Não persiste. Use pra simular antes de criar produto ou ao avaliar gap. |
+
+---
+
+## 🎯 Fluxos típicos
+
+### A. Brainstorm marketplace → backlog
+1. `estatisticas_oportunidades` (contexto)
+2. `explorar_top_vendas` com filtros (vendasMin >= 200, faixa preço, ratingMin >= 4)
+3. Avaliar candidatos aplicando [`oportunidades-mahou/criterios-3d.md`](../../.claude/skills/oportunidades-mahou/criterios-3d.md)
+4. Apresentar ao usuário (não use score como filtro de corte — só pra ranquear se pedirem)
+5. `salvar_oportunidades_em_lote` com `status='EM_ANALISE'` + notas estruturadas
+
+### B. Geração de ideias autorais (fonte=IDEIA_GERADA)
+1. Varre nichos diversos via `buscar_oportunidades` (≥3 categorias diferentes — diversidade obrigatória).
+2. Analisa transversalmente: padrões, gaps, faixas de preço, concorrentes 3D ativos.
+3. Gera N ideias **autorais** (não copia o que viu — propõe variação/combinação/ângulo único).
+4. Salva via `salvar_oportunidades_em_lote` com `fonte='IDEIA_GERADA'`, `externalId='IG-AAAA-MM-DD-slug'`, `lojaNome='Mahou Prints'`.
+5. Notas estruturadas: **Conceito** / **Inspirações** (refs Shopee) / **Diferencial** / **Por que faz sentido** / **Estimativa produção** / **Risco**.
+
+Detalhe completo em [`oportunidades-mahou/geracao-ideias.md`](../../.claude/skills/oportunidades-mahou/geracao-ideias.md).
+
+### C. Investigar loja descoberta (sem cadastrar)
+`buscar_oportunidades({ tipo: 'concorrente', params: { lojaExternalId: 'SHOPID' } })` — chama Affiliate API ao vivo pra qualquer shopId Shopee. Útil pra avaliar uma loja antes de decidir cadastrar como concorrente.
+
+### D. Cadastro de concorrente (via REST, sem tool MCP)
+Não tem tool MCP de criação. Use:
+```bash
+curl -X POST https://api.mahouprints.com/api/v1/concorrentes/from-link \
+  -H "Authorization: Bearer $MAHOU_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://shopee.com.br/shop/SHOPID"}'
+```
+URL aceita `shop/{shopId}` (determinístico) ou `{username}` (slug). **NÃO** funciona com URL de produto.
+
+### E. Gap analysis (fluxo só via REST + UI, sem tool MCP)
+- UI: `hub.mahouprints.com/oportunidades/gaps` — tabela com filtros (classificação, loja, vendasMin), insights, ações (copiar rascunho / match manual / descartar).
+- REST: `GET /api/v1/oportunidades/gaps?classificacao=GAP&vendasMin=200`
+- Categorias emergentes (catIds frequentes em GAPs não-curados): `GET /api/v1/oportunidades/gaps/categorias-emergentes?minFreq=10`
+
+---
+
+## ⏱️ Rate-limits
+
+NestJS Throttler no backend Mahou (NÃO confundir com Shopee Affiliate):
+
+| Endpoint | Tool | Limite |
+|---|---|---|
+| `POST /oportunidades/buscar` | `buscar_oportunidades` | **20/min** |
+| `POST /oportunidades/explorar` | `explorar_top_vendas` | **10/min** (varre top global; mais caro) |
+| `POST /oportunidades/bulk` | `salvar_oportunidades_em_lote` | **30/min** |
+| Demais endpoints | — | 100/min (default global) |
+
+Pra varredura em lote (múltiplas keywords/categorias): sequencial com ~3s entre chamadas. **Não paralelizar `buscar_oportunidades`** — Claude pode disparar 4-5/seg e estourar 429.
+
+---
+
+## ⚠️ Limitações conhecidas
+
+### Shopee Affiliate API expõe só 18 campos por produto
+`itemId, productName, commissionRate, commission, sales, priceMin, priceMax, priceDiscountRate, imageUrl, productLink, offerLink, periodStartTime, periodEndTime, shopId, shopName, shopType, productCatIds, ratingStar`.
+
+**NÃO retorna**: descrição textual, material declarado, dimensões/peso, imagens adicionais, variantes, nome da categoria (só catId), reviews textuais. Confirma `memory/shopee_affiliate_limits.md`.
+
+Implicação: classificação de "material 3D vs cerâmica vs MDF" é qualitativa via `productName`. Match de gap fica em ~90% de precisão.
+
+### Estimativa de vendas via Affiliate é aproximada
+`sales` é janela de campanha (~30 dias do afiliado, não histórico total). Heurística `(sales/dias × 30) / 0.05` aplicada no backend assume ~5% das vendas via afiliado (média observada na 3DTECH). Pode ser ±50% em valor absoluto, mas ordem de grandeza é confiável.
+
+### Não há tool MCP de criação de concorrente
+Cadastro precisa REST direto (`POST /concorrentes/from-link`). Foi decisão consciente — cadastro é ato deliberado humano, não fluxo de descoberta automática.
+
+### Não há tool MCP de gap analysis
+Gap analysis tem volume típico de 200-500 produtos por consulta — inviável retornar no contexto Claude. Use UI ou REST. Pra Claude, melhor pedir resumo de GAPs específicos via filtros estreitos.
+
+---
+
+## 🧪 Dev
 
 ```bash
 pnpm --filter @mahou-hub/mcp-hub dev     # tsc --watch
 ```
 
-Pra testar manualmente (sem Claude), instale `@modelcontextprotocol/inspector` e rode:
+Testar manualmente (sem Claude):
 ```bash
 npx @modelcontextprotocol/inspector node dist/index.js
 ```
 
-## Arquitetura
+### Arquitetura
 
 ```
 mcp-servers/mahou-hub/
 ├── src/
-│   ├── index.ts                 # entry stdio + combina tools
-│   ├── client.ts                # fetch wrapper + JWT do env
-│   ├── tools-oportunidades.ts   # 10 tools de descoberta/backlog
-│   └── tools-catalogo.ts        # 11 tools de produtos/filamentos/pricing
-└── README.md                    # este arquivo
+│   ├── index.ts                 # entry stdio + combina tools + zodToJsonSchema (target default)
+│   ├── client.ts                # fetch wrapper + lê MAHOU_API_TOKEN do env
+│   ├── tools-oportunidades.ts   # 10 tools: descoberta + backlog
+│   └── tools-catalogo.ts        # 12 tools: produtos + filamentos + pricing
+├── .env.local                   # gitignored — MAHOU_API_URL + MAHOU_API_TOKEN
+└── README.md
 ```
 
-Pra adicionar nova área (ex: vendas, produção): crie `tools-<area>.ts`, exporta `tools`, importe em `index.ts`. Schemas Zod replicados localmente (sem dep em `@mahou-hub/contracts` pra MCP ficar publicável standalone).
+Pra adicionar nova área (ex: vendas, produção, financeiro):
+1. Crie `tools-<area>.ts` exportando `tools` array.
+2. Importe em `index.ts` e concatene no array geral.
+3. Schemas Zod replicados localmente — **sem dep em `@mahou-hub/contracts`** pra MCP ficar publicável standalone no futuro.
+
+### Detalhes técnicos importantes
+
+- **JSON Schema target**: `zodToJsonSchema(s)` sem `target: 'openApi3'`. OpenAPI 3.0 gera `nullable: true` que viola JSON Schema draft 2020-12 (exigido pela API da Anthropic) — disparado erro 400 e o servidor "desconecta" todas as tools de uma vez.
+- **Env loading**: `.mcp.json` usa `node --env-file=...env.local` (Node 20.6+ nativo, sem dotenv). `${VAR}` no `.mcp.json` **não é interpolado** pelo Claude Code — passa string literal pro filho, causa 401 silencioso.
+- **Idempotência**: bulk de oportunidades faz upsert; reaplicar com mesmo `(marketplace, externalId)` atualiza dados de mercado mas **preserva workflow** (status/score/notas) — exceto se você enviar campos novos pra eles.

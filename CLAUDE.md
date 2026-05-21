@@ -65,8 +65,12 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Canais de venda: SHOPEE, ML, SITE, TIKTOK. Shopee/ML têm tabelas de faixa por preço; TIKTOK tem 4 percentuais fixos em `Parametro` (sem faixa); SITE não tem taxa.
 - Sync de coleção filha (`ProdutoInsumo`, `PrecoConcorrente`): `deleteMany` + `createMany` dentro de transação. Não tente diff incremental — o ganho não compensa a complexidade.
 - `Concorrente` tem dois modos coexistindo: **manual** (só `loja/instagram/website`, sem `shopId`) e **linkado Shopee** (com `shopId BigInt UNIQUE` + sync via Affiliate API). Botão "Linkar Shopee" na UI promove um manual a linkado. Cada sync (manual ou cron domingo 03h America/Sao_Paulo) cria um `ConcorrenteSnapshot` + N `ConcorrenteSnapshotProduto` (histórico, não sobrescreve).
-- Shopee Affiliate API expõe **só 19 campos** em `ProductOfferV2`. `sales` é janela de campanha (~30 dias via afiliado), NÃO histórico total. Vendas totais estimadas usam a heurística `(sales/dias)*30 / 0.05` (assumindo 5% das vendas via afiliado — média observada na 3DTECH). Não tente puxar histórico real via mobile-web `/api/v4/pdp/get_pc` — bloqueado por anti-fraud `x-sap-sec`.
+- Shopee Affiliate API expõe **só 18 campos** em `ProductOfferV2` (lista exata em `apps/api/src/modules/concorrentes/shopee/queries.ts`). `sales` é janela de campanha (~30 dias via afiliado), NÃO histórico total. Vendas totais estimadas usam a heurística `(sales/dias)*30 / 0.05` (assumindo 5% das vendas via afiliado — média observada na 3DTECH). Não tente puxar histórico real via mobile-web `/api/v4/pdp/get_pc` — bloqueado por anti-fraud `x-sap-sec`. **Não retorna**: descrição, material, dimensões, peso, imagens adicionais, variantes, nome categoria, reviews. Classificação de material 3D × cerâmica × MDF é qualitativa via `productName`.
 - Comissão da Shopee (`commissionRate`, `commission`) é IRRELEVANTE pra Mahou (não recebemos como afiliado). UI esconde esses campos — métrica útil é vendas estimadas.
+- **Oportunidade.fonte** tem 5 valores: `TOP_VENDAS` / `KEYWORD` / `CATEGORIA` / `CONCORRENTE` (descobertas no marketplace) + `IDEIA_GERADA` (autoria Mahou inspirada no mercado — `externalId` é cuid local prefixado `IG-`, não Shopee item). Use `IDEIA_GERADA` quando a oportunidade for proposta autoral (variação, combinação, ângulo único) e não cópia direta.
+- **Cadastro de Concorrente Shopee via REST**: `POST /api/v1/concorrentes/from-link { url }` aceita 2 formatos — `shopee.com.br/shop/{shopId}` (determinístico, prefira esse) ou `shopee.com.br/{username}` (slug). **URL de produto retorna 500** — resolver só trata os 2 formatos acima. Não existe tool MCP de cadastro (decisão consciente — é ato deliberado humano).
+- **Gap analysis** (`hub.mahouprints.com/oportunidades/gaps`): cruza catálogo Mahou × snapshot agregado dos concorrentes. Classifica cada produto Shopee como GAP / VARIACAO / MATCH / MATCH_MANUAL / DESCARTADO. Decisões manuais persistem em `ProdutoGapDecisao` (UNIQUE por `marketplace+externalId`) e sobrescrevem a auto. Não há tool MCP — volume típico (200-500 produtos) é inviável no contexto Claude; use UI ou REST `GET /oportunidades/gaps`.
+- **`buscar_oportunidades` com `tipo: 'concorrente'`** aceita `concorrenteId` (interno, lê snapshot local rápido) OU `lojaExternalId` (shopId Shopee, chama Affiliate API ao vivo sem precisar cadastrar). Use `lojaExternalId` pra investigar loja descoberta antes de decidir cadastrar.
 
 ## Imagens e storage
 - `ProdutoImagem.arquivo` é path relativo a `STORAGE_DIR`: `produtos/<produtoId>/<uuid>.jpg`. Cascade na deleção do produto via Prisma `onDelete: Cascade`.
@@ -102,9 +106,11 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
   Em Linux/Docker (prod) não acontece.
 
 ## MCP server (Claude Code/Desktop)
-- `mcp-servers/mahou-hub/` expõe 21 tools pro Claude (oportunidades + catálogo).
-- Onboarding completo em `mcp-servers/mahou-hub/README.md` (passo-a-passo 5min: gerar token → .env.local → build → abre Claude no repo).
+- `mcp-servers/mahou-hub/` expõe **22 tools** pro Claude (10 oportunidades + 12 catálogo).
+- Onboarding completo + lista de tools agrupadas + fluxos típicos em `mcp-servers/mahou-hub/README.md` (passo-a-passo 5min).
 - Pra adicionar novas áreas de tools: criar `tools-<area>.ts`, importar em `src/index.ts`. Schemas Zod replicados localmente (sem dep em contracts) pra manter o MCP server publicável standalone.
+- **`.mcp.json` usa `node --env-file=./mcp-servers/mahou-hub/.env.local`** (Node 20.6+ nativo). `${VAR}` no `.mcp.json` **NÃO é interpolado** pelo Claude Code — usar shell env causa 401 silencioso (passou string literal pro filho).
+- **`zodToJsonSchema(s)` sem `target: 'openApi3'`** — OpenAPI 3.0 gera `nullable: true` que viola JSON Schema draft 2020-12 (exigido pela Anthropic API). Erro 400 derruba TODAS as 22 tools de uma vez.
 
 ## Comandos úteis
 - `pnpm dev` — sobe web + api em modo dev.
