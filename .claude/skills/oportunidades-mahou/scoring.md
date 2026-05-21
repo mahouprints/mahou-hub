@@ -1,6 +1,10 @@
 # Scoring de oportunidades (0-100)
 
-Como pontuar candidatos pra ranquear no backlog.
+⚠️ **Use só como ferramenta de ranqueamento opcional, não como filtro de corte.** A skill prioriza diversidade de ideias (modos 3 e 4) sobre otimização numérica. Score serve quando o usuário pedir explicitamente "ranqueia esses 10 pra mim" ou "qual o melhor entre A e B" — não pra descartar candidatos antes da apresentação.
+
+A penalidade de IP licenciado foi removida na prática (preferência da Mahou — aceita risco). Mantém-se na sinalização das notas mas sem subtração no score.
+
+Como pontuar candidatos pra ranquear:
 
 ## Componentes
 

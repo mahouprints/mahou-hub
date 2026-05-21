@@ -6,7 +6,15 @@ const DecimalString = z.string().regex(/^-?\d+(\.\d+)?$/);
 export const OportunidadeMarketplaceSchema = z.enum(['SHOPEE', 'TIKTOK', 'ML', 'OUTRO']);
 export type OportunidadeMarketplace = z.infer<typeof OportunidadeMarketplaceSchema>;
 
-export const OportunidadeFonteSchema = z.enum(['CONCORRENTE', 'KEYWORD', 'CATEGORIA', 'TOP_VENDAS']);
+// IDEIA_GERADA = ideia autoral da Mahou inspirada em produtos do marketplace,
+// não importação direta. externalId nesse caso é cuid local, não Shopee item.
+export const OportunidadeFonteSchema = z.enum([
+  'CONCORRENTE',
+  'KEYWORD',
+  'CATEGORIA',
+  'TOP_VENDAS',
+  'IDEIA_GERADA',
+]);
 export type OportunidadeFonte = z.infer<typeof OportunidadeFonteSchema>;
 
 export const OportunidadeStatusSchema = z.enum([

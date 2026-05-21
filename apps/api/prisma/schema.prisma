@@ -78,6 +78,9 @@ enum OportunidadeFonte {
   KEYWORD
   CATEGORIA
   TOP_VENDAS
+  // Ideia autoral da Mahou inspirada em produtos do marketplace.
+  // externalId é um cuid local (não Shopee item). Notas guardam inspirações + análise.
+  IDEIA_GERADA
 }
 
 enum OportunidadeStatus {

@@ -19,13 +19,13 @@ Sinais: usuário menciona keyword, categoria, ou loja específica. Exemplos:
 Ferramenta: `buscar_oportunidades`
 - `tipo: 'keyword'` + `params: { keyword: '...' }` pra termo livre
 - `tipo: 'categoria'` + `params: { categoryId: '...' }` pra categoria Shopee
-- `tipo: 'concorrente'` + `params: { concorrenteId: '...' }` pra varrer 1 loja monitorada
+- `tipo: 'concorrente'` + `params: { concorrenteId: '...' }` pra varrer 1 loja **cadastrada** (lê snapshot local)
+- `tipo: 'concorrente'` + `params: { lojaExternalId: '...' }` pra investigar uma loja **não cadastrada** via Affiliate API live (útil pra avaliar antes de cadastrar)
 
-### 2. Brainstorm — "me dá ideias"
+### 2. Brainstorm — "me dá ideias do que tá vendendo"
 
-Sinais: usuário pede sem alvo claro. Exemplos:
+Sinais: usuário quer ver **o que o marketplace está vendendo** agora. Exemplos:
 - "O que tá bombando que dá pra imprimir?"
-- "Me surpreenda, quero ideias"
 - "Varre o top de vendas e analisa"
 
 Ferramenta: `explorar_top_vendas` com filtros mínimos pra reduzir ruído. Default sugerido:
@@ -41,14 +41,32 @@ Ferramenta: `explorar_top_vendas` com filtros mínimos pra reduzir ruído. Defau
 }
 ```
 
+### 3. Geração de ideias autorais — "me dá ideias **da Mahou**"
+
+Sinais: usuário quer ideias autorais Mahou inspiradas no mercado (não importação direta). Exemplos:
+- "O que a Mahou poderia produzir?"
+- "Gera ideias pra impressão 3D no nicho gamer"
+- "Cria propostas de produto com base no que tá vendendo"
+
+Detalhe em [geracao-ideias.md](geracao-ideias.md). Workflow: varre nicho → analisa transversalmente → gera N ideias autorais distribuídas em **pelo menos 3 categorias diferentes** → salva com `fonte: 'IDEIA_GERADA'`.
+
+### 4. Gap analysis vs concorrentes — "o que eles têm que a gente não tem?"
+
+Sinais: usuário quer cruzar catálogo Mahou × concorrentes cadastrados pra detectar oportunidades. Exemplos:
+- "Varre todos os concorrentes e mostra os gaps"
+- "O que a gente tá deixando de produzir que os outros vendem?"
+- "Compare nosso catálogo com o dos concorrentes"
+
+Detalhe em [gaps-concorrentes.md](gaps-concorrentes.md). Workflow: agrega snapshots de **todos os concorrentes cadastrados** → cruza com `listar_produtos` Mahou → detecta GAPS / VARIAÇÕES / MATCHES → gera ideias autorais inspiradas nos top gaps.
+
 ## Workflow recomendado (brainstorm)
 
 1. Chame `estatisticas_oportunidades` pra ter contexto do backlog atual.
 2. Chame `explorar_top_vendas` com os filtros baseline.
-3. Para cada candidato, avalie aplicando os [critérios "imprimível em 3D"](criterios-3d.md) e calcule [score](scoring.md).
-4. Filtre os top N (recomendo 10) com melhor score.
-5. Chame `salvar_oportunidades_em_lote` com `status='EM_ANALISE'`, `score` e `notas` estruturadas.
-6. Reporte ao usuário: total avaliado, quantos salvos, top 3 com justificativa curta.
+3. Para cada candidato, avalie aplicando os [critérios "imprimível em 3D"](criterios-3d.md).
+4. **Não use [score](scoring.md) como filtro de corte.** Score existe pra ranquear quando o usuário pedir comparação relativa — não pra descartar candidatos. Diversidade > otimização local.
+5. Apresenta candidatos viáveis ao usuário (com volume, preço, observações), pergunta quais salvar.
+6. Salva os escolhidos com `salvar_oportunidades_em_lote` + `notas` estruturadas.
 
 ## Workflow recomendado (direcionado)
 

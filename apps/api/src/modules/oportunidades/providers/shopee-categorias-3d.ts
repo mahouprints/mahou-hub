@@ -100,6 +100,27 @@ export const CATEGORIAS_SHOPEE_3D: CategoriaShopee3D[] = [
     nome: 'Organizadores de gaveta',
     notas: 'Caixas clear pra gaveta, nichos modulares.',
   },
+  // Adicionadas em 2026-05-21 via segunda rodada do discover (varreu 499 produtos).
+  {
+    id: 100016,
+    nome: 'Chaveiros e estojos pequenos',
+    notas: 'Chaveiros temáticos (Patrulha, Pokebola), estojos de cartão/controle.',
+  },
+  {
+    id: 100284,
+    nome: 'Organizadores de cabo / celular',
+    notas: 'Gancho cabo gerenciador de fios, suporte fio adesivo, organizador cabo gancho.',
+  },
+  {
+    id: 100738,
+    nome: 'Porta-cartões e credenciais',
+    notas: 'Porta-crachá, porta-card BNARDO, porta-cartão de acesso.',
+  },
+  {
+    id: 102601,
+    nome: 'Acabamentos plásticos automotivos',
+    notas: 'Cinzeiro, porta-treco Peugeot 206, peças plásticas de reposição interior carro.',
+  },
 ];
 
 // Lookup util pra UI/MCP rapidinho.
