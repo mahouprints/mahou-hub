@@ -13,6 +13,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
   BulkDeleteSchema,
+  GapCopiarRascunhoSchema,
+  GapDecidirSchema,
+  GapsQuerySchema,
   OportunidadeBulkCreateSchema,
   OportunidadeBuscarSchema,
   OportunidadeCreateSchema,
@@ -20,6 +23,9 @@ import {
   OportunidadeUpdateSchema,
   OportunidadeVirarProdutoSchema,
   type BulkDelete,
+  type GapCopiarRascunho,
+  type GapDecidir,
+  type GapsQuery,
   type OportunidadeBulkCreate,
   type OportunidadeBuscar,
   type OportunidadeCreate,
@@ -34,6 +40,8 @@ import { CurrentUser, type AuthUser } from '../../common/current-user.decorator'
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { DescobertaService } from './descoberta.service';
+import { GapsActionsService } from './gaps-actions.service';
+import { GapsService } from './gaps.service';
 import { OportunidadesCron } from './oportunidades.cron';
 import { OportunidadesService } from './oportunidades.service';
 import { CATEGORIAS_SHOPEE_3D } from './providers/shopee-categorias-3d';
@@ -46,6 +54,8 @@ export class OportunidadesController {
   constructor(
     private readonly service: OportunidadesService,
     private readonly descoberta: DescobertaService,
+    private readonly gaps: GapsService,
+    private readonly gapsActions: GapsActionsService,
     private readonly cron: OportunidadesCron,
   ) {}
 
@@ -120,6 +130,61 @@ export class OportunidadesController {
   })
   categorias3d() {
     return CATEGORIAS_SHOPEE_3D;
+  }
+
+  @Get('gaps')
+  @ApiOperation({
+    summary: 'Gap analysis: produtos de concorrentes × catálogo Mahou',
+    description:
+      'Cruza snapshot agregado dos concorrentes cadastrados com produtos ativos do catálogo. ' +
+      'Cada item vem classificado como GAP / VARIACAO / MATCH / MATCH_MANUAL / DESCARTADO. ' +
+      'Decisões manuais (POST /gaps/:marketplace/:externalId/decisao) têm prioridade sobre auto.',
+  })
+  async gapsList(@Query(new ZodValidationPipe(GapsQuerySchema)) query: GapsQuery) {
+    return this.gaps.listar(query);
+  }
+
+  @Get('gaps/categorias-emergentes')
+  @ApiOperation({
+    summary: 'Categorias Shopee frequentes nos GAPs que ainda não estão na lista curada',
+    description: 'Use pra expandir manualmente o shopee-categorias-3d.ts.',
+  })
+  async gapsCategoriasEmergentes(@Query('minFreq') minFreq?: string) {
+    return this.gaps.categoriasEmergentes(minFreq != null ? Number(minFreq) : undefined);
+  }
+
+  @Post('gaps/:marketplace/:externalId/decisao')
+  @ApiOperation({ summary: 'Marca decisão manual (MATCH_MANUAL ou DESCARTADO)' })
+  async gapsDecidir(
+    @Param('marketplace') marketplace: OportunidadeMarketplace,
+    @Param('externalId') externalId: string,
+    @Body(new ZodValidationPipe(GapDecidirSchema)) data: GapDecidir,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.gapsActions.decidir(marketplace, externalId, data, user.sub);
+  }
+
+  @Delete('gaps/:marketplace/:externalId/decisao')
+  @ApiOperation({ summary: 'Revoga decisão (volta pra classificação automática)' })
+  async gapsRevogarDecisao(
+    @Param('marketplace') marketplace: OportunidadeMarketplace,
+    @Param('externalId') externalId: string,
+  ) {
+    await this.gapsActions.revogarDecisao(marketplace, externalId);
+    return { ok: true };
+  }
+
+  @Post('gaps/:marketplace/:externalId/copiar-rascunho')
+  @ApiOperation({
+    summary: 'Cria Produto rascunho a partir do produto Shopee do snapshot',
+    description: 'Peso/tempo zerados — completar antes de anunciar. inspiracao = link Shopee.',
+  })
+  async gapsCopiarRascunho(
+    @Param('marketplace') marketplace: OportunidadeMarketplace,
+    @Param('externalId') externalId: string,
+    @Body(new ZodValidationPipe(GapCopiarRascunhoSchema)) data: GapCopiarRascunho,
+  ) {
+    return this.gapsActions.copiarRascunho(marketplace, externalId, data);
   }
 
   @Get(':id')

@@ -5,7 +5,7 @@ import { apiCall } from './client.js';
 // (MCP server é workspace separado pra ser publicável standalone — não importa @mahou-hub/contracts).
 
 const MarketplaceSchema = z.enum(['SHOPEE', 'TIKTOK', 'ML', 'OUTRO']).default('SHOPEE');
-const FonteSchema = z.enum(['CONCORRENTE', 'KEYWORD', 'CATEGORIA', 'TOP_VENDAS']);
+const FonteSchema = z.enum(['CONCORRENTE', 'KEYWORD', 'CATEGORIA', 'TOP_VENDAS', 'IDEIA_GERADA']);
 const StatusSchema = z.enum(['NOVO', 'EM_ANALISE', 'APROVADO', 'DESCARTADO', 'VIRARAM_PRODUTO']);
 
 const FiltrosSchema = z
