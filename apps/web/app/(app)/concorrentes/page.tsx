@@ -52,9 +52,10 @@ type ConcorrenteListItem = {
     erroMensagem: string | null;
     origem: 'MANUAL' | 'CRON';
   } | null;
+  vendasEstimadasMesTotal: number | null;
 };
 
-type ColunaSort = 'loja' | 'rating' | 'produtos' | 'sync';
+type ColunaSort = 'loja' | 'rating' | 'produtos' | 'estimado' | 'sync';
 
 export default function ConcorrentesPage() {
   const qc = useQueryClient();
@@ -71,6 +72,7 @@ export default function ConcorrentesPage() {
     loja: (c) => c.loja.toLowerCase(),
     rating: (c) => Number(c.ratingStar ?? 0),
     produtos: (c) => c.ultimoSnapshot?.qtdProdutos ?? -1,
+    estimado: (c) => c.vendasEstimadasMesTotal ?? -1,
     sync: (c) => (c.ultimoSyncEm ? new Date(c.ultimoSyncEm).getTime() : 0),
   });
 
@@ -208,6 +210,9 @@ export default function ConcorrentesPage() {
               <SortableHead chave="produtos" estado={sort.estado} onClick={sort.alternar}>
                 Produtos
               </SortableHead>
+              <SortableHead chave="estimado" estado={sort.estado} onClick={sort.alternar}>
+                Vendas est./mês
+              </SortableHead>
               <SortableHead chave="sync" estado={sort.estado} onClick={sort.alternar}>
                 Último sync
               </SortableHead>
@@ -217,21 +222,21 @@ export default function ConcorrentesPage() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   Carregando…
                 </TableCell>
               </TableRow>
             )}
             {error && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-destructive">
+                <TableCell colSpan={7} className="py-10 text-center text-destructive">
                   Erro ao carregar
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && lista.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   Nenhum concorrente. Adicione via link.
                 </TableCell>
               </TableRow>
@@ -286,6 +291,13 @@ export default function ConcorrentesPage() {
                     )}
                   </TableCell>
                   <TableCell>{snap?.qtdProdutos ?? '—'}</TableCell>
+                  <TableCell className="tabular-nums">
+                    {c.vendasEstimadasMesTotal != null ? (
+                      c.vendasEstimadasMesTotal.toLocaleString('pt-BR')
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <span title={c.ultimoSyncEm ?? ''}>{tempoRelativo(c.ultimoSyncEm)}</span>
                     {erroSync && (

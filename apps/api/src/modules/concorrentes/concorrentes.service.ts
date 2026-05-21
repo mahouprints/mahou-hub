@@ -4,6 +4,7 @@ import type {
   ConcorrenteCreate,
   ConcorrenteUpdate,
 } from '@mahou-hub/contracts';
+import { somarVendasEstimadasMes } from '@mahou-hub/pricing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShopeeAffiliateService } from './shopee-affiliate.service';
 import type { AffiliateProductNode } from './shopee/queries';
@@ -24,7 +25,15 @@ export class ConcorrentesService {
         snapshots: {
           orderBy: { sincronizadoEm: 'desc' },
           take: 1,
-          select: { sincronizadoEm: true, qtdProdutos: true, erroMensagem: true, origem: true },
+          select: {
+            sincronizadoEm: true,
+            qtdProdutos: true,
+            erroMensagem: true,
+            origem: true,
+            produtos: {
+              select: { sales: true, periodStartTime: true, periodEndTime: true },
+            },
+          },
         },
       },
     });
@@ -38,7 +47,15 @@ export class ConcorrentesService {
         snapshots: {
           orderBy: { sincronizadoEm: 'desc' },
           take: 1,
-          select: { sincronizadoEm: true, qtdProdutos: true, erroMensagem: true, origem: true },
+          select: {
+            sincronizadoEm: true,
+            qtdProdutos: true,
+            erroMensagem: true,
+            origem: true,
+            produtos: {
+              select: { sales: true, periodStartTime: true, periodEndTime: true },
+            },
+          },
         },
       },
     });
@@ -236,15 +253,31 @@ export class ConcorrentesService {
 
   private toDto(
     c: Prisma.ConcorrenteGetPayload<Record<string, never>>,
-    ultimoSnap?: { sincronizadoEm: Date; qtdProdutos: number; erroMensagem: string | null; origem: SyncOrigem },
+    ultimoSnap?: {
+      sincronizadoEm: Date;
+      qtdProdutos: number;
+      erroMensagem: string | null;
+      origem: SyncOrigem;
+      produtos?: { sales: number; periodStartTime: Date; periodEndTime: Date }[];
+    },
   ) {
+    const produtos = ultimoSnap?.produtos ?? [];
+    const vendasEstimadasMesTotal = produtos.length > 0 ? somarVendasEstimadasMes(produtos) : null;
     return {
       ...c,
       shopId: c.shopId ? c.shopId.toString() : null,
       ratingStar: c.ratingStar?.toString() ?? null,
       commissionRatePadrao: c.commissionRatePadrao?.toString() ?? null,
       sellerCommCoveRatio: c.sellerCommCoveRatio?.toString() ?? null,
-      ultimoSnapshot: ultimoSnap ?? null,
+      ultimoSnapshot: ultimoSnap
+        ? {
+            sincronizadoEm: ultimoSnap.sincronizadoEm,
+            qtdProdutos: ultimoSnap.qtdProdutos,
+            erroMensagem: ultimoSnap.erroMensagem,
+            origem: ultimoSnap.origem,
+          }
+        : null,
+      vendasEstimadasMesTotal,
     };
   }
 }

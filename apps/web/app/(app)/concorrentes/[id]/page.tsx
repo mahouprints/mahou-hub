@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { estimarVendasTotaisMes } from '@mahou-hub/pricing';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, pct, tempoRelativo } from '@/lib/format';
 import { useTableSort } from '@/lib/use-table-sort';
@@ -85,23 +86,6 @@ type SnapshotProduto = {
 type SnapshotDetail = SnapshotMeta & { produtos: SnapshotProduto[] };
 
 type ColunaSort = 'name' | 'preco' | 'sales' | 'rating' | 'estimado';
-
-// Fração das vendas atribuídas ao programa de afiliados.
-// Derivada da amostragem em 6 produtos da 3DTECH: ratios variaram de 1.6% a 7.3%,
-// média ~5%. É aproximação grosseira — varia por loja, categoria e idade do produto.
-const TAXA_AFILIADO = 0.05;
-
-// Estimativa de vendas TOTAIS por mês:
-//   1. Normaliza `sales` (vendas via afiliado na janela de campanha) pra base mensal.
-//   2. Divide pela taxa estimada de afiliado → vendas totais (incl. orgânicas).
-function estimarVendasTotaisMes(p: SnapshotProduto): number {
-  const diasJanela =
-    (new Date(p.periodEndTime).getTime() - new Date(p.periodStartTime).getTime()) / 86_400_000;
-  const salesNoMes = Number.isFinite(diasJanela) && diasJanela > 0
-    ? (p.sales / diasJanela) * 30
-    : p.sales;
-  return Math.round(salesNoMes / TAXA_AFILIADO);
-}
 
 export default function ConcorrenteDetailPage(props: { params: Promise<{ id: string }> }) {
   const { id } = use(props.params);
