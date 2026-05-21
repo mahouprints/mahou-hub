@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Canal } from '@prisma/client';
+import { Canal, Prisma } from '@prisma/client';
 import {
   calcularProduto,
   type CalculoSaida,
@@ -72,38 +72,16 @@ export class ProdutosService {
     ]);
 
     if (produtos.length === 0) return { items: [], total };
-
-    const parametros = await this.carregarParametros();
-    const tabelaShopee = await this.carregarTabelaShopee();
-    const tabelaMl = await this.carregarTabelaMl();
-
-    const items = produtos.map((p) => ({
-      ...p,
-      pesoG: Number(p.pesoG),
-      tempoH: Number(p.tempoH),
-      custoInsumosCentavos: somarCustoInsumos(p.insumos),
-      imagens: p.imagens.map((img) => this.imagens.paraDto(img)),
-      pricing: calcularProduto({
-        pesoG: Number(p.pesoG),
-        tempoH: Number(p.tempoH),
-        impressora: p.impressora,
-        filamento: {
-          nome: p.filamento.nome,
-          custoKgCentavos: p.filamento.custoKgCentavos,
-          potenciaA1W: p.filamento.potenciaA1W,
-          potenciaH2cW: p.filamento.potenciaH2cW,
-        },
-        embalagemCentavos: p.embalagemCentavos,
-        custoInsumosCentavos: somarCustoInsumos(p.insumos),
-        precoCentavos: p.precoCentavos,
-        parametros,
-        tabelaShopee,
-        tabelaMercadoLivre: tabelaMl,
-      }),
-    }));
+    const items = await this.enriquecerComPricing(produtos);
     return { items, total };
   }
 
+  /**
+   * Detalha 1 produto já com pricing calculado — mesma forma do `list()`.
+   * Antes (≤2026-05-21) este endpoint devolvia o produto cru, e o frontend chamava
+   * `/pricing/calcular` em separado pra ter o pricing; consumers externos (MCP, n8n)
+   * ficavam sem. Agora a forma do payload bate entre `list` e `get`.
+   */
   async get(id: string) {
     const p = await this.prisma.produto.findUnique({
       where: { id },
@@ -114,7 +92,8 @@ export class ProdutosService {
       },
     });
     if (!p) throw new NotFoundException(`Produto ${id} não existe`);
-    return { ...p, imagens: p.imagens.map((img) => this.imagens.paraDto(img)) };
+    const [enriquecido] = await this.enriquecerComPricing([p]);
+    return enriquecido;
   }
 
   async create(data: ProdutoCreate) {
@@ -226,6 +205,46 @@ export class ProdutosService {
     };
   }
 
+  /**
+   * Calcula pricing pra uma lista de produtos. Carrega Parametro+tabelas 1x e
+   * aplica em todos (evita N+1). Usado por `list()` e `get()` pra garantir que
+   * a forma do payload é a mesma nos dois endpoints.
+   */
+  private async enriquecerComPricing(produtos: ProdutoComIncludes[]) {
+    const [parametros, tabelaShopee, tabelaMl] = await Promise.all([
+      this.carregarParametros(),
+      this.carregarTabelaShopee(),
+      this.carregarTabelaMl(),
+    ]);
+    return produtos.map((p) => {
+      const custoInsumos = somarCustoInsumos(p.insumos);
+      return {
+        ...p,
+        pesoG: Number(p.pesoG),
+        tempoH: Number(p.tempoH),
+        custoInsumosCentavos: custoInsumos,
+        imagens: p.imagens.map((img) => this.imagens.paraDto(img)),
+        pricing: calcularProduto({
+          pesoG: Number(p.pesoG),
+          tempoH: Number(p.tempoH),
+          impressora: p.impressora,
+          filamento: {
+            nome: p.filamento.nome,
+            custoKgCentavos: p.filamento.custoKgCentavos,
+            potenciaA1W: p.filamento.potenciaA1W,
+            potenciaH2cW: p.filamento.potenciaH2cW,
+          },
+          embalagemCentavos: p.embalagemCentavos,
+          custoInsumosCentavos: custoInsumos,
+          precoCentavos: p.precoCentavos,
+          parametros,
+          tabelaShopee,
+          tabelaMercadoLivre: tabelaMl,
+        }),
+      };
+    });
+  }
+
   private async carregarParametros(): Promise<ParametrosGlobais> {
     const p = await this.prisma.parametro.findUnique({ where: { id: 1 } });
     if (!p) throw new NotFoundException('Parâmetros não inicializados');
@@ -273,6 +292,16 @@ export class ProdutosService {
 
 export type ProdutoComPricing = Awaited<ReturnType<ProdutosService['list']>>['items'][number];
 export type { CalculoSaida };
+
+// Shape do produto com todos os includes que list/get carregam.
+// Derivado do Prisma payload pra ficar sincronizado se o include mudar.
+type ProdutoComIncludes = Prisma.ProdutoGetPayload<{
+  include: {
+    filamento: true;
+    insumos: { include: { insumo: true } };
+    imagens: true;
+  };
+}>;
 
 /**
  * Soma dos insumos consumidos pelo produto (em centavos).
