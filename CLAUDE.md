@@ -19,7 +19,7 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Docstring em função pública: intent + 1 exemplo de uso.
 
 ## Testes
-- **Estado real (2026-05):** só `packages/pricing` tem testes Vitest (22 testes em calculadora/custos/taxas/simulador, ~100% coverage). `apps/api` e `apps/web` ainda sem testes; Playwright nunca foi configurado.
+- **Estado real (2026-05-22):** `packages/pricing` 22 testes (calculadora/custos/taxas/simulador, ~100% cov). `apps/api` 38 testes Vitest (oportunidades service+cron, shopee provider+signature, gaps service, produtos service); helper `test/helpers/prisma-mock.ts` cobre os delegates mais usados. `apps/web` sem testes; Playwright nunca configurado.
 - Alvo: 90% em `packages/pricing` (já atingido), 70% no resto (pendente).
 - Novo backend module precisa de teste Vitest pro service; features de UI críticas, Playwright. Estabelecer o padrão na primeira feature testada.
 - Banco de teste sobe via `docker compose -f infra/docker-compose.test.yml up -d` (arquivo já existe pro Postgres ephemeral).

@@ -26,10 +26,23 @@ export function makePrismaMock() {
       count: vi.fn(),
       groupBy: vi.fn(),
     },
-    produto: { create: vi.fn() },
+    produto: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    produtoGapDecisao: { findMany: vi.fn(), upsert: vi.fn(), delete: vi.fn() },
     filamento: { findUnique: vi.fn(), findFirst: vi.fn() },
     concorrente: { findMany: vi.fn() },
     oportunidadeLog: { create: vi.fn(), findMany: vi.fn() },
+    parametro: { findUnique: vi.fn() },
+    taxaShopee: { findMany: vi.fn() },
+    taxaMercadoLivre: { findMany: vi.fn() },
+    venda: { aggregate: vi.fn(), findMany: vi.fn() },
+    jobProducao: { aggregate: vi.fn() },
     // $transaction aceita: (1) array de promises ou (2) callback com tx.
     // Pra (1) Promise.all; pra (2) executa o callback com txDelegate.
     $transaction: vi.fn(async (arg: unknown) => {
