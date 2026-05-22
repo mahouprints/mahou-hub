@@ -9,6 +9,8 @@ import { apiFetch } from '@/lib/api-client';
 import { tempoRelativo } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
+import { useTablePagination } from '@/lib/use-table-pagination';
+import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { SelectionToolbar } from '@/components/selection-toolbar';
 import { ConcorrenteLinkDialog } from '@/components/concorrente-link-dialog';
@@ -77,7 +79,9 @@ export default function ConcorrentesPage() {
   });
 
   const lista = useMemo(() => sort.ordenar(data ?? []), [data, sort]);
-  const idsVisiveis = useMemo(() => lista.map((c) => c.id), [lista]);
+  const pag = useTablePagination();
+  const listaPaginada = useMemo(() => pag.paginar(lista), [lista, pag]);
+  const idsVisiveis = useMemo(() => listaPaginada.map((c) => c.id), [listaPaginada]);
   const sel = useTableSelection(idsVisiveis);
 
   const sincronizar = useMutation({
@@ -241,7 +245,7 @@ export default function ConcorrentesPage() {
                 </TableCell>
               </TableRow>
             )}
-            {lista.map((c) => {
+            {listaPaginada.map((c) => {
               const snap = c.ultimoSnapshot;
               const erroSync = snap?.erroMensagem;
               const sincronizandoEsta = sincronizar.isPending && sincronizar.variables === c.id;
@@ -347,6 +351,12 @@ export default function ConcorrentesPage() {
             })}
           </TableBody>
         </Table>
+        <Pagination
+          page={pag.page}
+          pageSize={pag.pageSize}
+          total={lista.length}
+          onPageChange={pag.setPage}
+        />
       </Card>
     </div>
   );

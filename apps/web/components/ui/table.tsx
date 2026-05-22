@@ -3,10 +3,14 @@ import { cn } from '@/lib/utils';
 
 export const Table = forwardRef<HTMLTableElement, HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    // overflow-x explícito + min-w-0: garante que a tabela rola DENTRO
-    // do wrapper em vez de empurrar o layout. Combinar com min-w-0 nos
-    // ancestrais flex (ver apps/web/app/(app)/layout.tsx).
-    <div className="relative w-full min-w-0 overflow-x-auto overflow-y-hidden">
+    // overflow-x-auto + min-w-0: garante que a tabela rola horizontalmente DENTRO
+    // do wrapper em vez de empurrar o layout. Combinar com min-w-0 nos ancestrais
+    // flex (ver apps/web/app/(app)/layout.tsx).
+    //
+    // overflow-y-clip (não hidden): hidden criaria um scroll-container em Y e
+    // quebraria o `position: sticky` do <thead> — clip só corta visualmente.
+    // Sticky thead cola contra o <main overflow-y-auto> do layout.
+    <div className="relative w-full min-w-0 overflow-x-auto overflow-y-clip">
       <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   ),
@@ -15,7 +19,17 @@ Table.displayName = 'Table';
 
 export const TableHeader = forwardRef<HTMLTableSectionElement, HTMLAttributes<HTMLTableSectionElement>>(
   ({ className, ...props }, ref) => (
-    <thead ref={ref} className={cn('[&_tr]:border-b', className)} {...props} />
+    // sticky top-0: header fica fixo enquanto a tabela rola sob ele.
+    // bg-background impede que linhas vazem por baixo no scroll;
+    // z-20 fica acima de checkboxes e badges nas células.
+    <thead
+      ref={ref}
+      className={cn(
+        'sticky top-0 z-20 bg-background shadow-[inset_0_-1px_0_0_hsl(var(--border))] [&_tr]:border-b',
+        className,
+      )}
+      {...props}
+    />
   ),
 );
 TableHeader.displayName = 'TableHeader';

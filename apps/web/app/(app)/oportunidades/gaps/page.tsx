@@ -45,6 +45,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { Pagination } from '@/components/pagination';
+import { useTablePagination } from '@/lib/use-table-pagination';
 
 type Classificacao = 'GAP' | 'VARIACAO' | 'MATCH' | 'MATCH_MANUAL' | 'DESCARTADO';
 
@@ -99,6 +101,7 @@ export default function GapsPage() {
   const [dialogMatch, setDialogMatch] = useState<GapItem | null>(null);
 
   const queryClient = useQueryClient();
+  const pag = useTablePagination({ resetKey: filtros });
 
   const qsParams = useMemo(() => {
     const p = new URLSearchParams();
@@ -106,9 +109,10 @@ export default function GapsPage() {
     if (filtros.lojaExternalId) p.set('lojaExternalId', filtros.lojaExternalId);
     if (filtros.vendasMin) p.set('vendasMin', filtros.vendasMin);
     if (filtros.q) p.set('q', filtros.q);
-    p.set('pageSize', '200');
+    p.set('page', String(pag.page));
+    p.set('pageSize', String(pag.pageSize));
     return p.toString();
-  }, [filtros]);
+  }, [filtros, pag.page, pag.pageSize]);
 
   const gapsQuery = useQuery<GapsResponse>({
     queryKey: ['gaps', qsParams],
@@ -121,22 +125,17 @@ export default function GapsPage() {
     select: (data) => data.filter((f) => f.ativo),
   });
 
-  // Estatísticas calculadas no client (top lojas, top categorias). Mais barato que endpoint dedicado.
-  const insights = useMemo(() => {
-    const items = gapsQuery.data?.items ?? [];
-    const porLoja = new Map<string, number>();
-    for (const it of items) {
-      if (it.classificacao === 'GAP' && it.lojaNome) {
-        porLoja.set(it.lojaNome, (porLoja.get(it.lojaNome) ?? 0) + 1);
-      }
-    }
-    const totalGaps = items.filter((i) => i.classificacao === 'GAP').length;
-    const totalVariacoes = items.filter((i) => i.classificacao === 'VARIACAO').length;
-    const topLojas = [...porLoja.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-    return { totalGaps, totalVariacoes, topLojas };
-  }, [gapsQuery.data]);
+  // Counts globais (independentes da página atual). pageSize=1 economiza payload;
+  // só precisamos do `total`. Não passa lojaExternalId/q/vendasMin de propósito —
+  // queremos o totalizador de gaps/variações do universo todo, não do filtro UI.
+  const gapsCountQuery = useQuery<GapsResponse>({
+    queryKey: ['gaps-count', 'GAP'],
+    queryFn: () => apiFetch('/oportunidades/gaps?classificacao=GAP&pageSize=1'),
+  });
+  const variacoesCountQuery = useQuery<GapsResponse>({
+    queryKey: ['gaps-count', 'VARIACAO'],
+    queryFn: () => apiFetch('/oportunidades/gaps?classificacao=VARIACAO&pageSize=1'),
+  });
 
   return (
     <div className="space-y-4 p-4">
@@ -156,26 +155,15 @@ export default function GapsPage() {
         </div>
       </header>
 
-      {/* Insights */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      {/* Insights — counts globais, independentes do filtro/página atual */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Gaps detectados</div>
-          <div className="text-2xl font-semibold">{insights.totalGaps}</div>
+          <div className="text-xs text-muted-foreground">Gaps detectados (total)</div>
+          <div className="text-2xl font-semibold">{gapsCountQuery.data?.total ?? '—'}</div>
         </Card>
         <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Variações sugeridas</div>
-          <div className="text-2xl font-semibold">{insights.totalVariacoes}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-xs text-muted-foreground">Top lojas (em gaps)</div>
-          <div className="space-y-1 text-sm">
-            {insights.topLojas.map(([loja, qtd]) => (
-              <div key={loja} className="flex justify-between gap-2">
-                <span className="truncate">{loja}</span>
-                <span className="font-mono text-muted-foreground">{qtd}</span>
-              </div>
-            ))}
-          </div>
+          <div className="text-xs text-muted-foreground">Variações sugeridas (total)</div>
+          <div className="text-2xl font-semibold">{variacoesCountQuery.data?.total ?? '—'}</div>
         </Card>
       </div>
 
@@ -360,6 +348,12 @@ export default function GapsPage() {
             ))}
           </TableBody>
         </Table>
+        <Pagination
+          page={pag.page}
+          pageSize={pag.pageSize}
+          total={gapsQuery.data?.total ?? 0}
+          onPageChange={pag.setPage}
+        />
       </Card>
 
       {/* Modal: Copiar como rascunho */}

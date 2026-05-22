@@ -10,6 +10,8 @@ import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
+import { useTablePagination } from '@/lib/use-table-pagination';
+import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -90,7 +92,9 @@ export default function CustosPage() {
     return sort.ordenar(f);
   }, [data, filtroCategoria, filtroOrigem, sort]);
 
-  const idsVisiveis = useMemo(() => filtrados.map((c) => c.id), [filtrados]);
+  const pag = useTablePagination({ resetKey: `${mes}|${filtroCategoria}|${filtroOrigem}` });
+  const filtradosPaginados = useMemo(() => pag.paginar(filtrados), [filtrados, pag]);
+  const idsVisiveis = useMemo(() => filtradosPaginados.map((c) => c.id), [filtradosPaginados]);
   const sel = useTableSelection(idsVisiveis);
 
   const bulkDelete = useMutation({
@@ -242,7 +246,7 @@ export default function CustosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.map((c) => (
+              {filtradosPaginados.map((c) => (
                 <TableRow key={c.id}>
                   {sel.modoSelecao && (
                     <TableCell>
@@ -303,6 +307,12 @@ export default function CustosPage() {
               )}
             </TableBody>
           </Table>
+          <Pagination
+            page={pag.page}
+            pageSize={pag.pageSize}
+            total={filtrados.length}
+            onPageChange={pag.setPage}
+          />
         </Card>
       )}
 

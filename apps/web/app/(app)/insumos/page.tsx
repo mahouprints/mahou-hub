@@ -8,6 +8,8 @@ import type { Insumo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
 import { useTableSort } from '@/lib/use-table-sort';
+import { useTablePagination } from '@/lib/use-table-pagination';
+import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,6 +53,8 @@ export default function InsumosPage() {
   });
 
   const ordenados = useMemo(() => (data ? sort.ordenar(data) : []), [data, sort]);
+  const pag = useTablePagination();
+  const ordenadosPaginados = useMemo(() => pag.paginar(ordenados), [ordenados, pag]);
 
   function abrirNovo() {
     setEmEdicao(undefined);
@@ -110,7 +114,7 @@ export default function InsumosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {ordenados.map((i) => (
+              {ordenadosPaginados.map((i) => (
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.nome}</TableCell>
                   <TableCell>
@@ -146,6 +150,12 @@ export default function InsumosPage() {
               )}
             </TableBody>
           </Table>
+          <Pagination
+            page={pag.page}
+            pageSize={pag.pageSize}
+            total={ordenados.length}
+            onPageChange={pag.setPage}
+          />
         </Card>
       )}
 

@@ -9,6 +9,8 @@ import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, tempoRelativo } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
+import { useTablePagination } from '@/lib/use-table-pagination';
+import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { SelectionToolbar } from '@/components/selection-toolbar';
 import { Badge } from '@/components/ui/badge';
@@ -84,7 +86,9 @@ export default function OportunidadesPage() {
     if (filtroStatus !== 'TODOS') p.set('status', filtroStatus);
     if (filtroFonte !== 'TODAS') p.set('fonte', filtroFonte);
     if (busca.trim()) p.set('q', busca.trim());
-    p.set('take', '500');
+    // Cap defensivo. Quando o backlog passar disso, migrar pra server-side pagination
+    // adicionando envelope { items, total } no endpoint.
+    p.set('take', '5000');
     return p.toString();
   }, [filtroStatus, filtroFonte, busca]);
 
@@ -106,7 +110,11 @@ export default function OportunidadesPage() {
   );
 
   const lista = useMemo(() => sort.ordenar(data ?? []), [data, sort]);
-  const idsVisiveis = useMemo(() => lista.map((o) => o.id), [lista]);
+  const pag = useTablePagination({ resetKey: `${filtroStatus}|${filtroFonte}|${busca}` });
+  const listaPaginada = useMemo(() => pag.paginar(lista), [lista, pag]);
+  // Seleção opera sobre IDs visíveis na página atual — "selecionar todos" não
+  // cruza páginas. Pra bulk grande, sair-do-modo, mudar filtro e voltar.
+  const idsVisiveis = useMemo(() => listaPaginada.map((o) => o.id), [listaPaginada]);
   const sel = useTableSelection(idsVisiveis);
 
   const bulkDelete = useMutation({
@@ -260,7 +268,7 @@ export default function OportunidadesPage() {
                 </TableCell>
               </TableRow>
             )}
-            {lista.map((o) => {
+            {listaPaginada.map((o) => {
               const precoStr =
                 o.priceMinCentavos === o.priceMaxCentavos
                   ? centavosParaReais(o.priceMinCentavos)
@@ -329,6 +337,12 @@ export default function OportunidadesPage() {
             })}
           </TableBody>
         </Table>
+        <Pagination
+          page={pag.page}
+          pageSize={pag.pageSize}
+          total={lista.length}
+          onPageChange={pag.setPage}
+        />
       </Card>
     </div>
   );

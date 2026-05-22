@@ -10,6 +10,8 @@ import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
+import { useTablePagination } from '@/lib/use-table-pagination';
+import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,7 +86,9 @@ export default function VendasPage() {
     return sort.ordenar(f);
   }, [data, filtroCanal, sort]);
 
-  const idsVisiveis = useMemo(() => filtradas.map((v) => v.id), [filtradas]);
+  const pag = useTablePagination({ resetKey: `${mes}|${filtroCanal}` });
+  const filtradasPaginadas = useMemo(() => pag.paginar(filtradas), [filtradas, pag]);
+  const idsVisiveis = useMemo(() => filtradasPaginadas.map((v) => v.id), [filtradasPaginadas]);
   const sel = useTableSelection(idsVisiveis);
 
   const bulkDelete = useMutation({
@@ -236,7 +240,7 @@ export default function VendasPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtradas.map((v) => (
+              {filtradasPaginadas.map((v) => (
                 <TableRow key={v.id}>
                   {sel.modoSelecao && (
                     <TableCell>
@@ -292,6 +296,12 @@ export default function VendasPage() {
               )}
             </TableBody>
           </Table>
+          <Pagination
+            page={pag.page}
+            pageSize={pag.pageSize}
+            total={filtradas.length}
+            onPageChange={pag.setPage}
+          />
         </Card>
       )}
 

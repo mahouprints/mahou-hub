@@ -21,6 +21,8 @@ import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
+import { useTablePagination } from '@/lib/use-table-pagination';
+import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -150,7 +152,11 @@ export default function ProdutosPage() {
     return sort.ordenar(f);
   }, [data, filtroFilamento, filtroCanal, filtroImpressora, filtroAnunciado, filtroStatus, sort]);
 
-  const idsVisiveis = useMemo(() => filtrados.map((p) => p.id), [filtrados]);
+  const pag = useTablePagination({
+    resetKey: `${filtroFilamento}|${filtroCanal}|${filtroImpressora}|${filtroAnunciado}|${filtroStatus}`,
+  });
+  const filtradosPaginados = useMemo(() => pag.paginar(filtrados), [filtrados, pag]);
+  const idsVisiveis = useMemo(() => filtradosPaginados.map((p) => p.id), [filtradosPaginados]);
   const sel = useTableSelection(idsVisiveis);
 
   const bulkDelete = useMutation({
@@ -343,7 +349,7 @@ export default function ProdutosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.map((p) => {
+              {filtradosPaginados.map((p) => {
                 const melhor = melhorCanalMarketplace(p);
                 const marcado = sel.selecionados.has(p.id);
                 return (
@@ -420,6 +426,12 @@ export default function ProdutosPage() {
               )}
             </TableBody>
           </Table>
+          <Pagination
+            page={pag.page}
+            pageSize={pag.pageSize}
+            total={filtrados.length}
+            onPageChange={pag.setPage}
+          />
         </Card>
       )}
     </div>

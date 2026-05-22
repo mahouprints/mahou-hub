@@ -27,6 +27,8 @@ import { TaxaShopeeDialog } from '@/components/taxa-shopee-dialog';
 import { TaxaMlDialog } from '@/components/taxa-ml-dialog';
 import { ParametrosDialog } from '@/components/parametros-dialog';
 import { ApiTokenCard } from '@/components/api-token-card';
+import { Pagination } from '@/components/pagination';
+import { useTablePagination } from '@/lib/use-table-pagination';
 
 export default function ConfiguracoesPage() {
   const parametros = useQuery({
@@ -45,6 +47,11 @@ export default function ConfiguracoesPage() {
     queryKey: ['taxas-ml'],
     queryFn: () => apiFetch<FaixaMercadoLivre[]>('/parametros/taxas/ml'),
   });
+
+  // Paginação só pra filamentos. Taxas Shopee/ML são tabelas de configuração de
+  // tamanho conhecido (faixas A–E, ~6 faixas Shopee) — paginar não faz sentido.
+  const filPag = useTablePagination();
+  const filamentosPaginados = filPag.paginar(filamentos.data ?? []);
 
   const [filDialog, setFilDialog] = useState<{ open: boolean; item: Filamento | null }>({ open: false, item: null });
   const [shopeeDialog, setShopeeDialog] = useState<{ open: boolean; item: FaixaShopee | null }>({ open: false, item: null });
@@ -124,7 +131,7 @@ export default function ConfiguracoesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filamentos.data?.map((f) => (
+              {filamentosPaginados.map((f) => (
                 <TableRow key={f.id}>
                   <TableCell className="font-medium">{f.nome}</TableCell>
                   <TableCell className="text-right tabular-nums">{centavosParaReais(f.custoKgCentavos)}</TableCell>
@@ -151,6 +158,12 @@ export default function ConfiguracoesPage() {
               ))}
             </TableBody>
           </Table>
+          <Pagination
+            page={filPag.page}
+            pageSize={filPag.pageSize}
+            total={filamentos.data?.length ?? 0}
+            onPageChange={filPag.setPage}
+          />
         </CardContent>
       </Card>
 
