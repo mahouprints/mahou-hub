@@ -224,17 +224,19 @@ export class GapsService {
     const precoMahou = best.produto.precoCentavos;
     const precoProximo = Math.abs(precoMahou - snap.priceMinCentavos) / Math.max(precoMahou, 1) < 0.5;
 
+    const produtoMahouSimilar = { id: best.produto.id, nome: best.produto.nome };
+
+    /// MATCH exige cobertura total dos tokens Mahou — sem isso, "Cortador de biscoito copa" bate
+    /// com "Cortador de biscoito amendoim" pois jaccard=0.5 mas o token-tema (copa) não aparece.
     if (best.jaccard >= 0.5) {
-      return {
-        classificacao: 'MATCH',
-        produtoMahouSimilar: { id: best.produto.id, nome: best.produto.nome },
-      };
+      const todosCobertos = [...best.produto.tokens].every((t) =>
+        concorrenteTokens.has(t),
+      );
+      if (todosCobertos) return { classificacao: 'MATCH', produtoMahouSimilar };
+      return { classificacao: 'VARIACAO', produtoMahouSimilar };
     }
     if (best.jaccard >= 0.3 && precoProximo) {
-      return {
-        classificacao: 'VARIACAO',
-        produtoMahouSimilar: { id: best.produto.id, nome: best.produto.nome },
-      };
+      return { classificacao: 'VARIACAO', produtoMahouSimilar };
     }
     return { classificacao: 'GAP', produtoMahouSimilar: null };
   }
