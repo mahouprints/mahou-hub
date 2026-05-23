@@ -40,6 +40,7 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - API prefixo `api/v1` (setGlobalPrefix em `main.ts`). Frontend chama `/api/<path>` e o Next rewrite traduz pra `/api/v1/<path>` — UI fica alheia à versão. Consumer externo usa `/api/v1/...`. `/healthz` segue fora do prefixo.
 - Swagger UI em `/api/v1/docs`, spec em `/api/v1/docs-json` — agrupado por `@ApiTags` por controller. Ao adicionar endpoint, manter o padrão (`@ApiOperation` em endpoints que consumer externo usa).
 - Rate-limit global: 100 req/min por IP via `@nestjs/throttler` + `APP_GUARD`. Pra endpoint mais permissivo ou mais restrito, usar `@Throttle({ default: { limit, ttl } })`. `@SkipThrottle()` pra isentar.
+- `content/` — assets de marca consumidos pelas skills do Claude Code (regras de marketplace, catálogo Mahou, tom de voz Instagram, templates de cena, memória visual). É dado editorial em `.md`/`.json`/`.jpeg`, **não código**. Separado de `apps/`/`packages/`. Outputs personalizados (posts com cliente real, listings publicados) ficam locais via `.gitignore` — privacidade.
 
 ## Formatação
 - `prettier` + `eslint --fix` rodam em pre-commit (lefthook).
@@ -111,6 +112,18 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Pra adicionar novas áreas de tools: criar `tools-<area>.ts`, importar em `src/index.ts`. Schemas Zod replicados localmente (sem dep em contracts) pra manter o MCP server publicável standalone.
 - **`.mcp.json` usa `node --env-file=./mcp-servers/mahou-hub/.env.local`** (Node 20.6+ nativo). `${VAR}` no `.mcp.json` **NÃO é interpolado** pelo Claude Code — usar shell env causa 401 silencioso (passou string literal pro filho).
 - **`zodToJsonSchema(s)` sem `target: 'openApi3'`** — OpenAPI 3.0 gera `nullable: true` que viola JSON Schema draft 2020-12 (exigido pela Anthropic API). Erro 400 derruba TODAS as 22 tools de uma vez.
+
+## Skills de conteúdo (Claude Code slash commands)
+- `.claude/skills/<nome>/SKILL.md` — skills slash command que automatizam tarefas editoriais. **Diferente do MCP server**: skills são instruções em texto pro agente seguir (sem código); MCP tools são funções TypeScript que retornam dados. Skills usam MCP tools quando precisam ler do banco.
+- **Skills atuais:**
+  - `oportunidades-mahou/` — descobre produtos do mercado pra entrar no catálogo (multi-arquivo: SKILL.md + criterios-3d.md + exemplos/ + scoring.md + gaps-concorrentes.md + geracao-ideias.md)
+  - `gerar-imagem/` — gera fotos de produto via Google Flow + Nano Banana Pro (automação Playwright)
+  - `gerar-descricao/` — títulos e descrições pra Shopee/ML/TikTok com fórmula universal USP-first
+  - `gerar-post/` — posts pra @MahouPrints (copy + hashtags + roteiros de vídeo + descrições de imagem pra `/gerar-imagem`)
+- **Skills consomem `content/`** (regras, catálogo, templates, tom). Paths nos `SKILL.md` versionados usam `content/...` (relativo ao repo).
+- **Sync pra uso global** (`~/.claude/commands/`): `bash scripts/sync-skills.sh`. O script espelha skills single-file ajustando paths de `content/...` pra `~/Marketplace/`, `~/Instagram/`, `~/ImageGen/`, `~/.claude/projects/.../memory/`. Skills multi-arquivo (`oportunidades-mahou`) são puladas — pra essas, abre Claude Code dentro do repo (project-level skills são lidas automaticamente).
+- **Fluxo:** repo é fonte da verdade. Edita SKILL.md no repo, commita, roda `sync-skills.sh` localmente. Nunca edite `~/.claude/commands/` direto — drift impossível de rastrear.
+- **Outputs das skills NÃO vão pro repo** (`.gitignore` bloqueia `content/instagram/posts/`, `content/marketplace/listings/`). Outputs personalizados contêm dados de clientes reais.
 
 ## Comandos úteis
 - `pnpm dev` — sobe web + api em modo dev.
