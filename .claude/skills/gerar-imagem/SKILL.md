@@ -130,50 +130,88 @@ Modo que **integra a skill com o backend do Mahou Hub via MCP**. Lista produtos 
 
 #### G.1 — Levantamento de estado (chama MCP)
 
-Chamadas paralelas:
-- `mcp__mahou-hub__listar_produtos_pendentes_imagem({ pageSize: 50 })` → Categoria A
-- `mcp__mahou-hub__listar_produtos({ anunciado: 'false', temImagens: 'true', pageSize: 50 })` → Categoria B
-- (opcional) `mcp__mahou-hub__listar_produtos({ anunciado: 'false', temReferencia: 'false', pageSize: 50 })` → Categoria C (sem referência — bloqueada)
+Chamada inicial:
+- `mcp__mahou-hub__listar_produtos_pendentes_imagem({ pageSize: 200 })` → lista bruta (anunciado=false + temReferencia=true + temImagens=false)
+- `mcp__mahou-hub__listar_produtos({ anunciado: 'false', temImagens: 'true', pageSize: 200 })` → Categoria B (prontos pra anunciar)
+
+**ATENÇÃO — `temReferencia=true` no Hub é fraco:** o filtro retorna produtos com `inspiracao` (URL textual) OU `modelo3dUrl` (URL textual). NÃO garante que tenha imagem upada em `ProdutoImagem`. Pra a skill **só processa produto que tem imagem upada de verdade** (origem=INSPIRACAO ou MODELO_3D no array `imagens`).
+
+**Filtragem fina** (chama `obter_produto` em paralelo pra todos da lista bruta):
+- 🟢 **PRONTOS** — `imagens.some(img => img.origem === 'INSPIRACAO' || img.origem === 'MODELO_3D')`
+- ⚠️ **BLOQUEADOS** — `imagens.length === 0` ou só tem origem=GERADA/OUTRA
 
 #### G.2 — Apresentação ao usuário
 
-Tabelas separadas por categoria:
+Tabelas separadas:
 
 ```
 📋 Estado do catálogo (Mahou Hub)
 
-🟡 CATEGORIA A — Pendentes de imagem (N produtos)
-   Têm referência, ainda não têm foto final. Candidatos diretos pra geração.
+🟢 PRONTOS PRA GERAR (N produtos com imagem upada)
+   Têm imagem INSPIRACAO ou MODELO_3D em ProdutoImagem. Skill baixa do
+   media.mahouprints.com e usa como ref no Flow.
 
-   | # | Nome | Cor/Filamento | Refs | Cena sugerida (auto) |
-   |---|------|---------------|------|----------------------|
-   | 1 | Porta Escova de Dente | Preto matte | 2 INSPIRACAO | bathroom_modern_black_marble |
-   | 2 | Suporte para Mug | Branco translúcido | 1 INSPIRACAO + URL 3D | wooden_warm_cozy |
+   | # | Nome | Filamento | Imagens upadas | Cena sugerida |
+   |---|------|-----------|----------------|---------------|
+   | 1 | Suporte Mug | Branco PLA | 2 INSPIRACAO | wooden_warm_cozy |
    ...
 
-✅ CATEGORIA B — Prontos pra anunciar (M produtos)
+⚠️  BLOQUEADOS — só têm URL textual (M produtos — IGNORADOS pela skill)
+   Têm `inspiracao` (URL Shopee/MakerWorld) ou `modelo3dUrl` cadastrados,
+   mas NENHUMA imagem upada no Hub. Skill NÃO processa esses — faltam
+   pixels reais pra usar como referência no Flow.
+
+   - Cortador biscoito Patrulha Canina (id: cmpa8j..., URL Shopee + MakerWorld)
+   - Cubo de memoria (id: cmpa8j..., só MakerWorld)
+   - Abajur Nuvem (id: cmpa8j..., URL Shopee + MakerWorld)
+   ... [M produtos]
+
+   👉 Pra processar esses: faz upload de imagem INSPIRACAO via UI ou API
+      (instruções abaixo) — depois roda /gerar-imagem fila-hub de novo.
+
+✅ JÁ PRONTOS PRA ANUNCIAR (K produtos da Categoria B)
    Têm imagem gerada e anunciado=false. Só falta publicar no marketplace.
 
-   | # | Nome | Imagens | Canal principal | Última atualização |
-   |---|------|---------|-----------------|--------------------|
-   | 1 | Suporte Mobile Bebê | 3 GERADAS | SITE | há 3 dias |
+   | # | Nome | Imagens GERADAS | Canal principal |
+   |---|------|-----------------|-----------------|
+   | 1 | Suporte Mobile Bebê | 3 | SITE |
    ...
-
-⚠️  CATEGORIA C — Bloqueados (K produtos, opcional listar)
-   Sem referência cadastrada. Precisa upload de inspiração no Hub antes.
 ```
 
-Pergunta direta: **"Quais quer gerar agora? Categoria A: 1, 2, todos, ou nenhum?"**
+Pergunta direta: **"Quais dos PRONTOS quer gerar agora? 1, 2, todos, nenhum?"**
 
-#### G.3 — Pra cada produto selecionado
+#### G.2.1 — Como fazer upload de imagem INSPIRACAO (instrução pro user)
 
-1. **Buscar detalhe**: `mcp__mahou-hub__obter_produto({ id })` — pega nome, dimensões, filamento, URLs de referências, modelo3dUrl, descrição da inspiração.
+Quando produtos estão na lista BLOQUEADOS, o user precisa fazer upload manual antes. Skill mostra:
+
+```bash
+# Via API (1 imagem):
+source mcp-servers/mahou-hub/.env.local
+curl -X POST "$MAHOU_API_URL/api/v1/produtos/$PRODUTO_ID/imagens" \
+  -H "Authorization: Bearer $MAHOU_API_TOKEN" \
+  -F "arquivo=@caminho/da/inspiracao.jpg" \
+  -F "origem=INSPIRACAO"
+```
+
+Ou via UI: `hub.mahouprints.com/produtos/$PRODUTO_ID` → card Imagens → upload com origem=INSPIRACAO.
+
+**Idealmente: 1-3 imagens INSPIRACAO por produto** (ângulos diferentes do produto físico ou da inspiração Shopee/MakerWorld).
+
+#### G.3 — Pra cada produto selecionado (somente da lista PRONTOS)
+
+1. **Detalhe já em memória** (foi obtido no G.1 pra filtragem) — pega nome, dimensões, filamento, array `imagens` com URLs absolutas e `origem`.
 
 2. **Slugify nome**: `Porta Escova de Dente` → `porta-escova-dente`.
 
 3. **Criar pasta local**: `Documents/Mahou Prints/products (em revisão)/<slug>/` + `referencias/`.
 
-4. **Baixar referências do Hub**: `curl -L -o referencias/inspiracao_N.jpg https://media.mahouprints.com/<arquivo>` (URLs vêm absolutas do `obter_produto`).
+4. **Baixar APENAS imagens upadas no Hub** (origem=INSPIRACAO ou MODELO_3D):
+   ```bash
+   # Pra cada img de p.imagens onde origem ∈ {INSPIRACAO, MODELO_3D}:
+   curl -L -o "referencias/inspiracao_${i}.jpg" "${img.arquivo}"
+   # img.arquivo já é URL absoluta (MediaUrlService resolveu).
+   ```
+   **NÃO** tenta baixar do `inspiracao` (URL textual Shopee) nem do `modelo3dUrl` — esses são links pra páginas externas, não imagens diretas.
 
 5. **Salvar `_meta.json`** com:
    ```json
@@ -249,10 +287,12 @@ Pra cada produto aprovado:
 **Caso o produto não case com nenhuma palavra-chave clara:** pergunta ao usuário antes de gerar.
 
 **Limitações conhecidas do Modo G:**
+- **Só processa produto com imagem upada** (`ProdutoImagem.origem` ∈ {INSPIRACAO, MODELO_3D}). Produto com só URL textual (`inspiracao`/`modelo3dUrl`) é **listado mas ignorado** — não há pixels reais pra usar como ref no Flow. Skill mostra instruções de upload via curl/UI.
 - Não cria produto novo no Hub (use UI ou `mcp__mahou-hub__criar_produto` antes).
-- Não faz upload de referências/inspirações pro Hub (só consome as que já estão lá).
+- Não faz upload de referências/inspirações pro Hub (só consome as que já estão lá). Upload de INSPIRACAO é ato humano deliberado (escolher imagem, decidir ângulo).
 - Não marca anunciado=true (decisão humana após publicação real).
 - Cenário pode precisar ajuste manual em produtos atípicos (vide heurística acima).
+- Heurística de cenário é por palavra-chave: produtos como "Suporte de papel Higiênico Mario" caem em default (wooden) por causa do "Mario", quando deveriam ir pra bathroom. Skill pergunta quando ambíguo.
 
 ### Modo E — `editar` (edição cirúrgica via Nano Banana — RECOMENDADO para ajustes pequenos)
 Quando uma imagem ficou ÓTIMA mas tem 1 detalhe pra corrigir (ex: remover bebê, trocar cor de item, mudar pose, adicionar elemento), use o **modo Edit nativo do Flow** ao invés de regerar do zero. Vantagens:
