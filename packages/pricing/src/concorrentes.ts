@@ -1,12 +1,18 @@
-// Estimativa de vendas TOTAIS de produtos Shopee a partir do dado `sales`
-// devolvido pela Affiliate API.
+// Normalização de `sales` da Shopee Affiliate API pra base mensal.
 //
 // Provenance: Shopee Affiliate só expõe `sales` da janela de campanha (~30 dias),
-// não o histórico total. Amostragem em 6 produtos da 3DTECH (2026-05) mostrou
-// que `sales` corresponde a ~5% das vendas reais (ratios 1.6% a 7.3%, média ~5%).
-// Sem outra fonte viável (Affiliate só tem 19 campos, /pdp/get_pc bloqueado por
-// x-sap-sec stateful) — essa é a aproximação que dá pro MVP do módulo Concorrentes.
+// não o histórico total. O número que sai daqui é o **sales do afiliado**
+// normalizado por janela — NÃO uma estimativa de vendas totais.
+//
+// Decisão (2026-05-23): paramos de inflar com `1/0.05` (heurística de "5% via
+// afiliado") porque o resultado era contraintuitivo e dependia de uma média
+// observada em poucas lojas. UI mostra agora "Vendas (afiliado)" e mantém um
+// campo separado `vendasReais` (nullable) pra enriquecimento manual futuro.
 
+/**
+ * @deprecated Mantido pra compatibilidade. Não use em código novo —
+ * o pipeline atual não infere vendas totais a partir do sales do afiliado.
+ */
 export const TAXA_AFILIADO_SHOPEE = 0.05;
 
 export type ProdutoComVendasShopee = {
@@ -16,30 +22,47 @@ export type ProdutoComVendasShopee = {
 };
 
 /**
- * Estima vendas totais mensais a partir de `sales` da Shopee Affiliate.
+ * Normaliza `sales` da Shopee Affiliate pra base mensal de 30 dias.
  *
- * 1. Normaliza `sales` (vendas via afiliado na janela de campanha) pra base mensal.
- * 2. Divide pela taxa estimada de afiliado → vendas totais (incl. orgânicas).
+ * `sales` vem com janela de campanha variável (ex.: 14 dias, 28 dias, 35 dias).
+ * Pra comparar lojas com janelas diferentes, normalizamos pra 30 dias.
+ * Quando a janela é inválida ou zero-divisão, retorna `sales` direto.
  *
  * @example
- *   estimarVendasTotaisMes({ sales: 449, periodStartTime: '2026-04-20', periodEndTime: '2026-05-20' })
- *   // → ~8980 (449 / 30 * 30 / 0.05)
+ *   normalizarVendasAfiliadoMes({ sales: 449, periodStartTime: '2026-04-20', periodEndTime: '2026-05-20' })
+ *   // → 449  (janela ~30 dias, sem ajuste)
+ *
+ *   normalizarVendasAfiliadoMes({ sales: 200, periodStartTime: '2026-04-20', periodEndTime: '2026-05-04' })
+ *   // → 429  (janela 14 dias → projeção pra 30: 200/14*30)
  */
-export function estimarVendasTotaisMes(produto: ProdutoComVendasShopee): number {
-  const inicio = produto.periodStartTime instanceof Date
-    ? produto.periodStartTime.getTime()
-    : new Date(produto.periodStartTime).getTime();
-  const fim = produto.periodEndTime instanceof Date
-    ? produto.periodEndTime.getTime()
-    : new Date(produto.periodEndTime).getTime();
+export function normalizarVendasAfiliadoMes(produto: ProdutoComVendasShopee): number {
+  const inicio =
+    produto.periodStartTime instanceof Date
+      ? produto.periodStartTime.getTime()
+      : new Date(produto.periodStartTime).getTime();
+  const fim =
+    produto.periodEndTime instanceof Date
+      ? produto.periodEndTime.getTime()
+      : new Date(produto.periodEndTime).getTime();
   const diasJanela = (fim - inicio) / 86_400_000;
-  const salesNoMes = Number.isFinite(diasJanela) && diasJanela > 0
-    ? (produto.sales / diasJanela) * 30
-    : produto.sales;
-  return Math.round(salesNoMes / TAXA_AFILIADO_SHOPEE);
+  const salesNoMes =
+    Number.isFinite(diasJanela) && diasJanela > 0
+      ? (produto.sales / diasJanela) * 30
+      : produto.sales;
+  return Math.round(salesNoMes);
 }
 
-/** Soma a estimativa mensal de uma lista de produtos da mesma loja. */
-export function somarVendasEstimadasMes(produtos: readonly ProdutoComVendasShopee[]): number {
-  return produtos.reduce((acc, p) => acc + estimarVendasTotaisMes(p), 0);
+/** Soma `normalizarVendasAfiliadoMes` de uma lista de produtos da mesma loja. */
+export function somarVendasAfiliadoMes(produtos: readonly ProdutoComVendasShopee[]): number {
+  return produtos.reduce((acc, p) => acc + normalizarVendasAfiliadoMes(p), 0);
 }
+
+// ─── aliases @deprecated (compat) ────────────────────────────────────────────
+// Mantidos pra não quebrar imports de fora do monorepo. Internamente já é tudo
+// o novo nome. Remover quando confirmar que nenhum consumer externo depende.
+
+/** @deprecated Renomeado pra `normalizarVendasAfiliadoMes`. */
+export const estimarVendasTotaisMes = normalizarVendasAfiliadoMes;
+
+/** @deprecated Renomeado pra `somarVendasAfiliadoMes`. */
+export const somarVendasEstimadasMes = somarVendasAfiliadoMes;

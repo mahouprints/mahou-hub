@@ -10,7 +10,7 @@ export type OportunidadeCandidato = {
   priceMaxCentavos: number;
   imageUrl: string;
   productLink: string;
-  vendasEstimadasMes: number;
+  vendasAfiliadoMes: number;
   ratingStar: number | null;
   categoriaIds: number[];
   lojaExternalId: string | null;

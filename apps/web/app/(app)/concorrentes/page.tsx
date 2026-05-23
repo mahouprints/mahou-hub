@@ -54,7 +54,7 @@ type ConcorrenteListItem = {
     erroMensagem: string | null;
     origem: 'MANUAL' | 'CRON';
   } | null;
-  vendasEstimadasMesTotal: number | null;
+  vendasAfiliadoMesTotal: number | null;
 };
 
 type ColunaSort = 'loja' | 'rating' | 'produtos' | 'estimado' | 'sync';
@@ -74,7 +74,7 @@ export default function ConcorrentesPage() {
     loja: (c) => c.loja.toLowerCase(),
     rating: (c) => Number(c.ratingStar ?? 0),
     produtos: (c) => c.ultimoSnapshot?.qtdProdutos ?? -1,
-    estimado: (c) => c.vendasEstimadasMesTotal ?? -1,
+    estimado: (c) => c.vendasAfiliadoMesTotal ?? -1,
     sync: (c) => (c.ultimoSyncEm ? new Date(c.ultimoSyncEm).getTime() : 0),
   });
 
@@ -215,7 +215,7 @@ export default function ConcorrentesPage() {
                 Produtos
               </SortableHead>
               <SortableHead chave="estimado" estado={sort.estado} onClick={sort.alternar}>
-                Vendas est./mês
+                Vendas (afiliado)
               </SortableHead>
               <SortableHead chave="sync" estado={sort.estado} onClick={sort.alternar}>
                 Último sync
@@ -296,8 +296,8 @@ export default function ConcorrentesPage() {
                   </TableCell>
                   <TableCell>{snap?.qtdProdutos ?? '—'}</TableCell>
                   <TableCell className="tabular-nums">
-                    {c.vendasEstimadasMesTotal != null ? (
-                      c.vendasEstimadasMesTotal.toLocaleString('pt-BR')
+                    {c.vendasAfiliadoMesTotal != null ? (
+                      c.vendasAfiliadoMesTotal.toLocaleString('pt-BR')
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}

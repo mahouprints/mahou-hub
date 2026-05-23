@@ -63,17 +63,17 @@ describe('ShopeeProvider.makeNodeFilter', () => {
     expect(f(node({ ratingStar: 4.2 }))).toBe(true);
   });
 
-  it('rejeita vendasMin pela heurística estimada/mês', () => {
-    const f = provider.makeNodeFilter({ vendasMin: 1500 });
-    // Default: sales=50, janela 30d → (50/30)*30 / 0.05 = 1000 vendas/mês — abaixo de 1500.
+  it('rejeita vendasMin pela normalização do sales afiliado', () => {
+    const f = provider.makeNodeFilter({ vendasMin: 75 });
+    // Default: sales=50, janela 30d → 50 vendas/mês (sem heurística inflada) — abaixo de 75.
     expect(f(node())).toBe(false);
-    // sales=100 → 2000 vendas/mês — passa.
+    // sales=100 → 100 vendas/mês — passa.
     expect(f(node({ sales: 100 }))).toBe(true);
   });
 
   it('combina múltiplos filtros (AND)', () => {
-    const f = provider.makeNodeFilter({ precoMinCentavos: 3000, vendasMin: 1500, ratingMin: 4 });
-    // 1500 vendas precisa de sales=75 (75/30*30 / 0.05 = 1500).
+    const f = provider.makeNodeFilter({ precoMinCentavos: 3000, vendasMin: 75, ratingMin: 4 });
+    // 75 vendas/mês precisa de sales=75 (janela 30d → 75/30*30 = 75).
     expect(f(node({ priceMin: 50, sales: 80, ratingStar: 4.5 }))).toBe(true);
     expect(f(node({ priceMin: 20, sales: 80, ratingStar: 4.5 }))).toBe(false); // preço baixo
     expect(f(node({ priceMin: 50, sales: 20, ratingStar: 4.5 }))).toBe(false); // vendas baixas

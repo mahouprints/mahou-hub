@@ -325,7 +325,10 @@ model ConcorrenteSnapshotProduto {
   priceMinCentavos   Int
   priceMaxCentavos   Int
   priceDiscountRate  Int
+  /// `sales` cru da Shopee Affiliate API — período da campanha, NÃO histórico total.
   sales              Int
+  /// Vendas totais reais (enriquecimento manual via Seller Center, opcional). Null = ainda não preenchido.
+  vendasReais        Int?
   commissionRate     Decimal               @db.Decimal(5, 4)
   commissionCentavos Int
   imageUrl           String
@@ -356,8 +359,10 @@ model ProdutoOportunidade {
   priceMaxCentavos   Int
   imageUrl           String
   productLink        String
-  /// Vendas estimadas/mês via heurística do provider (Shopee=5%, outros TBD).
-  vendasEstimadasMes Int
+  /// `sales` da Shopee Affiliate normalizado pra base mensal — NÃO histórico total. Antes inflava com 1/0.05; agora é só sales do afiliado projetado pra 30 dias.
+  vendasAfiliadoMes  Int
+  /// Vendas totais reais (enriquecimento manual via Seller Center, opcional). Null = ainda não preenchido.
+  vendasReais        Int?
   ratingStar         Decimal? @db.Decimal(3, 2)
   /// IDs de categoria no marketplace (genérico — Shopee usa productCatIds).
   categoriaIds       Int[]

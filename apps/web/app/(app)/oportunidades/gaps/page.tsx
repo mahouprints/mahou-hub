@@ -58,7 +58,7 @@ type GapItem = {
   priceMaxCentavos: number;
   imageUrl: string;
   productLink: string;
-  vendasEstimadasMes: number;
+  vendasAfiliadoMes: number;
   ratingStar: number | null;
   categoriaIds: number[];
   lojaExternalId: string | null;
@@ -235,7 +235,7 @@ export default function GapsPage() {
               <TableHead>Produto</TableHead>
               <TableHead className="w-40">Loja</TableHead>
               <TableHead className="w-28 text-right">Preço</TableHead>
-              <TableHead className="w-24 text-right">Vendas/mês</TableHead>
+              <TableHead className="w-24 text-right">Vendas (afiliado)</TableHead>
               <TableHead className="w-32">Classificação</TableHead>
               <TableHead className="w-48">Mahou similar</TableHead>
               <TableHead className="w-44 text-right">Ações</TableHead>
@@ -297,7 +297,7 @@ export default function GapsPage() {
                     : `${centavosParaReais(item.priceMinCentavos)} – ${centavosParaReais(item.priceMaxCentavos)}`}
                 </TableCell>
                 <TableCell className="text-right font-mono text-sm">
-                  {item.vendasEstimadasMes.toLocaleString('pt-BR')}
+                  {item.vendasAfiliadoMes.toLocaleString('pt-BR')}
                 </TableCell>
                 <TableCell>
                   <Badge variant={CLASSIFICACAO_LABEL[item.classificacao].variant}>

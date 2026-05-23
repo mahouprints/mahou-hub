@@ -43,3 +43,6 @@ apps/api/scripts/*.json
 # que não devem ser espelhadas no repo. Defensivo caso alguém crie por engano.
 content/instagram/posts/
 content/marketplace/listings/
+
+# Dados temporários de análises (snapshots concorrentes, agregados de pesquisa)
+.tmp_*

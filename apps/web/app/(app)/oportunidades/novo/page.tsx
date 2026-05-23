@@ -32,7 +32,7 @@ type Candidato = {
   priceMaxCentavos: number;
   imageUrl: string;
   productLink: string;
-  vendasEstimadasMes: number;
+  vendasAfiliadoMes: number;
   ratingStar: number | null;
   categoriaIds: number[];
   lojaExternalId: string | null;
@@ -107,7 +107,7 @@ export default function BuscarOportunidadesPage() {
             priceMaxCentavos: c.priceMaxCentavos,
             imageUrl: c.imageUrl,
             productLink: c.productLink,
-            vendasEstimadasMes: c.vendasEstimadasMes,
+            vendasAfiliadoMes: c.vendasAfiliadoMes,
             ratingStar: c.ratingStar,
             categoriaIds: c.categoriaIds,
             lojaExternalId: c.lojaExternalId,
@@ -340,7 +340,7 @@ export default function BuscarOportunidadesPage() {
                           </span>
                           <span>·</span>
                           <span className="tabular-nums">
-                            {c.vendasEstimadasMes.toLocaleString('pt-BR')} v/mês
+                            {c.vendasAfiliadoMes.toLocaleString('pt-BR')} v/mês
                           </span>
                           {c.ratingStar != null && (
                             <>

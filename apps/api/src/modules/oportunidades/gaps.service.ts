@@ -7,7 +7,7 @@ import type {
   OportunidadeMarketplace,
 } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
-import { estimarVendasTotaisMes } from '@mahou-hub/pricing';
+import { normalizarVendasAfiliadoMes } from '@mahou-hub/pricing';
 import { CATEGORIAS_SHOPEE_3D_MAP } from './providers/shopee-categorias-3d';
 
 /// Tokens descartados ao normalizar nomes pra match — palavras genéricas que não diferenciam produto.
@@ -69,7 +69,7 @@ export class GapsService {
         priceMaxCentavos: snap.priceMaxCentavos,
         imageUrl: snap.imageUrl,
         productLink: snap.productLink,
-        vendasEstimadasMes: snap.vendasEstimadasMes,
+        vendasAfiliadoMes: snap.vendasAfiliadoMes,
         ratingStar: snap.ratingStar,
         categoriaIds: snap.categoriaIds,
         lojaExternalId: snap.lojaExternalId,
@@ -90,7 +90,7 @@ export class GapsService {
     const filtered = items.filter((item) => {
       if (query.classificacao && item.classificacao !== query.classificacao) return false;
       if (query.categoriaId != null && !item.categoriaIds.includes(query.categoriaId)) return false;
-      if (query.vendasMin != null && item.vendasEstimadasMes < query.vendasMin) return false;
+      if (query.vendasMin != null && item.vendasAfiliadoMes < query.vendasMin) return false;
       if (query.q) {
         const needle = query.q.toLowerCase();
         if (!item.productName.toLowerCase().includes(needle)) return false;
@@ -98,7 +98,7 @@ export class GapsService {
       return true;
     });
 
-    filtered.sort((a, b) => b.vendasEstimadasMes - a.vendasEstimadasMes);
+    filtered.sort((a, b) => b.vendasAfiliadoMes - a.vendasAfiliadoMes);
 
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
@@ -142,7 +142,7 @@ export class GapsService {
       priceMaxCentavos: number;
       imageUrl: string;
       productLink: string;
-      vendasEstimadasMes: number;
+      vendasAfiliadoMes: number;
       ratingStar: number | null;
       categoriaIds: number[];
       lojaExternalId: string | null;
@@ -178,7 +178,7 @@ export class GapsService {
           priceMaxCentavos: p.priceMaxCentavos,
           imageUrl: p.imageUrl,
           productLink: p.productLink,
-          vendasEstimadasMes: estimarVendasTotaisMes({
+          vendasAfiliadoMes: normalizarVendasAfiliadoMes({
             sales: p.sales,
             periodStartTime: p.periodStartTime,
             periodEndTime: p.periodEndTime,

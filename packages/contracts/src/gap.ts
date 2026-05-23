@@ -29,7 +29,7 @@ export const GapItemSchema = z.object({
   priceMaxCentavos: z.number().int(),
   imageUrl: z.string(),
   productLink: z.string(),
-  vendasEstimadasMes: z.number().int(),
+  vendasAfiliadoMes: z.number().int(),
   ratingStar: z.number().nullable(),
   categoriaIds: z.array(z.number().int()),
   lojaExternalId: z.string().nullable(),

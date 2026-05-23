@@ -42,7 +42,7 @@ type Oportunidade = {
   priceMaxCentavos: number;
   imageUrl: string;
   productLink: string;
-  vendasEstimadasMes: number;
+  vendasAfiliadoMes: number;
   ratingStar: string | null;
   categoriaIds: number[];
   lojaExternalId: string | null;
@@ -199,9 +199,9 @@ export default function OportunidadeDetailPage(props: { params: Promise<{ id: st
               <dd className="font-medium tabular-nums">{precoStr}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Vendas est./mês</dt>
+              <dt className="text-muted-foreground">Vendas (afiliado)</dt>
               <dd className="font-medium tabular-nums">
-                {o.vendasEstimadasMes.toLocaleString('pt-BR')}
+                {o.vendasAfiliadoMes.toLocaleString('pt-BR')}
               </dd>
             </div>
             <div>

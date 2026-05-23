@@ -166,7 +166,7 @@ describe('GapsService.listar — classificação automática', () => {
   });
 
   describe('ordenação e filtros', () => {
-    it('ordena por vendasEstimadasMes desc', async () => {
+    it('ordena por vendasAfiliadoMes desc', async () => {
       const svc = setupCenario({
         produtosMahou: [],
         produtosConcorrente: [
@@ -178,7 +178,7 @@ describe('GapsService.listar — classificação automática', () => {
       const { items } = await svc.listar({});
       expect(items.map((i) => i.externalId)).toEqual(['1', '2', '3']);
       // Mesmo sales nos 3 mocks → ordem do snapshot. Resort: garantir desc estável.
-      expect(items[0]?.vendasEstimadasMes).toBeGreaterThanOrEqual(items[2]?.vendasEstimadasMes ?? 0);
+      expect(items[0]?.vendasAfiliadoMes).toBeGreaterThanOrEqual(items[2]?.vendasAfiliadoMes ?? 0);
     });
 
     it('filtra por busca textual case-insensitive no productName', async () => {

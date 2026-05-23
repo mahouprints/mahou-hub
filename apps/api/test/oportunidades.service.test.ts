@@ -20,7 +20,7 @@ const basePayload: OportunidadeCreate = {
   priceMaxCentavos: 4900,
   imageUrl: 'https://img/1.jpg',
   productLink: 'https://shopee/1',
-  vendasEstimadasMes: 1800,
+  vendasAfiliadoMes: 1800,
   ratingStar: 4.7,
   categoriaIds: [100012],
   lojaExternalId: '999',

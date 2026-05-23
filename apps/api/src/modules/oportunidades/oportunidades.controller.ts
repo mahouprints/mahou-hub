@@ -73,7 +73,7 @@ export class OportunidadesController {
   @ApiOperation({
     summary: 'Busca direcionada de produtos no marketplace (keyword / categoria / concorrente)',
     description:
-      'Não persiste — devolve candidatos enriquecidos com vendasEstimadasMes. ' +
+      'Não persiste — devolve candidatos enriquecidos com vendasAfiliadoMes. ' +
       'Use POST / pra salvar no backlog os que valem a pena. **Rate-limit: 20 req/min.**',
   })
   buscar(@Body(new ZodValidationPipe(OportunidadeBuscarSchema)) data: OportunidadeBuscar) {

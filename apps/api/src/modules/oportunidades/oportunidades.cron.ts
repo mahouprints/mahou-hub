@@ -78,7 +78,7 @@ export class OportunidadesCron {
           priceMaxCentavos: c.priceMaxCentavos,
           imageUrl: c.imageUrl,
           productLink: c.productLink,
-          vendasEstimadasMes: c.vendasEstimadasMes,
+          vendasAfiliadoMes: c.vendasAfiliadoMes,
           ratingStar: c.ratingStar,
           categoriaIds: c.categoriaIds,
           lojaExternalId: c.lojaExternalId,

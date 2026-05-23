@@ -7,11 +7,13 @@ import {
   ArrowLeft,
   ArrowUpRight,
   ExternalLink,
+  LayoutGrid,
+  List,
   RefreshCw,
   Star,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { estimarVendasTotaisMes } from '@mahou-hub/pricing';
+import { normalizarVendasAfiliadoMes } from '@mahou-hub/pricing';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
 import { useTableSort } from '@/lib/use-table-sort';
@@ -19,6 +21,7 @@ import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ProdutoConcorrenteCard } from '@/components/produto-concorrente-card';
 import {
   Select,
   SelectContent,
@@ -72,6 +75,7 @@ type SnapshotProduto = {
   priceMaxCentavos: number;
   priceDiscountRate: number;
   sales: number;
+  vendasReais: number | null;
   commissionRate: string;
   commissionCentavos: number;
   imageUrl: string;
@@ -81,6 +85,8 @@ type SnapshotProduto = {
   periodStartTime: string;
   periodEndTime: string;
 };
+
+type ViewMode = 'cards' | 'tabela';
 
 type SnapshotDetail = SnapshotMeta & { produtos: SnapshotProduto[] };
 
@@ -102,6 +108,7 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
 
   // Snapshot selecionado — default = mais recente quando carregar.
   const [snapshotId, setSnapshotId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const idEscolhido = snapshotId ?? snapshots?.[0]?.id ?? null;
 
   const { data: snapshotDetail, isLoading: loadingSnap } = useQuery({
@@ -117,7 +124,7 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
       preco: (p) => p.priceMinCentavos,
       sales: (p) => p.sales,
       rating: (p) => Number(p.ratingStar ?? 0),
-      estimado: (p) => estimarVendasTotaisMes(p),
+      estimado: (p) => normalizarVendasAfiliadoMes(p),
     },
     { chave: 'estimado', direcao: 'desc' },
   );
@@ -146,7 +153,12 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
   }
 
   const totalSalesAfiliado = produtos.reduce((s, p) => s + p.sales, 0);
-  const totalVendasEstimadasMes = produtos.reduce((s, p) => s + estimarVendasTotaisMes(p), 0);
+  const totalVendasAfiliadoMes = produtos.reduce((s, p) => s + normalizarVendasAfiliadoMes(p), 0);
+  const totalVendasReais = produtos.reduce(
+    (s, p) => s + (typeof p.vendasReais === 'number' ? p.vendasReais : 0),
+    0,
+  );
+  const temVendasReais = produtos.some((p) => typeof p.vendasReais === 'number');
 
   return (
     <div className="space-y-4">
@@ -244,31 +256,88 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
       </Card>
 
       {produtos.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Vendas via afiliado (janela)</CardTitle>
+              <CardTitle className="text-sm">Vendas (afiliado) — janela</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{totalSalesAfiliado}</div>
+              <div className="text-2xl font-semibold tabular-nums">
+                {totalSalesAfiliado.toLocaleString('pt-BR')}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Soma de `sales` da Shopee Affiliate API neste snapshot
+                Soma de <code>sales</code> da Shopee Affiliate (período da campanha)
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Vendas totais estimadas/mês</CardTitle>
+              <CardTitle className="text-sm">Vendas (afiliado) /mês</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold">{totalVendasEstimadasMes}</div>
+              <div className="text-2xl font-semibold tabular-nums">
+                {totalVendasAfiliadoMes.toLocaleString('pt-BR')}
+              </div>
               <p className="text-xs text-muted-foreground">
-                Assumindo 5% das vendas via afiliado
+                Normalizado pra base mensal de 30 dias
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Vendas reais /mês</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {temVendasReais ? (
+                <div className="text-2xl font-semibold tabular-nums">
+                  {totalVendasReais.toLocaleString('pt-BR')}
+                </div>
+              ) : (
+                <div className="text-2xl font-semibold text-muted-foreground">—</div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Enriquecimento manual via Seller Center (opcional)
               </p>
             </CardContent>
           </Card>
         </div>
       )}
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium">Produtos do snapshot</h2>
+        <ToggleViewMode value={viewMode} onChange={setViewMode} />
+      </div>
+
+      {viewMode === 'cards' ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {loadingSnap && (
+            <div className="col-span-full py-10 text-center text-muted-foreground">
+              Carregando snapshot…
+            </div>
+          )}
+          {!loadingSnap && produtos.length === 0 && (
+            <div className="col-span-full py-10 text-center text-muted-foreground">
+              Sem produtos neste snapshot
+            </div>
+          )}
+          {produtos.map((p) => (
+            <ProdutoConcorrenteCard
+              key={p.id}
+              produto={{
+                productName: p.productName,
+                imageUrl: p.imageUrl,
+                productLink: p.productLink,
+                priceMinCentavos: p.priceMinCentavos,
+                priceMaxCentavos: p.priceMaxCentavos,
+                sales: p.sales,
+                vendasAfiliadoMes: normalizarVendasAfiliadoMes(p),
+                vendasReais: p.vendasReais,
+                ratingStar: p.ratingStar,
+              }}
+            />
+          ))}
+        </div>
+      ) : (
 
       <Card>
         <Table>
@@ -309,7 +378,7 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
               </TableRow>
             )}
             {produtos.map((p) => {
-              const estMes = estimarVendasTotaisMes(p);
+              const estMes = normalizarVendasAfiliadoMes(p);
               const precoStr =
                 p.priceMinCentavos === p.priceMaxCentavos
                   ? centavosParaReais(p.priceMinCentavos)
@@ -365,6 +434,44 @@ export default function ConcorrenteDetailPage(props: { params: Promise<{ id: str
           </TableBody>
         </Table>
       </Card>
+      )}
+    </div>
+  );
+}
+
+function ToggleViewMode({
+  value,
+  onChange,
+}: {
+  value: ViewMode;
+  onChange: (v: ViewMode) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-md border bg-muted/30 p-0.5">
+      <button
+        type="button"
+        onClick={() => onChange('cards')}
+        className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-medium transition-colors ${
+          value === 'cards'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        aria-pressed={value === 'cards'}
+      >
+        <LayoutGrid className="h-3.5 w-3.5" /> Cards
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('tabela')}
+        className={`inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-xs font-medium transition-colors ${
+          value === 'tabela'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+        aria-pressed={value === 'tabela'}
+      >
+        <List className="h-3.5 w-3.5" /> Tabela
+      </button>
     </div>
   );
 }

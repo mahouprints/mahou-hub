@@ -4,7 +4,7 @@ import type {
   ConcorrenteCreate,
   ConcorrenteUpdate,
 } from '@mahou-hub/contracts';
-import { somarVendasEstimadasMes } from '@mahou-hub/pricing';
+import { somarVendasAfiliadoMes } from '@mahou-hub/pricing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ShopeeAffiliateService } from './shopee-affiliate.service';
 import type { AffiliateProductNode } from './shopee/queries';
@@ -285,7 +285,7 @@ export class ConcorrentesService {
     },
   ) {
     const produtos = ultimoSnap?.produtos ?? [];
-    const vendasEstimadasMesTotal = produtos.length > 0 ? somarVendasEstimadasMes(produtos) : null;
+    const vendasAfiliadoMesTotal = produtos.length > 0 ? somarVendasAfiliadoMes(produtos) : null;
     return {
       ...c,
       shopId: c.shopId ? c.shopId.toString() : null,
@@ -300,7 +300,7 @@ export class ConcorrentesService {
             origem: ultimoSnap.origem,
           }
         : null,
-      vendasEstimadasMesTotal,
+      vendasAfiliadoMesTotal,
     };
   }
 }

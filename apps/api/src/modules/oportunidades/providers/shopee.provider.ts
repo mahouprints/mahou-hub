@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { estimarVendasTotaisMes } from '@mahou-hub/pricing';
+import { normalizarVendasAfiliadoMes } from '@mahou-hub/pricing';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ShopeeAffiliateService } from '../../concorrentes/shopee-affiliate.service';
 import type { AffiliateProductNode } from '../../concorrentes/shopee/queries';
@@ -78,7 +78,7 @@ export class ShopeeProvider implements MarketplaceProvider {
           priceMaxCentavos: p.priceMaxCentavos,
           imageUrl: p.imageUrl,
           productLink: p.productLink,
-          vendasEstimadasMes: estimarVendasTotaisMes({
+          vendasAfiliadoMes: normalizarVendasAfiliadoMes({
             sales: p.sales,
             periodStartTime: p.periodStartTime,
             periodEndTime: p.periodEndTime,
@@ -123,7 +123,7 @@ export class ShopeeProvider implements MarketplaceProvider {
       priceMaxCentavos: Math.round(Number(p.priceMax) * 100),
       imageUrl: p.imageUrl,
       productLink: p.productLink,
-      vendasEstimadasMes: estimarVendasTotaisMes({
+      vendasAfiliadoMes: normalizarVendasAfiliadoMes({
         sales: Math.trunc(Number(p.sales ?? 0)),
         periodStartTime: new Date(Number(p.periodStartTime) * 1000),
         periodEndTime: new Date(Number(p.periodEndTime) * 1000),
@@ -136,7 +136,7 @@ export class ShopeeProvider implements MarketplaceProvider {
   }
 
   // Constrói filter (node → bool) que paginate vai aplicar página a página.
-  // Filtros operam no node BRUTO; vendas mínimas precisa do cálculo de heurística.
+  // Filtros operam no node BRUTO; `vendasMin` compara com `sales` normalizado pra base mensal.
   // Exportado como método pra ser testável isoladamente.
   makeNodeFilter(opts: SearchOpts): (n: AffiliateProductNode) => boolean {
     return (n) => {
@@ -145,7 +145,7 @@ export class ShopeeProvider implements MarketplaceProvider {
       if (opts.precoMaxCentavos != null && priceMinCents > opts.precoMaxCentavos) return false;
       if (opts.ratingMin != null && Number(n.ratingStar ?? 0) < opts.ratingMin) return false;
       if (opts.vendasMin != null) {
-        const vendasMes = estimarVendasTotaisMes({
+        const vendasMes = normalizarVendasAfiliadoMes({
           sales: Math.trunc(Number(n.sales ?? 0)),
           periodStartTime: new Date(Number(n.periodStartTime) * 1000),
           periodEndTime: new Date(Number(n.periodEndTime) * 1000),
@@ -165,7 +165,7 @@ export class ShopeeProvider implements MarketplaceProvider {
     return items.filter((c) => {
       if (opts.precoMinCentavos != null && c.priceMinCentavos < opts.precoMinCentavos) return false;
       if (opts.precoMaxCentavos != null && c.priceMinCentavos > opts.precoMaxCentavos) return false;
-      if (opts.vendasMin != null && c.vendasEstimadasMes < opts.vendasMin) return false;
+      if (opts.vendasMin != null && c.vendasAfiliadoMes < opts.vendasMin) return false;
       if (opts.ratingMin != null && (c.ratingStar ?? 0) < opts.ratingMin) return false;
       return true;
     });

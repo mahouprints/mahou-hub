@@ -26,7 +26,7 @@ const CandidatoSchema = z.object({
   priceMaxCentavos: z.number().int().nonnegative(),
   imageUrl: z.string(),
   productLink: z.string(),
-  vendasEstimadasMes: z.number().int().nonnegative(),
+  vendasAfiliadoMes: z.number().int().nonnegative(),
   ratingStar: z.number().min(0).max(5).nullable().optional(),
   categoriaIds: z.array(z.number().int()).default([]),
   lojaExternalId: z.string().nullable().optional(),
@@ -48,7 +48,7 @@ export const tools = [
     name: 'buscar_oportunidades',
     description:
       'Busca direcionada de produtos no marketplace (keyword, categoria ou concorrente). ' +
-      'Não persiste — devolve candidatos enriquecidos com vendasEstimadasMes. Use ' +
+      'Não persiste — devolve candidatos enriquecidos com vendasAfiliadoMes. Use ' +
       '`salvar_oportunidades_em_lote` depois pra adicionar ao backlog os que valem a pena. ' +
       'Pro tipo `concorrente`: passe `concorrenteId` (interno) pra ler snapshot local rápido, ' +
       'OU `lojaExternalId` (shopId Shopee) pra investigar loja não cadastrada via Affiliate API on-demand.',

@@ -36,7 +36,7 @@ export class ConcorrentesController {
   @Get()
   @ApiOperation({
     summary: 'Lista lojas concorrentes monitoradas',
-    description: 'Inclui `vendasEstimadasMesTotal` agregado do snapshot mais recente.',
+    description: 'Inclui `vendasAfiliadoMesTotal` agregado do snapshot mais recente.',
   })
   list() {
     return this.service.list();

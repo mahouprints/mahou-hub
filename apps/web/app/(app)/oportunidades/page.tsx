@@ -47,7 +47,7 @@ type OportunidadeListItem = {
   priceMaxCentavos: number;
   imageUrl: string;
   productLink: string;
-  vendasEstimadasMes: number;
+  vendasAfiliadoMes: number;
   ratingStar: string | null;
   fonte: Fonte;
   status: Status;
@@ -100,7 +100,7 @@ export default function OportunidadesPage() {
   const sort = useTableSort<OportunidadeListItem, Coluna>(
     {
       name: (o) => o.productName.toLowerCase(),
-      vendas: (o) => o.vendasEstimadasMes,
+      vendas: (o) => o.vendasAfiliadoMes,
       preco: (o) => o.priceMinCentavos,
       rating: (o) => Number(o.ratingStar ?? 0),
       score: (o) => Number(o.score ?? 0),
@@ -228,7 +228,7 @@ export default function OportunidadesPage() {
                 Produto
               </SortableHead>
               <SortableHead chave="vendas" estado={sort.estado} onClick={sort.alternar}>
-                Vendas est./mês
+                Vendas (afiliado)
               </SortableHead>
               <SortableHead chave="preco" estado={sort.estado} onClick={sort.alternar}>
                 Preço
@@ -303,7 +303,7 @@ export default function OportunidadesPage() {
                     )}
                   </TableCell>
                   <TableCell className="tabular-nums">
-                    {o.vendasEstimadasMes.toLocaleString('pt-BR')}
+                    {o.vendasAfiliadoMes.toLocaleString('pt-BR')}
                   </TableCell>
                   <TableCell className="tabular-nums">{precoStr}</TableCell>
                   <TableCell>

@@ -28,7 +28,7 @@ function candidato(externalId: string): OportunidadeCandidato {
     priceMaxCentavos: 3000,
     imageUrl: 'x',
     productLink: 'x',
-    vendasEstimadasMes: 500,
+    vendasAfiliadoMes: 500,
     ratingStar: 4.5,
     categoriaIds: [],
     lojaExternalId: null,
