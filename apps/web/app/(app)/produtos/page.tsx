@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Pencil,
   Plus,
+  Search,
   Trash2,
   X,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -86,6 +88,11 @@ type ColunaSort =
 type FiltroAnunciado = 'todos' | 'sim' | 'nao';
 type FiltroStatus = 'todos' | 'completos' | 'rascunhos';
 
+/** lowercase + sem acento, pra busca textual case/accent-insensitive */
+function normalizarTexto(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 /**
  * Escolhe o canal entre marketplaces (Shopee × ML) com maior líquido por peça.
  * Site fica de fora porque não paga taxa e sempre venceria — não é decisão útil.
@@ -120,6 +127,7 @@ export default function ProdutosPage() {
     queryFn: () => apiFetch<Filamento[]>('/filamentos'),
   });
 
+  const [filtroBusca, setFiltroBusca] = useState('');
   const [filtroFilamento, setFiltroFilamento] = useState(TODOS);
   const [filtroCanal, setFiltroCanal] = useState(TODOS);
   const [filtroImpressora, setFiltroImpressora] = useState(TODOS);
@@ -139,6 +147,7 @@ export default function ProdutosPage() {
 
   const filtrados = useMemo(() => {
     if (!data) return [];
+    const buscaNorm = filtroBusca.trim() ? normalizarTexto(filtroBusca.trim()) : '';
     const f = data.filter((p) => {
       if (filtroFilamento !== TODOS && p.filamentoId !== filtroFilamento) return false;
       if (filtroCanal !== TODOS && p.canalPrincipal !== filtroCanal) return false;
@@ -147,13 +156,29 @@ export default function ProdutosPage() {
       if (filtroAnunciado === 'nao' && p.anunciado) return false;
       if (filtroStatus === 'completos' && p.rascunho) return false;
       if (filtroStatus === 'rascunhos' && !p.rascunho) return false;
+      if (buscaNorm) {
+        const nomeMatch = normalizarTexto(p.nome).includes(buscaNorm);
+        const inspMatch = p.inspiracao
+          ? normalizarTexto(p.inspiracao).includes(buscaNorm)
+          : false;
+        if (!nomeMatch && !inspMatch) return false;
+      }
       return true;
     });
     return sort.ordenar(f);
-  }, [data, filtroFilamento, filtroCanal, filtroImpressora, filtroAnunciado, filtroStatus, sort]);
+  }, [
+    data,
+    filtroBusca,
+    filtroFilamento,
+    filtroCanal,
+    filtroImpressora,
+    filtroAnunciado,
+    filtroStatus,
+    sort,
+  ]);
 
   const pag = useTablePagination({
-    resetKey: `${filtroFilamento}|${filtroCanal}|${filtroImpressora}|${filtroAnunciado}|${filtroStatus}`,
+    resetKey: `${filtroBusca}|${filtroFilamento}|${filtroCanal}|${filtroImpressora}|${filtroAnunciado}|${filtroStatus}`,
   });
   const filtradosPaginados = useMemo(() => pag.paginar(filtrados), [filtrados, pag]);
   const idsVisiveis = useMemo(() => filtradosPaginados.map((p) => p.id), [filtradosPaginados]);
@@ -210,19 +235,22 @@ export default function ProdutosPage() {
         </div>
       </header>
 
-      <FiltrosBar
-        filamentos={filamentos ?? []}
-        filtroFilamento={filtroFilamento}
-        setFiltroFilamento={setFiltroFilamento}
-        filtroCanal={filtroCanal}
-        setFiltroCanal={setFiltroCanal}
-        filtroImpressora={filtroImpressora}
-        setFiltroImpressora={setFiltroImpressora}
-        filtroAnunciado={filtroAnunciado}
-        setFiltroAnunciado={setFiltroAnunciado}
-        filtroStatus={filtroStatus}
-        setFiltroStatus={setFiltroStatus}
-      />
+      <div className="space-y-3">
+        <BuscaInput valor={filtroBusca} onChange={setFiltroBusca} />
+        <FiltrosBar
+          filamentos={filamentos ?? []}
+          filtroFilamento={filtroFilamento}
+          setFiltroFilamento={setFiltroFilamento}
+          filtroCanal={filtroCanal}
+          setFiltroCanal={setFiltroCanal}
+          filtroImpressora={filtroImpressora}
+          setFiltroImpressora={setFiltroImpressora}
+          filtroAnunciado={filtroAnunciado}
+          setFiltroAnunciado={setFiltroAnunciado}
+          filtroStatus={filtroStatus}
+          setFiltroStatus={setFiltroStatus}
+        />
+      </div>
 
       <SelectionToolbar
         count={sel.count}
@@ -538,6 +566,38 @@ function FiltrosBar({
           </SelectContent>
         </Select>
       </div>
+    </div>
+  );
+}
+
+function BuscaInput({
+  valor,
+  onChange,
+}: {
+  valor: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="relative max-w-md">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        type="search"
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Buscar por nome ou inspiração…"
+        aria-label="Buscar produtos"
+        className="pl-9 pr-9"
+      />
+      {valor && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          aria-label="Limpar busca"
+          className="absolute right-2 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
