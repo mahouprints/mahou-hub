@@ -37,3 +37,9 @@ apps/api/prisma/*.db-journal
 
 # Dados intermediários gerados por scripts de manutenção (read-xlsx → JSON).
 apps/api/scripts/*.json
+
+# Outputs personalizados das skills (contêm dados reais de clientes — privacidade).
+# As skills geram em pastas locais ~/Instagram/posts/ e ~/Documents/Mahou Prints/products/
+# que não devem ser espelhadas no repo. Defensivo caso alguém crie por engano.
+content/instagram/posts/
+content/marketplace/listings/

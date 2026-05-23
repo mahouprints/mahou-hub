@@ -1,0 +1,470 @@
+{
+  "marca": {
+    "nome": "Mahou Prints",
+    "descricao_curta": "Loja de produtos impressos em 3D (FDM PLA matte) sob demanda — decoração, utilidade e personalizados premium.",
+    "diferenciais_universais": [
+      "Impressão 3D FDM em PLA premium (ecológico, sem odor)",
+      "Acabamento matte/fosco com camadas finas 0.2mm",
+      "Cada peça é feita sob demanda — qualidade artesanal",
+      "Pintura/cores estáveis e duráveis",
+      "Despacho em até 1 dia útil",
+      "Embalagem reforçada com proteção"
+    ],
+    "valores_marca": ["artesanal", "premium", "design autoral", "sustentável", "personalizado", "decorativo + funcional"]
+  },
+
+  "formula_titulo_universal": {
+    "regra": "[Descrição curta-detalhada + USP] [Keywords SEO empilhadas]",
+    "sem_separador": "NUNCA usar /, |, —, vírgula ou qualquer caractere como separador entre os blocos. Só espaço.",
+    "como_usar": "Lê 'descricao_curta_titulo' do produto e usa como bloco 1. Empilha keywords do produto (primárias + secundárias + lifestyle conforme o marketplace) como bloco 2.",
+    "exemplo": "Suporte de Controle e Headset 3 em 1 Ps5 Xbox Gamer 3d"
+  },
+
+  "produtos": {
+    "suporte-controle-ps5": {
+      "nome_loja": "Suporte para Controles PS5 e Headset",
+      "descricao_curta_titulo": "Suporte de Controle e Headset 3 em 1",
+      "usp": "3 em 1 — organiza 2 controles + 1 headset numa peça só, cross-console (PS5 + Xbox)",
+      "categoria": "gamer",
+      "marketplace_categoria": {
+        "shopee": "Eletrônicos > Acessórios para Games",
+        "mercado_livre": "Games > Acessórios > Suportes",
+        "tiktok_shop": "Eletrônicos > Acessórios para Games"
+      },
+      "keywords_primarias": ["suporte controle ps5", "suporte controle xbox", "suporte controle playstation", "organizador controles ps5"],
+      "keywords_secundarias": ["dualsense", "headset gamer", "suporte headset", "stand controle", "apoio controle", "videogame"],
+      "keywords_lifestyle": ["setup gamer", "decoração gamer", "quarto gamer", "geek", "aesthetic gamer"],
+      "publico": ["gamers", "donos de PS5 ou Xbox", "decoradores de setup", "presente para gamer"],
+      "beneficios": [
+        "Organiza 2 controles + 1 headset em peça única",
+        "Cross-console: PS5 DualSense + Xbox Series/One",
+        "Libera espaço da mesa/rack",
+        "Acabamento matte que não risca os controles",
+        "Visual sculptural que valoriza o setup",
+        "Base ampla — não tomba"
+      ],
+      "dimensoes_aproximadas": "28cm alt x 18cm larg x 14cm prof",
+      "cor_padrao": "Preto matte",
+      "tom_recomendado": "gamer-aesthetic, mix de funcional e visual"
+    },
+
+    "suporte-kindle-livro": {
+      "nome_loja": "Suporte Kindle Tema Livro",
+      "descricao_curta_titulo": "Suporte para Kindle Formato Livro Decorativo",
+      "usp": "Formato de livro empilhado — decoração temática que mostra paixão por leitura",
+      "categoria": "leitura",
+      "marketplace_categoria": {
+        "shopee": "Eletrônicos > E-readers e Acessórios",
+        "mercado_livre": "Eletrônicos > E-readers > Acessórios",
+        "tiktok_shop": "Eletrônicos > Acessórios"
+      },
+      "keywords_primarias": ["suporte kindle", "apoio kindle", "suporte para kindle"],
+      "keywords_secundarias": ["suporte leitura", "stand kindle", "porta kindle", "decoração leitura"],
+      "keywords_lifestyle": ["bookstagram", "booktok", "cantinho leitura", "leitora", "presente leitor", "dark academia"],
+      "publico": ["leitores de Kindle", "amantes de livros", "presente dia das mães/dia do livro"],
+      "beneficios": [
+        "Mantém o Kindle no ângulo perfeito pra leitura sem segurar",
+        "Decoração temática que mostra sua paixão por livros",
+        "Compatível com Kindle Paperwhite, Oasis, Basic",
+        "Estável — não escorrega"
+      ],
+      "dimensoes_aproximadas": "15cm x 12cm x 8cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "cozy, intelectual, presente"
+    },
+
+    "suporte-kindle-nuvem": {
+      "nome_loja": "Suporte Kindle Tema Nuvem",
+      "descricao_curta_titulo": "Suporte para Kindle Formato Nuvem Cute",
+      "usp": "Formato nuvem cute pra decorar cantinho aesthetic — exclusivo Mahou Prints",
+      "categoria": "leitura",
+      "marketplace_categoria": {
+        "shopee": "Eletrônicos > E-readers e Acessórios",
+        "mercado_livre": "Eletrônicos > E-readers > Acessórios",
+        "tiktok_shop": "Eletrônicos > Acessórios"
+      },
+      "keywords_primarias": ["suporte kindle", "apoio kindle", "suporte para kindle nuvem"],
+      "keywords_secundarias": ["suporte leitura", "stand kindle", "porta kindle decorativo"],
+      "keywords_lifestyle": ["aesthetic", "cute decor", "kawaii", "cantinho leitura", "soft girl"],
+      "publico": ["leitoras de Kindle", "fãs de decor aesthetic", "presente para amiga leitora"],
+      "beneficios": [
+        "Formato nuvem cute pra decorar o cantinho de leitura",
+        "Mantém o Kindle no ângulo perfeito",
+        "Compatível com qualquer modelo de Kindle",
+        "Suporte estável e leve"
+      ],
+      "dimensoes_aproximadas": "15cm x 12cm x 8cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "cute, aesthetic, jovem feminino"
+    },
+
+    "suporte-placa-video": {
+      "nome_loja": "Suporte para Placa de Vídeo (GPU Holder)",
+      "descricao_curta_titulo": "Suporte de Placa de Vídeo Anti Queda Ajustável",
+      "usp": "Anti-sag ajustável — previne queda de GPUs pesadas (RTX 4080/4090) e prolonga vida útil do slot PCIe",
+      "categoria": "pc-setup",
+      "marketplace_categoria": {
+        "shopee": "Computadores > Componentes > Acessórios",
+        "mercado_livre": "Informática > Componentes de PC > Suportes",
+        "tiktok_shop": "Eletrônicos > Acessórios"
+      },
+      "keywords_primarias": ["suporte placa de video", "gpu holder", "suporte gpu", "suporte rtx"],
+      "keywords_secundarias": ["anti queda gpu", "sag prevent gpu", "suporte vga", "anti sag"],
+      "keywords_lifestyle": ["setup pc gamer", "pc build", "pc enthusiast", "rgb setup"],
+      "publico": ["donos de PC gamer", "donos de placa pesada (RTX, RX)", "PC enthusiasts"],
+      "beneficios": [
+        "Previne sag/queda da GPU pesada (RTX 4080/4090 e similares)",
+        "Aumenta vida útil do slot PCIe",
+        "Visual limpo e discreto dentro do gabinete",
+        "Ajustável em altura para várias GPUs"
+      ],
+      "dimensoes_aproximadas": "ajustável 4-8cm de altura",
+      "cor_padrao": "Preto matte",
+      "tom_recomendado": "técnico, funcional, PC enthusiast"
+    },
+
+    "suporte-polaroid-coracao": {
+      "nome_loja": "Suporte para Polaroid de Coração",
+      "descricao_curta_titulo": "Suporte para Polaroid Formato Coração",
+      "usp": "Formato coração — porta-foto romântico e decorativo, ideal pra presente",
+      "categoria": "decorativo-mesa",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Decoração",
+        "mercado_livre": "Casa, Móveis e Decoração > Decoração",
+        "tiktok_shop": "Casa & Decoração > Acessórios Decorativos"
+      },
+      "keywords_primarias": ["suporte polaroid", "porta polaroid", "suporte foto"],
+      "keywords_secundarias": ["porta retrato coração", "suporte foto coração", "decoração mesa"],
+      "keywords_lifestyle": ["cantinho aesthetic", "decor quarto", "presente namorada", "namorados", "cottagecore"],
+      "publico": ["casais", "presente romântico", "decoradores de cantinho", "fãs de polaroid"],
+      "beneficios": [
+        "Formato coração pra deixar a memória ainda mais especial",
+        "Suporta polaroids padrão e fotos pequenas",
+        "Decoração que vira presente",
+        "Compacto — cabe em qualquer mesa/prateleira"
+      ],
+      "dimensoes_aproximadas": "8cm x 8cm x 4cm",
+      "cor_padrao": "Cherry red / variações",
+      "tom_recomendado": "romântico, fofo, presente"
+    },
+
+    "suporte-toalha": {
+      "nome_loja": "Suporte/Gancho de Toalha para Banheiro",
+      "descricao_curta_titulo": "Gancho de Toalha Adesivo Sem Furo",
+      "usp": "Fixação 3M sem furar parede — design moderno + instalação fácil",
+      "categoria": "banheiro",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Banheiro",
+        "mercado_livre": "Casa, Móveis e Decoração > Banheiro",
+        "tiktok_shop": "Casa & Decoração > Banheiro"
+      },
+      "keywords_primarias": ["gancho toalha", "suporte toalha", "cabide toalha", "porta toalha"],
+      "keywords_secundarias": ["organizador banheiro", "decoração banheiro", "gancho parede", "gancho adesivo"],
+      "keywords_lifestyle": ["banheiro moderno", "banheiro aesthetic", "minimalista", "home decor"],
+      "publico": ["donos de banheiro pequeno", "decor moderno/minimalista", "casa nova"],
+      "beneficios": [
+        "Organiza a toalha sem ocupar espaço de bancada",
+        "Design moderno que valoriza o banheiro",
+        "Fixação com fita 3M dupla face (sem furar)",
+        "Resistente à umidade do banheiro"
+      ],
+      "dimensoes_aproximadas": "10cm x 6cm x 5cm",
+      "cor_padrao": "Preto matte / Branco",
+      "tom_recomendado": "moderno, funcional, premium"
+    },
+
+    "abajur-bubble": {
+      "nome_loja": "Abajur Bubble Decorativo LED",
+      "descricao_curta_titulo": "Abajur LED Bubble Translúcido Decorativo",
+      "usp": "Design bubble translúcido único — acende uniformemente e cria atmosfera cozy",
+      "categoria": "luminaria",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Iluminação > Abajures",
+        "mercado_livre": "Casa, Móveis e Decoração > Iluminação > Abajures",
+        "tiktok_shop": "Casa & Decoração > Iluminação"
+      },
+      "keywords_primarias": ["abajur", "luminária de mesa", "abajur led", "luminária cabeceira"],
+      "keywords_secundarias": ["abajur bubble", "abajur decorativo", "iluminação quarto"],
+      "keywords_lifestyle": ["decor quarto", "aesthetic", "cantinho cozy", "vibes", "tumblr room", "y2k"],
+      "publico": ["jovens decoradores de quarto", "fãs de luz quente", "presente"],
+      "beneficios": [
+        "Luz quente (2700K) que cria atmosfera cozy",
+        "Design bubble único e instagramável",
+        "Acende uniformemente — translúcido bonito",
+        "Bivolt / USB",
+        "Não esquenta — segurança no quarto"
+      ],
+      "dimensoes_aproximadas": "15cm alt x 12cm diâm",
+      "cor_padrao": "Branco translúcido",
+      "tom_recomendado": "aesthetic, cozy, jovem"
+    },
+
+    "abajur-wave": {
+      "nome_loja": "Abajur Wave Decorativo LED",
+      "descricao_curta_titulo": "Abajur LED Wave Ondulado Decorativo",
+      "usp": "Formato wave (ondas) — vira ponto focal da decoração com luz quente difusa",
+      "categoria": "luminaria",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Iluminação > Abajures",
+        "mercado_livre": "Casa, Móveis e Decoração > Iluminação > Abajures",
+        "tiktok_shop": "Casa & Decoração > Iluminação"
+      },
+      "keywords_primarias": ["abajur", "luminária de mesa", "abajur led", "luminária moderna"],
+      "keywords_secundarias": ["abajur wave", "abajur ondulado", "luminária design"],
+      "keywords_lifestyle": ["decor aesthetic", "minimalista", "wave aesthetic", "cantinho cozy"],
+      "publico": ["fãs de design moderno", "decoradores de quarto/sala", "presente"],
+      "beneficios": [
+        "Formato wave (ondas) que vira ponto focal da decoração",
+        "Luz quente difusa e relaxante",
+        "Acabamento matte premium",
+        "Bivolt / USB"
+      ],
+      "dimensoes_aproximadas": "18cm alt x 12cm larg",
+      "cor_padrao": "Branco translúcido",
+      "tom_recomendado": "design, moderno, aesthetic"
+    },
+
+    "abajur-triangular": {
+      "nome_loja": "Abajur Triangular Geométrico LED",
+      "descricao_curta_titulo": "Abajur LED Triangular Geométrico Minimalista",
+      "usp": "Design triangular geométrico minimalista — atemporal, estilo escandinavo",
+      "categoria": "luminaria",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Iluminação > Abajures",
+        "mercado_livre": "Casa, Móveis e Decoração > Iluminação > Abajures",
+        "tiktok_shop": "Casa & Decoração > Iluminação"
+      },
+      "keywords_primarias": ["abajur", "luminária de mesa", "abajur geométrico", "abajur led"],
+      "keywords_secundarias": ["abajur triangular", "luminária moderna", "decoração geométrica"],
+      "keywords_lifestyle": ["decor minimalista", "design escandinavo", "scandi", "modern decor"],
+      "publico": ["decoradores estilo escandinavo/minimal", "fãs de geometria"],
+      "beneficios": [
+        "Design triangular minimalista e atemporal",
+        "Luz quente que valoriza ambiente",
+        "Acabamento matte que não brilha forçado",
+        "Bivolt / USB"
+      ],
+      "dimensoes_aproximadas": "20cm alt x 14cm base",
+      "cor_padrao": "Branco translúcido",
+      "tom_recomendado": "minimalista, design, premium"
+    },
+
+    "brinquedo-gato": {
+      "nome_loja": "Brinquedo para Gato 3D",
+      "descricao_curta_titulo": "Brinquedo Interativo para Gato PLA Atóxico",
+      "usp": "PLA atóxico e seguro pra gatos — estimula instinto de caça",
+      "categoria": "pet",
+      "marketplace_categoria": {
+        "shopee": "Animais > Gatos > Brinquedos",
+        "mercado_livre": "Animais > Gatos > Brinquedos",
+        "tiktok_shop": "Pet Shop > Gatos"
+      },
+      "keywords_primarias": ["brinquedo gato", "brinquedo para gato", "brinquedo felino"],
+      "keywords_secundarias": ["enriquecimento ambiental gato", "brinquedo interativo gato"],
+      "keywords_lifestyle": ["gatinho", "tutor de gato", "presente para gato", "cat lover", "catstagram"],
+      "publico": ["tutores de gato", "fãs de pet", "presente para gato"],
+      "beneficios": [
+        "Estimula instinto de caça",
+        "Material PLA atóxico — seguro pra gatos",
+        "Resistente a mordidas leves",
+        "Lavável"
+      ],
+      "dimensoes_aproximadas": "8cm x 6cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "fofo, cuidado pet, divertido"
+    },
+
+    "contador-livros-lidos": {
+      "nome_loja": "Contador de Livros Lidos 3D",
+      "descricao_curta_titulo": "Contador de Livros Lidos Ajustável Decorativo",
+      "usp": "Numeração ajustável 0-99 — marca visualmente sua meta de leitura do ano",
+      "categoria": "leitura",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Decoração",
+        "mercado_livre": "Livros > Acessórios para Leitura",
+        "tiktok_shop": "Casa & Decoração"
+      },
+      "keywords_primarias": ["contador livros", "contador livros lidos", "contador leitura"],
+      "keywords_secundarias": ["meta leitura", "decoração leitura", "presente leitor"],
+      "keywords_lifestyle": ["bookstagram", "booktok", "meta de leitura", "leitora", "dark academia"],
+      "publico": ["leitores ávidos", "Skoob/Goodreads users", "presente para leitor"],
+      "beneficios": [
+        "Marca quantos livros você leu no ano — visualmente",
+        "Decoração de estante/escrivaninha",
+        "Numeração ajustável (0-99)",
+        "Presente perfeito pra quem ama ler"
+      ],
+      "dimensoes_aproximadas": "10cm x 6cm x 4cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "intelectual, presente, cozy"
+    },
+
+    "cortador-biscoito-copa": {
+      "nome_loja": "Cortador de Biscoito Tema Copa do Mundo",
+      "descricao_curta_titulo": "Cortador de Biscoito Tema Futebol e Taça",
+      "usp": "Tema futebol — formas de taça, bola e troféu pra festa temática Copa",
+      "categoria": "cortador",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Cozinha > Utensílios",
+        "mercado_livre": "Cozinha > Confeitaria > Cortadores",
+        "tiktok_shop": "Casa & Cozinha > Utensílios"
+      },
+      "keywords_primarias": ["cortador biscoito", "cortador de biscoito", "cortador massa"],
+      "keywords_secundarias": ["cortador biscoito copa", "cortador biscoito futebol", "cortador biscoito personalizado"],
+      "keywords_lifestyle": ["festa copa do mundo", "decoração futebol", "festinha torcedor"],
+      "publico": ["confeiteiras", "festas temáticas copa", "torcedores", "mães organizando festa"],
+      "beneficios": [
+        "Tema copa do mundo — várias formas (taça, bola, etc)",
+        "Corte limpo e definido",
+        "Lavável em água morna",
+        "PLA atóxico — seguro pra alimento (uso direto na massa, não no forno)"
+      ],
+      "dimensoes_aproximadas": "8cm x 6cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "festa, confeitaria, temático"
+    },
+
+    "cortador-biscoito-patrulha-canina": {
+      "nome_loja": "Cortador de Biscoito Tema Patrulha Canina",
+      "descricao_curta_titulo": "Cortador de Biscoito Tema Cãozinho e Patinha",
+      "usp": "Tema cãozinho infantil (inspirado em patrulha) — pra festinha temática infantil",
+      "categoria": "cortador",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Cozinha > Utensílios",
+        "mercado_livre": "Cozinha > Confeitaria > Cortadores",
+        "tiktok_shop": "Casa & Cozinha > Utensílios"
+      },
+      "keywords_primarias": ["cortador biscoito", "cortador biscoito cachorrinho", "cortador biscoito personalizado"],
+      "keywords_secundarias": ["cortador massa infantil", "cortador biscoito tema", "festa infantil cachorro"],
+      "keywords_lifestyle": ["festa infantil", "aniversário cachorrinho", "festinha menino"],
+      "publico": ["mães organizando festa infantil", "confeiteiras", "festa tema cachorrinho infantil"],
+      "beneficios": [
+        "Tema cãozinho/patinha (inspirado em desenho infantil)",
+        "Corte limpo na massa de biscoito",
+        "Lavável em água morna",
+        "PLA atóxico"
+      ],
+      "dimensoes_aproximadas": "8cm x 6cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "festa infantil, lúdico",
+      "atencao": "NÃO usar 'Patrulha Canina' no título ML (marca registrada). Usar 'cachorrinho', 'patinha de cão', 'cãozinho' no título e mencionar 'inspirado em desenho infantil' na descrição."
+    },
+
+    "cortador-biscoito-pokemon": {
+      "nome_loja": "Cortador de Biscoito Tema Pokemon",
+      "descricao_curta_titulo": "Cortador de Biscoito Tema Monstrinho Geek",
+      "usp": "Tema monstrinho colecionável (inspirado em pokemon) — pra festa geek/infantil",
+      "categoria": "cortador",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Cozinha > Utensílios",
+        "mercado_livre": "Cozinha > Confeitaria > Cortadores",
+        "tiktok_shop": "Casa & Cozinha > Utensílios"
+      },
+      "keywords_primarias": ["cortador biscoito", "cortador biscoito tema", "cortador biscoito geek"],
+      "keywords_secundarias": ["cortador biscoito monstrinho", "cortador biscoito anime", "festa geek"],
+      "keywords_lifestyle": ["festa geek", "festa anime", "festa monstros colecionáveis", "treinador"],
+      "publico": ["confeiteiras temáticas", "festa geek/anime", "fãs adultos pokemon", "festa infantil tema"],
+      "beneficios": [
+        "Formato inspirado em monstrinhos do anime mais famoso",
+        "Corte limpo e definido",
+        "Lavável",
+        "PLA atóxico"
+      ],
+      "dimensoes_aproximadas": "8cm x 8cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "geek, festa temática",
+      "atencao": "NÃO usar 'Pokemon' diretamente no título ML (marca registrada Nintendo). Usar 'monstrinho colecionável', 'monster geek' no título e mencionar 'inspirado em' na descrição."
+    },
+
+    "cesta-decorativa": {
+      "nome_loja": "Cesta Decorativa 3D",
+      "descricao_curta_titulo": "Cesta Decorativa Organizadora Mesa",
+      "usp": "Decora + organiza ao mesmo tempo — peça funcional virou objeto de décor",
+      "categoria": "decorativo-mesa",
+      "marketplace_categoria": {
+        "shopee": "Casa e Decoração > Organização",
+        "mercado_livre": "Casa, Móveis e Decoração > Organização",
+        "tiktok_shop": "Casa & Decoração > Organização"
+      },
+      "keywords_primarias": ["cesta decorativa", "cesta organizadora", "cesto decorativo"],
+      "keywords_secundarias": ["porta treco", "organizador mesa", "decoração quarto"],
+      "keywords_lifestyle": ["aesthetic", "boho decor", "cottagecore", "cantinho organizado"],
+      "publico": ["decoradores de casa", "organização", "presente casa nova"],
+      "beneficios": [
+        "Decoração + organização em uma peça",
+        "Acabamento matte que combina com qualquer décor",
+        "Várias cores disponíveis"
+      ],
+      "dimensoes_aproximadas": "10cm x 8cm x 8cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "decor, charmoso"
+    },
+
+    "marca-pagina-quarta-asa": {
+      "nome_loja": "Marca-Página Tema Quarta Asa (Fourth Wing)",
+      "descricao_curta_titulo": "Marca Página Tema Dragão para Romantasy",
+      "usp": "Formato dragão inspirado em Fourth Wing — presente perfeito pra fã de romantasy",
+      "categoria": "leitura",
+      "marketplace_categoria": {
+        "shopee": "Livros e Revistas > Acessórios",
+        "mercado_livre": "Livros > Acessórios para Leitura",
+        "tiktok_shop": "Casa & Decoração > Acessórios"
+      },
+      "keywords_primarias": ["marca pagina", "marcador de livro", "marca página decorativo"],
+      "keywords_secundarias": ["marca pagina dragão", "marca pagina fantasy", "marca pagina romantasy"],
+      "keywords_lifestyle": ["booktok", "bookstagram", "fourth wing", "quarta asa", "romantasy", "leitora"],
+      "publico": ["fãs de Fourth Wing", "leitoras de romantasy", "booktok community"],
+      "beneficios": [
+        "Inspirado em Fourth Wing / Quarta Asa (formato dragão)",
+        "Não dobra nem amassa o livro",
+        "Presente perfeito pra fã da saga"
+      ],
+      "dimensoes_aproximadas": "8cm x 3cm",
+      "cor_padrao": "consultar variações",
+      "tom_recomendado": "booktok, fandom, presente",
+      "atencao": "Mencionar 'inspirado em' — não usar 'oficial' ou logo da obra"
+    },
+
+    "suporte-mobile-bebe": {
+      "nome_loja": "Suporte para Mobile de Bebê",
+      "descricao_curta_titulo": "Suporte de Mobile para Berço Bebê Universal",
+      "usp": "Universal — suporta qualquer mobile decorativo, fixação segura no berço",
+      "categoria": "bebe",
+      "marketplace_categoria": {
+        "shopee": "Bebês > Quarto do Bebê > Decoração",
+        "mercado_livre": "Bebês > Quarto do Bebê",
+        "tiktok_shop": "Bebês e Crianças > Quarto do Bebê"
+      },
+      "keywords_primarias": ["suporte mobile bebe", "suporte mobile berço", "haste mobile"],
+      "keywords_secundarias": ["acessório berço", "decoração berço", "suporte enfeite bebê"],
+      "keywords_lifestyle": ["enxoval bebê", "quarto do bebê", "chá de bebê", "mamãe especial"],
+      "publico": ["mães grávidas", "presente chá de bebê", "enxoval"],
+      "beneficios": [
+        "Suporte para qualquer mobile decorativo",
+        "Fixação segura no berço",
+        "PLA premium — sem componentes tóxicos",
+        "Combina com qualquer décor de quarto de bebê"
+      ],
+      "dimensoes_aproximadas": "30cm alt",
+      "cor_padrao": "Branco / Pastel",
+      "tom_recomendado": "delicado, cuidado, presente especial"
+    }
+  },
+
+  "keywords_mahou_universais": {
+    "sempre_usar_se_couber": ["impressão 3d", "3d", "pla", "feito sob demanda", "personalizado", "artesanal"],
+    "marca": ["mahou prints", "mahou"],
+    "diferencial_qualidade": ["premium", "alta qualidade", "acabamento fosco", "matte", "design autoral"]
+  },
+
+  "regras_marcas_registradas": {
+    "criticas": [
+      "Disney/Marvel/Pixar → nunca no título, mencionar 'inspirado em' apenas",
+      "Pokemon (Nintendo) → usar 'monstrinho colecionável', 'monster' no título",
+      "Patrulha Canina (Paramount) → usar 'cachorrinho/patinha' no título",
+      "Fourth Wing/Quarta Asa (Yarros) → mencionar como 'inspirado em' na descrição",
+      "Sony/PlayStation → 'compatível com Dualsense PS5' é OK mas evitar logo no título"
+    ],
+    "regra_geral": "Marcas registradas = denúncia certa no ML (mais rigoroso). Shopee/TikTok também penalizam mas são menos automáticos. Sempre usar termos genéricos no título e mencionar tema/inspiração na descrição."
+  }
+}
