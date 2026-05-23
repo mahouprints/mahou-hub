@@ -65,7 +65,7 @@ Antes de criar projeto Flow para um produto, **identifique a categoria** dele e 
 
 ## Modos de operação
 
-A skill tem **6 modos**. O usuário pode invocar qualquer um, ou a skill detecta pela situação:
+A skill tem **7 modos**. O usuário pode invocar qualquer um, ou a skill detecta pela situação:
 
 ### Modo A — `gerar` (1 ou vários produtos novos, sem feedback imediato)
 Fluxo otimizado pra processar 1 ou N produtos em batch. Sem pedir avaliação no fim — salva tudo em `curadoria/` pro usuário revisar depois.
@@ -114,6 +114,145 @@ Modo cirúrgico pra gerar **1 imagem específica** a partir de descrição pront
 | Quantidade | 5-12 imagens/produto | 4 variações pra 1 imagem |
 
 **Importante — não duplicar trabalho:** ANTES de chamar Modo F, a `/gerar-post` já verificou se há imagem reusável em `Documents/Mahou Prints/products/{slug}/`. Modo F só é chamado quando confirmado que precisa gerar nova.
+
+### Modo G — `fila-hub` (integração MCP — produtos do Hub pendentes de imagem)
+
+Modo que **integra a skill com o backend do Mahou Hub via MCP**. Lista produtos cadastrados que estão prontos pra gerar imagem (com inspiração/modelo 3D mas sem foto final) E produtos prontos pra anunciar (com imagem gerada mas ainda não anunciados). Workflow completo: lista → você escolhe → skill gera → upload pro Hub.
+
+**Quando invocar:** "puxa fila do hub", "que produtos faltam imagem?", "produtos prontos pra anunciar", "lista pendentes".
+
+**Pré-requisitos:**
+- MCP server `mahou-hub` ativo (`.mcp.json` configurado + token em `mcp-servers/mahou-hub/.env.local`)
+- Sessão Claude rodando dentro do repo `mahou-hub/` OU com MCP configurado globalmente no Claude Desktop
+- Tools `mcp__mahou-hub__*` disponíveis (testa pedindo "quantas oportunidades temos")
+
+**Fluxo do Modo G:**
+
+#### G.1 — Levantamento de estado (chama MCP)
+
+Chamadas paralelas:
+- `mcp__mahou-hub__listar_produtos_pendentes_imagem({ pageSize: 50 })` → Categoria A
+- `mcp__mahou-hub__listar_produtos({ anunciado: 'false', temImagens: 'true', pageSize: 50 })` → Categoria B
+- (opcional) `mcp__mahou-hub__listar_produtos({ anunciado: 'false', temReferencia: 'false', pageSize: 50 })` → Categoria C (sem referência — bloqueada)
+
+#### G.2 — Apresentação ao usuário
+
+Tabelas separadas por categoria:
+
+```
+📋 Estado do catálogo (Mahou Hub)
+
+🟡 CATEGORIA A — Pendentes de imagem (N produtos)
+   Têm referência, ainda não têm foto final. Candidatos diretos pra geração.
+
+   | # | Nome | Cor/Filamento | Refs | Cena sugerida (auto) |
+   |---|------|---------------|------|----------------------|
+   | 1 | Porta Escova de Dente | Preto matte | 2 INSPIRACAO | bathroom_modern_black_marble |
+   | 2 | Suporte para Mug | Branco translúcido | 1 INSPIRACAO + URL 3D | wooden_warm_cozy |
+   ...
+
+✅ CATEGORIA B — Prontos pra anunciar (M produtos)
+   Têm imagem gerada e anunciado=false. Só falta publicar no marketplace.
+
+   | # | Nome | Imagens | Canal principal | Última atualização |
+   |---|------|---------|-----------------|--------------------|
+   | 1 | Suporte Mobile Bebê | 3 GERADAS | SITE | há 3 dias |
+   ...
+
+⚠️  CATEGORIA C — Bloqueados (K produtos, opcional listar)
+   Sem referência cadastrada. Precisa upload de inspiração no Hub antes.
+```
+
+Pergunta direta: **"Quais quer gerar agora? Categoria A: 1, 2, todos, ou nenhum?"**
+
+#### G.3 — Pra cada produto selecionado
+
+1. **Buscar detalhe**: `mcp__mahou-hub__obter_produto({ id })` — pega nome, dimensões, filamento, URLs de referências, modelo3dUrl, descrição da inspiração.
+
+2. **Slugify nome**: `Porta Escova de Dente` → `porta-escova-dente`.
+
+3. **Criar pasta local**: `Documents/Mahou Prints/products (em revisão)/<slug>/` + `referencias/`.
+
+4. **Baixar referências do Hub**: `curl -L -o referencias/inspiracao_N.jpg https://media.mahouprints.com/<arquivo>` (URLs vêm absolutas do `obter_produto`).
+
+5. **Salvar `_meta.json`** com:
+   ```json
+   {
+     "produtoId": "cuid-do-hub",
+     "nome": "Porta Escova de Dente",
+     "filamento": "PLA Preto Matte",
+     "dimensoes": "8x4x12 cm",
+     "cenarioEscolhido": "bathroom_modern_black_marble",
+     "criadoEm": "2026-05-23T..."
+   }
+   ```
+
+6. **Heurística de cenário** (consulta `content/imagegen/templates/template.json`):
+   - Aplica `mapeamento_produto_cena` cruzando palavras-chave do nome com `categorias_produto` de cada cena
+   - Ex: "porta-escova" / "suporte papel higiênico" → `bathroom_modern_black_marble`
+   - Ex: "abajur" / "luminária" → `dark_moody_premium`
+   - Ex: produto decorativo genérico → `wooden_warm_cozy` (default)
+   - **Se ambíguo (mais de 1 cena candidata ou nenhuma)**: pergunta ao usuário pra esse produto
+
+7. **Invocar Modo F**: passa prompt montado (template padrão Mahou + dados do produto) + cenário + slug + pasta `Documents/Mahou Prints/products (em revisão)/<slug>/variacoes/`.
+
+8. **Aguarda 4 variações** geradas pelo Modo F.
+
+9. **Pergunta qual aprovar**: "var1/var2/var3/var4? (ou 'regerar')"
+
+#### G.4 — Após aprovação (auto-upload + salva local)
+
+Pra cada produto aprovado:
+
+1. **Salva final local**: copia variação escolhida pra `Documents/Mahou Prints/products/<slug>/hero.jpeg` + arquiva variações em `variacoes/`.
+
+2. **Upload pro Hub (via curl multipart)**:
+   ```bash
+   source mcp-servers/mahou-hub/.env.local  # carrega MAHOU_API_TOKEN
+   curl -X POST "$MAHOU_API_URL/api/v1/produtos/$PRODUTO_ID/imagens" \
+     -H "Authorization: Bearer $MAHOU_API_TOKEN" \
+     -F "arquivo=@Documents/Mahou Prints/products/<slug>/hero.jpeg" \
+     -F "origem=GERADA"
+   ```
+   (Endpoint multipart — MCP tools não suportam upload de arquivo binário, então skill usa curl direto.)
+
+3. **Atualiza `_meta.json`** marcando `imagemFinalSubidaPraHub: true` + timestamp.
+
+4. **NÃO marca anunciado=true automaticamente**. Isso é ato deliberado humano após publicação real no marketplace. Skill só lembra:
+   > "✅ N imagens uploaded pro Hub. Quando publicar no marketplace, roda `marcar produtos anunciados` com os ids: [...] pra fechar o loop."
+
+#### G.5 — Resumo final
+
+```
+📊 Resumo da sessão
+
+✅ Gerados + uploaded pro Hub:
+   - Porta Escova de Dente (id: clxxx)
+   - Suporte para Mug (id: clyyy)
+
+⏭️  Pulados (você não escolheu):
+   - 3 produtos da Categoria A
+
+📋 Lembrete: 5 produtos na Categoria B já estão prontos pra anunciar.
+   Não esquecer de marcar anunciado=true via `marcar_produtos_anunciados` após publicar.
+```
+
+**Critérios de match nome→cenário (heurística):**
+
+| Palavra-chave no nome | Cenário sugerido |
+|---|---|
+| porta-escova, suporte-papel-higiênico, gancho-toalha, dispenser-sabonete, bandeja-sabonete, organizador-cosmético, cabide-toalha | `bathroom_modern_black_marble` |
+| abajur, luminária, led, vela, porta-vela, difusor-luminoso, mobile-com-luz | `dark_moody_premium` |
+| mobile-bebê, suporte-mobile-bebê, decoração-quarto-bebê, organizador-quarto-bebê | `nursery_soft_pastel` |
+| (qualquer outro decorativo / organizador / cortador / contador / polaroid / vaso / brinquedo-pet / marca-página) | `wooden_warm_cozy` (default) |
+
+**Caso o produto não case com nenhuma palavra-chave clara:** pergunta ao usuário antes de gerar.
+
+**Limitações conhecidas do Modo G:**
+- Não cria produto novo no Hub (use UI ou `mcp__mahou-hub__criar_produto` antes).
+- Não faz upload de referências/inspirações pro Hub (só consome as que já estão lá).
+- Não marca anunciado=true (decisão humana após publicação real).
+- Cenário pode precisar ajuste manual em produtos atípicos (vide heurística acima).
 
 ### Modo E — `editar` (edição cirúrgica via Nano Banana — RECOMENDADO para ajustes pequenos)
 Quando uma imagem ficou ÓTIMA mas tem 1 detalhe pra corrigir (ex: remover bebê, trocar cor de item, mudar pose, adicionar elemento), use o **modo Edit nativo do Flow** ao invés de regerar do zero. Vantagens:
