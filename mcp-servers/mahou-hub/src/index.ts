@@ -8,10 +8,11 @@ import {
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { tools as oportunidadesTools } from './tools-oportunidades.js';
 import { tools as catalogoTools } from './tools-catalogo.js';
+import { tools as concorrentesTools } from './tools-concorrentes.js';
 
-// Tools de oportunidades e catálogo ficam em arquivos separados pra organização
-// — combinadas aqui pra exposição única ao Claude.
-const tools = [...oportunidadesTools, ...catalogoTools];
+// Tools por domínio ficam em arquivos separados — combinadas aqui pra exposição
+// única ao Claude. Adicionar nova área = importar + concatenar no array.
+const tools = [...oportunidadesTools, ...catalogoTools, ...concorrentesTools];
 
 const server = new Server(
   { name: 'mahou-hub', version: '0.2.0' },

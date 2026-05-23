@@ -10,17 +10,20 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SyncOrigem } from '@prisma/client';
+import { Query } from '@nestjs/common';
 import {
   BulkDeleteSchema,
   ConcorrenteCreateFromLinkSchema,
   ConcorrenteCreateSchema,
   ConcorrenteLinkShopeeSchema,
   ConcorrenteUpdateSchema,
+  ProdutosConcorrentesDenseQuerySchema,
   type BulkDelete,
   type ConcorrenteCreate,
   type ConcorrenteCreateFromLink,
   type ConcorrenteLinkShopee,
   type ConcorrenteUpdate,
+  type ProdutosConcorrentesDenseQuery,
 } from '@mahou-hub/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -40,6 +43,22 @@ export class ConcorrentesController {
   })
   list() {
     return this.service.list();
+  }
+
+  @Get('produtos')
+  @ApiOperation({
+    summary: 'Produtos dos concorrentes em formato denso (CSV-like)',
+    description:
+      'Devolve { headers, rows } em vez de array de objetos — economiza ~50% dos tokens ' +
+      'e é ideal pra consumo via MCP/exports. Snapshot mais recente de cada loja. Filtros: ' +
+      '`concorrenteId` (1 loja), `vendasMin`, `precoMinCentavos`, `precoMaxCentavos`, `q` ' +
+      '(busca textual nome), `sortBy` (vendas/preco/rating/nome), `sortDir`, `limit` (≤500).',
+  })
+  listProdutosDense(
+    @Query(new ZodValidationPipe(ProdutosConcorrentesDenseQuerySchema))
+    query: ProdutosConcorrentesDenseQuery,
+  ) {
+    return this.service.listProdutosDense(query);
   }
 
   @Get(':id')

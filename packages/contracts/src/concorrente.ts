@@ -89,6 +89,7 @@ export const ConcorrenteSnapshotProdutoSchema = z.object({
   priceMaxCentavos: z.number().int().nonnegative(),
   priceDiscountRate: z.number().int().min(0).max(100),
   sales: z.number().int().nonnegative(),
+  vendasReais: z.number().int().nonnegative().nullable(),
   commissionRate: DecimalString,
   commissionCentavos: z.number().int().nonnegative(),
   imageUrl: z.string(),
@@ -100,6 +101,49 @@ export const ConcorrenteSnapshotProdutoSchema = z.object({
   periodStartTime: z.string().datetime(),
   periodEndTime: z.string().datetime(),
 });
+
+// ───── Dense product list (CSV-like) ─────
+// Formato compacto pra consumo via MCP ou exports rápidos. Em vez de array de objetos,
+// devolve headers + rows — economiza ~50% dos tokens vs JSON tradicional.
+//
+// Caso de uso: "me dá tudo que os concorrentes vendem entre R$ 20-50 com vendas mín 100".
+// Consumer (Claude, scripts) consegue tratar como tabela diretamente.
+
+export const ProdutosConcorrentesDenseQuerySchema = z.object({
+  /** Limita a 1 loja específica (cuid). Omitir = todas as lojas. */
+  concorrenteId: z.string().min(1).optional(),
+  /** Filtra `sales` (afiliado, janela) mínimo. */
+  vendasMin: z.coerce.number().int().nonnegative().optional(),
+  /** Filtra preço mínimo em centavos. */
+  precoMinCentavos: z.coerce.number().int().nonnegative().optional(),
+  /** Filtra preço máximo em centavos. */
+  precoMaxCentavos: z.coerce.number().int().nonnegative().optional(),
+  /** Busca textual no productName (case+accent-insensitive). */
+  q: z.string().min(1).max(200).optional(),
+  /** Coluna pra ordenar. */
+  sortBy: z.enum(['vendas', 'preco', 'rating', 'nome']).optional(),
+  sortDir: z.enum(['asc', 'desc']).optional(),
+  /** Default 100, máximo 500 (acima disso estoura contexto Claude facilmente). */
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+});
+
+export const ProdutosConcorrentesDenseResponseSchema = z.object({
+  /** Nomes das colunas, na ordem em que aparecem em cada row. */
+  headers: z.array(z.string()),
+  /** Cada row = array de valores na ordem dos headers. */
+  rows: z.array(z.array(z.union([z.string(), z.number(), z.null()]))),
+  /** Total de produtos que casam com os filtros (antes do limit). */
+  total: z.number().int().nonnegative(),
+  /** Quantos retornados (após o limit). */
+  retornados: z.number().int().nonnegative(),
+  /** Filtros efetivamente aplicados (eco pra debug). */
+  filtros: z.record(z.unknown()),
+  /** Nota pro consumer entender o que é. */
+  nota: z.string(),
+});
+
+export type ProdutosConcorrentesDenseQuery = z.infer<typeof ProdutosConcorrentesDenseQuerySchema>;
+export type ProdutosConcorrentesDenseResponse = z.infer<typeof ProdutosConcorrentesDenseResponseSchema>;
 
 export type Concorrente = z.infer<typeof ConcorrenteSchema>;
 export type ConcorrenteCreate = z.infer<typeof ConcorrenteCreateSchema>;
