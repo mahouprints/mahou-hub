@@ -1,0 +1,110 @@
+{
+  "marca": {
+    "nome": "Mahou Prints",
+    "descricao": "Marca de produtos impressos em 3D (FDM PLA matte)"
+  },
+  "cenas": {
+    "wooden_warm_cozy": {
+      "nome": "Mesa madeira warm/cozy",
+      "background_path": "~/ImageGen/templates/cenas/wooden_warm_cozy/background.jpeg",
+      "info_path": "~/ImageGen/templates/cenas/wooden_warm_cozy/info.md",
+      "status": "ready",
+      "mood": "warm, cozy, premium, inviting",
+      "categorias_produto": ["decorativo", "organizador_mesa", "porta-retrato", "vaso", "polaroid", "contador_livros", "cesta", "brinquedo_pet", "marca_pagina"]
+    },
+    "bathroom_modern_black_marble": {
+      "nome": "Banheiro moderno mármore preto",
+      "backgrounds": {
+        "closeup": "~/ImageGen/templates/cenas/bathroom_modern_black_marble/background_closeup.jpeg",
+        "medium": "~/ImageGen/templates/cenas/bathroom_modern_black_marble/background_medium.jpeg",
+        "wide": "~/ImageGen/templates/cenas/bathroom_modern_black_marble/background_wide.jpeg"
+      },
+      "info_path": "~/ImageGen/templates/cenas/bathroom_modern_black_marble/info.md",
+      "status": "ready",
+      "mood": "moderno, contemporâneo, premium, urbano",
+      "categorias_produto": ["banheiro", "porta-escova", "dispenser_sabonete", "suporte_papel_higienico", "gancho_toalha", "bandeja_sabonete", "porta-escova_sanitaria", "organizador_cosmetico", "cabide_toalha"]
+    },
+    "nursery_soft_pastel": {
+      "nome": "Quarto bebê pastel suave",
+      "info_path": "~/ImageGen/templates/cenas/nursery_soft_pastel/info.md",
+      "status": "on_demand (gerado inline no prompt)",
+      "mood": "soft, gentle, pastel, cozy, baby-friendly",
+      "categorias_produto": ["suporte_mobile_bebe", "organizador_quarto_bebe", "decoracao_infantil"]
+    },
+    "minimal_white_studio": {
+      "nome": "Studio minimalista branco",
+      "background_path": "~/ImageGen/templates/cenas/minimal_white_studio/background.jpeg",
+      "status": "no_background_yet",
+      "mood": "clean, minimal, professional, ecommerce",
+      "categorias_produto": ["ecommerce_neutro", "produto_generico"]
+    },
+    "dark_moody_premium": {
+      "nome": "Dark moody premium (noturno)",
+      "background_path": "~/ImageGen/templates/cenas/dark_moody_premium/background.jpeg",
+      "info_path": "~/ImageGen/templates/cenas/dark_moody_premium/info.md",
+      "status": "ready",
+      "mood": "premium, dramatic, cinematic, night, intimate",
+      "categorias_produto": ["abajur", "luminaria", "produto_aceso", "led", "iluminacao", "vela", "porta_vela", "difusor_luminoso"],
+      "luz_principal": "warm amber 2700K cone vindo do canto superior-direito, falloff rápido pra shadows warm-brown profundas. Logo Mahou Prints em penumbra parcial. Mesa de madeira pega highlights warm onde luz cai.",
+      "uso_critico": "Produto ACESO deve emitir luz própria warm que se mistura com ambient. Layer lines suavizam quando produto translúcido está iluminado por dentro (regra feedback_mahou_layers_luz_acesa)."
+    },
+    "outdoor_natural": {
+      "nome": "Outdoor natural",
+      "background_path": "~/ImageGen/templates/cenas/outdoor_natural/background.jpeg",
+      "status": "no_background_yet",
+      "mood": "natural, organic, lifestyle",
+      "categorias_produto": ["jardim", "outdoor", "lifestyle"]
+    }
+  },
+  "mapeamento_produto_cena": {
+    "abajur-bubble": "dark_moody_premium",
+    "abajur-wave": "dark_moody_premium",
+    "abajur-triangular": "dark_moody_premium",
+    "suporte-papel-higienico": "bathroom_modern_black_marble",
+    "gancho-toalha": "bathroom_modern_black_marble",
+    "porta-escova": "bathroom_modern_black_marble",
+    "dispenser-sabonete": "bathroom_modern_black_marble",
+    "porta-escova-sanitaria": "bathroom_modern_black_marble",
+    "bandeja-sabonete": "bathroom_modern_black_marble",
+    "organizador-cosmetico": "bathroom_modern_black_marble",
+    "cabide-toalha": "bathroom_modern_black_marble",
+    "suporte-mobile-bebe": "nursery_soft_pastel",
+    "default": "wooden_warm_cozy"
+  },
+  "como_selecionar_cena": {
+    "regra_1": "Verifique se nome/refs do produto se encaixam em alguma das categorias listadas em cenas[X].categorias_produto",
+    "regra_2": "Se o produto for de banheiro (porta-escova, suporte de papel, gancho de toalha, dispenser, etc) → use bathroom_modern_black_marble",
+    "regra_3": "Se o produto ACENDE (abajur, luminária, mobile com luz, LED) → use dark_moody_premium para ter contraste correto",
+    "regra_4": "Se o produto for de berço/quarto de bebê → nursery_soft_pastel",
+    "regra_5": "Default (genérico, decorativo, organizador de mesa, etc) → wooden_warm_cozy",
+    "regra_6": "Se ambíguo, perguntar ao usuário antes de gerar"
+  },
+  "tecnico_fdm": {
+    "layers_descricao": "Horizontal STRAIGHT layer lines (0.2mm thick) parallel to the print bed/table surface, wrapping around the form like stacked rings/horizontal stripes at constant Z-height. Each line is one full revolution at the same height — NEVER spiral, NEVER concentric circles on side walls or curved surfaces. Tight, uniform, parallel — like contour lines on a topographic map but all horizontal.",
+    "top_surface": "Concentric circular tool-path rings ONLY on flat horizontal top/bottom surfaces (e.g., the top of the base plate seen from above, or any flat horizontal facet pointing up). NEVER on curved walls or vertical surfaces. Subtle, not exaggerated.",
+    "side_profile": "Visible thin vertical z-seam stripe where each horizontal layer starts/ends (one vertical line down the side). Subtle stepping on steeply sloped curves where layers transition.",
+    "finish": "Matte PLA with silky satin layer reflection. NOT glossy, NOT plastic-shiny.",
+    "realism_note": "Layer lines should look NATURAL — more prominent in close-up views and on highly curved areas (where the eye catches the stepping), subtle and almost invisible on flatter or distant regions. Density ~5 lines per centimeter of height (0.2mm layers). Always parallel to print bed (horizontal), never wrapping the surface like vinyl grooves.",
+    "negative_critical": "NO concentric circles on side walls. NO spiral patterns. NO vinyl-grooves look on curved surfaces. NO uniform circular texture wrapping the form. Layer lines are STRAIGHT and HORIZONTAL — like stacked rings at fixed heights, not flowing with the curve."
+  },
+  "filamentos": {
+    "pla_cherry_red": {
+      "descricao": "Vibrant cherry red / strawberry red (#DC143C to #E63946), Masterprint Red PLA - bright, saturated, NOT burgundy/brown"
+    },
+    "pla_black_matte": {
+      "descricao": "Deep matte black, soft non-reflective with subtle layer texture"
+    },
+    "pla_white_pure": {
+      "descricao": "Clean pure white PLA, slight cream warmth, matte finish"
+    }
+  },
+  "composicao_padrao": {
+    "formato": "Square 1:1",
+    "qualidade": "photorealistic, ultra-high resolution, e-commerce hero shot quality",
+    "dof": "Shallow DOF - product tack-sharp, background elements gently blurred but recognizable",
+    "angulo": "slight 3/4 angle (mas TOP-DOWN para cortadores planos e produtos baixos)",
+    "framing": "Close-up product photography style — product fills 60-70% of the frame, camera positioned close (~30-40cm equivalent). Background and props (logo, plant, books) visible but secondary. The product is the protagonist, not the environment.",
+    "lighting_para_layers": "Slight raking side light from low angle reveals the FDM layer texture (highlight on top edge of each ring, subtle shadow in the recess between) without overpowering the scene"
+  },
+  "negative_prompt_padrao": "NO glossy/wet/injection-molded plastic look. NO smooth seamless surface - FDM layer lines MUST be visible. NO resin/SLA smoothness"
+}
