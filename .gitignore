@@ -46,3 +46,8 @@ content/marketplace/listings/
 
 # Dados temporários de análises (snapshots concorrentes, agregados de pesquisa)
 .tmp_*
+.tmp-*
+
+# Exports agregados de concorrentes (gerados sob demanda pra colar em LLM externa).
+# Muda a cada snapshot do cron de domingo — não faz sentido versionar.
+concorrentes-catalogo*.md
