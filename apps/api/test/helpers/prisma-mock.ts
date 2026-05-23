@@ -34,7 +34,6 @@ export function makePrismaMock() {
       update: vi.fn(),
       updateMany: vi.fn(),
     },
-    produtoGapDecisao: { findMany: vi.fn(), upsert: vi.fn(), delete: vi.fn() },
     filamento: { findUnique: vi.fn(), findFirst: vi.fn() },
     concorrente: { findMany: vi.fn() },
     oportunidadeLog: { create: vi.fn(), findMany: vi.fn() },

@@ -84,13 +84,13 @@ Reinicia o Desktop.
 
 ## 🧭 Conceitos do domínio
 
-Pra usar bem as tools, ajuda entender 5 conceitos:
+Pra usar bem as tools, ajuda entender 4 conceitos:
 
 ### 1. Concorrente
 Loja Shopee que a Mahou monitora. Cadastra-se via UI ou REST (`POST /concorrentes/from-link`). Cron domingo 03h sincroniza snapshot de todos. **40+ lojas cadastradas em prod**, predominantemente impressão 3D.
 
 ### 2. Snapshot
-Fotografia semanal dos produtos de um concorrente (via Shopee Affiliate API). 1 snapshot por sync, histórico preservado. Gap analysis lê o snapshot mais recente.
+Fotografia semanal dos produtos de um concorrente (via Shopee Affiliate API). 1 snapshot por sync, histórico preservado. A tool `listar_produtos_concorrentes` lê o snapshot mais recente em formato denso.
 
 ### 3. Oportunidade
 Candidato a virar produto no catálogo Mahou. Vive em `ProdutoOportunidade` com `status` (NOVO → EM_ANALISE → APROVADO/DESCARTADO → VIRARAM_PRODUTO) e `fonte`:
@@ -100,19 +100,8 @@ Candidato a virar produto no catálogo Mahou. Vive em `ProdutoOportunidade` com 
 - `CONCORRENTE` — descoberto via `buscar_oportunidades` tipo concorrente.
 - `IDEIA_GERADA` — **autoria Mahou**, inspirada no mercado. `externalId` é cuid local prefixado `IG-` (não Shopee item). Usa pra propostas autorais que diferenciam Mahou dos copiadores.
 
-### 4. Gap analysis
-Cruza catálogo Mahou × snapshot agregado dos concorrentes. Cada produto Shopee vira:
-- **MATCH** — Mahou já tem similar (auto via jaccard nome+preço).
-- **VARIAÇÃO** — Mahou tem espírito mas em forma/tema diferente.
-- **GAP** — Mahou não tem nada parecido.
-- **MATCH_MANUAL** / **DESCARTADO** — usuário marcou na UI; sobrescreve auto.
-
-Disponível em `hub.mahouprints.com/oportunidades/gaps` (UI completa) e endpoints `/api/v1/oportunidades/gaps` (REST). **Não há tool MCP dedicada de gaps — Claude usa via REST se precisar**, ou orienta o usuário a abrir a UI.
-
-### 5. Produto rascunho
-`Produto.rascunho=true` é o limbo entre Oportunidade aprovada e Produto vendável. Peso/tempo podem estar zerados. Vem de:
-- `virar_produto` aplicado a Oportunidade (preenche o que dá; resto rascunho).
-- `POST /oportunidades/gaps/:marketplace/:externalId/copiar-rascunho` (cópia direta do produto concorrente).
+### 4. Produto rascunho
+`Produto.rascunho=true` é o limbo entre Oportunidade aprovada e Produto vendável. Peso/tempo podem estar zerados. Vem de `virar_produto` aplicado a Oportunidade (preenche o que dá; resto fica rascunho).
 
 Usuário completa via UI Produtos.
 
@@ -154,7 +143,7 @@ Usuário completa via UI Produtos.
 
 | Tool | Quando usar |
 |---|---|
-| `criar_produto` | Cria produto novo (todos campos obrigatórios). Pra rascunho use `virar_produto` ou endpoint de copiar gap. |
+| `criar_produto` | Cria produto novo (todos campos obrigatórios). Pra rascunho use `virar_produto`. |
 | `atualizar_produto` | Partial update (use pra completar peso/tempo de rascunhos). |
 | `desativar_produto` / `desativar_produtos_em_lote` | Soft-delete (`ativo=false`). Preserva referências em vendas/jobs históricos. |
 | `marcar_produtos_anunciados` | Bulk `anunciado=true|false` após publicar no marketplace. |
@@ -163,7 +152,7 @@ Usuário completa via UI Produtos.
 
 | Tool | Quando usar |
 |---|---|
-| `calcular_preco` | Calculadora stateless: "vale a pena imprimir X em Y filamento com Z preço?". Não persiste. Use pra simular antes de criar produto ou ao avaliar gap. |
+| `calcular_preco` | Calculadora stateless: "vale a pena imprimir X em Y filamento com Z preço?". Não persiste. Use pra simular antes de criar produto. |
 
 ---
 
@@ -178,7 +167,7 @@ Usuário completa via UI Produtos.
 
 ### B. Geração de ideias autorais (fonte=IDEIA_GERADA)
 1. Varre nichos diversos via `buscar_oportunidades` (≥3 categorias diferentes — diversidade obrigatória).
-2. Analisa transversalmente: padrões, gaps, faixas de preço, concorrentes 3D ativos.
+2. Analisa transversalmente: padrões, faixas de preço, concorrentes 3D ativos.
 3. Gera N ideias **autorais** (não copia o que viu — propõe variação/combinação/ângulo único).
 4. Salva via `salvar_oportunidades_em_lote` com `fonte='IDEIA_GERADA'`, `externalId='IG-AAAA-MM-DD-slug'`, `lojaNome='Mahou Prints'`.
 5. Notas estruturadas: **Conceito** / **Inspirações** (refs Shopee) / **Diferencial** / **Por que faz sentido** / **Estimativa produção** / **Risco**.
@@ -198,10 +187,10 @@ curl -X POST https://api.mahouprints.com/api/v1/concorrentes/from-link \
 ```
 URL aceita `shop/{shopId}` (determinístico) ou `{username}` (slug). **NÃO** funciona com URL de produto.
 
-### E. Gap analysis (fluxo só via REST + UI, sem tool MCP)
-- UI: `hub.mahouprints.com/oportunidades/gaps` — tabela com filtros (classificação, loja, vendasMin), insights, ações (copiar rascunho / match manual / descartar).
-- REST: `GET /api/v1/oportunidades/gaps?classificacao=GAP&vendasMin=200`
-- Categorias emergentes (catIds frequentes em GAPs não-curados): `GET /api/v1/oportunidades/gaps/categorias-emergentes?minFreq=10`
+### E. Produtos dos concorrentes (formato denso)
+- Tool: `listar_produtos_concorrentes` — retorna `{ headers, rows }` (CSV-like) com snapshot mais recente de cada loja.
+- REST: `GET /api/v1/concorrentes/produtos?concorrenteId=...&vendasMin=...&precoMinCentavos=...&q=...&limit=...`
+- Use pra análise rápida de mercado, busca textual, comparações por preço e ranqueamento por vendas afiliado.
 
 ---
 
@@ -227,7 +216,7 @@ Pra varredura em lote (múltiplas keywords/categorias): sequencial com ~3s entre
 
 **NÃO retorna**: descrição textual, material declarado, dimensões/peso, imagens adicionais, variantes, nome da categoria (só catId), reviews textuais. Confirma `memory/shopee_affiliate_limits.md`.
 
-Implicação: classificação de "material 3D vs cerâmica vs MDF" é qualitativa via `productName`. Match de gap fica em ~90% de precisão.
+Implicação: classificação de "material 3D vs cerâmica vs MDF" é qualitativa via `productName`.
 
 ### Estimativa de vendas via Affiliate é aproximada
 `sales` é janela de campanha (~30 dias do afiliado, não histórico total). Heurística `(sales/dias × 30) / 0.05` aplicada no backend assume ~5% das vendas via afiliado (média observada na 3DTECH). Pode ser ±50% em valor absoluto, mas ordem de grandeza é confiável.
@@ -235,8 +224,6 @@ Implicação: classificação de "material 3D vs cerâmica vs MDF" é qualitativ
 ### Não há tool MCP de criação de concorrente
 Cadastro precisa REST direto (`POST /concorrentes/from-link`). Foi decisão consciente — cadastro é ato deliberado humano, não fluxo de descoberta automática.
 
-### Não há tool MCP de gap analysis
-Gap analysis tem volume típico de 200-500 produtos por consulta — inviável retornar no contexto Claude. Use UI ou REST. Pra Claude, melhor pedir resumo de GAPs específicos via filtros estreitos.
 
 ---
 

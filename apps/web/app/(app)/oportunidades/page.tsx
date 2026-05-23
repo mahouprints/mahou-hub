@@ -151,11 +151,6 @@ export default function OportunidadesPage() {
               <CheckSquare className="mr-2 h-4 w-4" /> Selecionar
             </Button>
           )}
-          <Button asChild variant="outline">
-            <Link href="/oportunidades/gaps">
-              <Search className="mr-2 h-4 w-4" /> Ver Gaps
-            </Link>
-          </Button>
           <Button asChild>
             <Link href="/oportunidades/novo">
               <Plus className="mr-2 h-4 w-4" /> Buscar novos

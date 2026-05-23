@@ -140,7 +140,6 @@ model Produto {
   insumos           ProdutoInsumo[]
   imagens           ProdutoImagem[]
   oportunidades     ProdutoOportunidade[]
-  gapDecisoes       ProdutoGapDecisao[]
   criadoEm          DateTime              @default(now())
   atualizadoEm      DateTime              @updatedAt
 }
@@ -438,27 +437,3 @@ model JobProducao {
   @@index([dataInicio])
 }
 
-/// Decisão manual sobre um produto encontrado no snapshot de concorrentes.
-/// MATCH_MANUAL = Mahou já tem produto similar (filtra esse produto da tabela de gaps).
-/// DESCARTADO = não é relevante (material/categoria incompatível com 3D Mahou).
-/// Persiste pra que decisões anteriores não apareçam de novo na próxima rodada de gap analysis.
-model ProdutoGapDecisao {
-  id          String                  @id @default(cuid())
-  marketplace OportunidadeMarketplace
-  externalId  String
-  decisao     GapDecisao
-  /// Quando decisao=MATCH_MANUAL, aponta opcionalmente pro produto Mahou similar (pra rastreabilidade).
-  produtoId   String?
-  produto     Produto?                @relation(fields: [produtoId], references: [id], onDelete: SetNull)
-  observacao  String?
-  decididoPor String?
-  decididoEm  DateTime                @default(now())
-
-  @@unique([marketplace, externalId])
-  @@index([decisao])
-}
-
-enum GapDecisao {
-  MATCH_MANUAL
-  DESCARTADO
-}

@@ -11,7 +11,7 @@ Premissa importante: o backlog não é pra clonar o que tá vendendo no Shopee �
 3. **Análise transversal** — agrupa retornos por padrão, identifica:
    - Faixas de preço dominantes
    - Variações que existem (P/M/G, com/sem mecanismo, etc.)
-   - Gaps (faltam combinações, ângulos, customizações)
+   - Lacunas no catálogo Mahou (combinações, ângulos, customizações que ninguém oferece)
    - Concorrentes 3D ativos no nicho
 4. **Geração** — pra **cada categoria coberta**, gera 1+ ideias autorais (ver Regras abaixo).
 5. **Apresentação** — mostra a tabela de ideias + raciocínio ao usuário antes de salvar.
@@ -62,7 +62,7 @@ Premissa importante: o backlog não é pra clonar o que tá vendendo no Shopee �
 
 **Diferencial:** [o que essa ideia tem que as inspirações não têm]
 
-**Por que faz sentido:** [gap detectado / volume implícito / ângulo único / margem]
+**Por que faz sentido:** [lacuna detectada / volume implícito / ângulo único / margem]
 
 **Estimativa de produção:** [peso ~X g, tempo ~Y h, impressora A1/H2C, filamento sugerido]
 

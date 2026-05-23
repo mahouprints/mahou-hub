@@ -50,14 +50,14 @@ Sinais: usuário quer ideias autorais Mahou inspiradas no mercado (não importa�
 
 Detalhe em [geracao-ideias.md](geracao-ideias.md). Workflow: varre nicho → analisa transversalmente → gera N ideias autorais distribuídas em **pelo menos 3 categorias diferentes** → salva com `fonte: 'IDEIA_GERADA'`.
 
-### 4. Gap analysis vs concorrentes — "o que eles têm que a gente não tem?"
+### 4. Análise de produtos dos concorrentes — "o que eles vendem?"
 
-Sinais: usuário quer cruzar catálogo Mahou × concorrentes cadastrados pra detectar oportunidades. Exemplos:
-- "Varre todos os concorrentes e mostra os gaps"
-- "O que a gente tá deixando de produzir que os outros vendem?"
-- "Compare nosso catálogo com o dos concorrentes"
+Sinais: usuário quer ver/analisar produtos dos concorrentes cadastrados. Exemplos:
+- "Varre todos os concorrentes e mostra os mais vendidos"
+- "O que tá bombando nas lojas que a gente acompanha?"
+- "Lista produtos entre R$ 20-50 com mais de 100 vendas no afiliado"
 
-Detalhe em [gaps-concorrentes.md](gaps-concorrentes.md). Workflow: agrega snapshots de **todos os concorrentes cadastrados** → cruza com `listar_produtos` Mahou → detecta GAPS / VARIAÇÕES / MATCHES → gera ideias autorais inspiradas nos top gaps.
+Ferramenta: **`listar_produtos_concorrentes`** — retorna `{ headers, rows }` (formato denso CSV-like, ~50% menos tokens). Filtros: `concorrenteId`, `vendasMin`, `precoMinCentavos/MaxCentavos`, `q` (busca textual), `sortBy` (vendas/preco/rating/nome), `limit` (≤500). Lê snapshot mais recente de cada loja (sync semanal domingo 03h).
 
 ## Workflow recomendado (brainstorm)
 

@@ -9,7 +9,6 @@ export * from './pricing';
 export * from './producao';
 export * from './concorrente';
 export * from './oportunidade';
-export * from './gap';
 export * from './auth';
 export * from './venda';
 export * from './custo';

@@ -19,7 +19,7 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Docstring em função pública: intent + 1 exemplo de uso.
 
 ## Testes
-- **Estado real (2026-05-22):** `packages/pricing` 22 testes (calculadora/custos/taxas/simulador, ~100% cov). `apps/api` 38 testes Vitest (oportunidades service+cron, shopee provider+signature, gaps service, produtos service); helper `test/helpers/prisma-mock.ts` cobre os delegates mais usados. `apps/web` sem testes; Playwright nunca configurado.
+- **Estado real (2026-05-23):** `packages/pricing` 32 testes (calculadora/custos/taxas/simulador/concorrentes-normalização, ~100% cov). `apps/api` 31 testes Vitest (oportunidades service+cron, shopee provider+signature, produtos service); helper `test/helpers/prisma-mock.ts` cobre os delegates mais usados. `apps/web` sem testes; Playwright nunca configurado.
 - Alvo: 90% em `packages/pricing` (já atingido), 70% no resto (pendente).
 - Novo backend module precisa de teste Vitest pro service; features de UI críticas, Playwright. Estabelecer o padrão na primeira feature testada.
 - Banco de teste sobe via `docker compose -f infra/docker-compose.test.yml up -d` (arquivo já existe pro Postgres ephemeral).
@@ -70,7 +70,7 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Comissão da Shopee (`commissionRate`, `commission`) é IRRELEVANTE pra Mahou (não recebemos como afiliado). UI esconde esses campos — métrica útil é vendas estimadas.
 - **Oportunidade.fonte** tem 5 valores: `TOP_VENDAS` / `KEYWORD` / `CATEGORIA` / `CONCORRENTE` (descobertas no marketplace) + `IDEIA_GERADA` (autoria Mahou inspirada no mercado — `externalId` é cuid local prefixado `IG-`, não Shopee item). Use `IDEIA_GERADA` quando a oportunidade for proposta autoral (variação, combinação, ângulo único) e não cópia direta.
 - **Cadastro de Concorrente Shopee via REST**: `POST /api/v1/concorrentes/from-link { url }` aceita 2 formatos — `shopee.com.br/shop/{shopId}` (determinístico, prefira esse) ou `shopee.com.br/{username}` (slug). **URL de produto retorna 500** — resolver só trata os 2 formatos acima. Não existe tool MCP de cadastro (decisão consciente — é ato deliberado humano).
-- **Gap analysis** (`hub.mahouprints.com/oportunidades/gaps`): cruza catálogo Mahou × snapshot agregado dos concorrentes. Classifica cada produto Shopee como GAP / VARIACAO / MATCH / MATCH_MANUAL / DESCARTADO. Decisões manuais persistem em `ProdutoGapDecisao` (UNIQUE por `marketplace+externalId`) e sobrescrevem a auto. Não há tool MCP — volume típico (200-500 produtos) é inviável no contexto Claude; use UI ou REST `GET /oportunidades/gaps`.
+- **Produtos dos concorrentes** (substituiu o Gap analysis removido em 2026-05-23): `GET /api/v1/concorrentes/produtos` devolve formato denso `{ headers, rows }` (~50% menos tokens que JSON tradicional) com snapshot mais recente de cada loja. Filtros: `concorrenteId`, `vendasMin`, `precoMinCentavos/Maxima`, `q` (busca), `sortBy`, `limit`. Tool MCP `listar_produtos_concorrentes` consome isso.
 - **`buscar_oportunidades` com `tipo: 'concorrente'`** aceita `concorrenteId` (interno, lê snapshot local rápido) OU `lojaExternalId` (shopId Shopee, chama Affiliate API ao vivo sem precisar cadastrar). Use `lojaExternalId` pra investigar loja descoberta antes de decidir cadastrar.
 
 ## Imagens e storage
@@ -116,7 +116,7 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 ## Skills de conteúdo (Claude Code slash commands)
 - `.claude/skills/<nome>/SKILL.md` — skills slash command que automatizam tarefas editoriais. **Diferente do MCP server**: skills são instruções em texto pro agente seguir (sem código); MCP tools são funções TypeScript que retornam dados. Skills usam MCP tools quando precisam ler do banco.
 - **Skills atuais:**
-  - `oportunidades-mahou/` — descobre produtos do mercado pra entrar no catálogo (multi-arquivo: SKILL.md + criterios-3d.md + exemplos/ + scoring.md + gaps-concorrentes.md + geracao-ideias.md)
+  - `oportunidades-mahou/` — descobre produtos do mercado pra entrar no catálogo (multi-arquivo: SKILL.md + criterios-3d.md + exemplos/ + scoring.md + geracao-ideias.md)
   - `gerar-imagem/` — gera fotos de produto via Google Flow + Nano Banana Pro (automação Playwright)
   - `gerar-descricao/` — títulos e descrições pra Shopee/ML/TikTok com fórmula universal USP-first
   - `gerar-post/` — posts pra @MahouPrints (copy + hashtags + roteiros de vídeo + descrições de imagem pra `/gerar-imagem`)
