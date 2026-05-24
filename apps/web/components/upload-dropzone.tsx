@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -10,19 +10,20 @@ const MAX_BYTES = 100 * 1024 * 1024;
 interface Props {
   onArquivos: (arquivos: File[]) => void;
   disabled?: boolean;
-  /** Texto exibido no estado idle. Default: "Arraste imagens aqui ou clique pra selecionar". */
+  /** Texto exibido no estado idle. Default: "Arraste, clique ou cole (Ctrl+V) pra enviar". */
   label?: string;
   multiplos?: boolean;
 }
 
 /**
- * Drop zone com drag-and-drop nativo + click pra abrir picker. Sem dep externa.
- * Valida mime/tamanho client-side e descarta arquivos inválidos com warning leve.
+ * Drop zone com drag-and-drop nativo + click pra abrir picker + paste global
+ * (Ctrl+V/Cmd+V em qualquer lugar da página enquanto o componente está montado).
+ * Sem dep externa. Valida mime/tamanho client-side e descarta inválidos com warning leve.
  */
 export function UploadDropzone({
   onArquivos,
   disabled,
-  label = 'Arraste imagens aqui ou clique pra selecionar',
+  label = 'Arraste, clique ou cole (Ctrl+V) pra enviar',
   multiplos = true,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,7 +40,7 @@ export function UploadDropzone({
         return;
       }
       if (f.size > MAX_BYTES) {
-        rejeitados.push(`${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB > 10MB)`);
+        rejeitados.push(`${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB > 100MB)`);
         return;
       }
       arquivos.push(f);
@@ -51,6 +52,34 @@ export function UploadDropzone({
     }
     if (arquivos.length > 0) onArquivos(arquivos);
   }
+
+  // Paste global: enquanto o dropzone está montado, Ctrl+V em qualquer lugar
+  // da página captura imagens do clipboard. NÃO atrapalha paste de texto em
+  // inputs — clipboard items só são tratados quando kind==='file' + type=image/*.
+  // Screenshots colam como image/png com nome "image.png" gerado pelo browser.
+  useEffect(() => {
+    if (disabled) return;
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const arquivos: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const f = item.getAsFile();
+          if (f) arquivos.push(f);
+        }
+      }
+      if (arquivos.length === 0) return; // não era imagem, deixa o paste seguir
+      e.preventDefault();
+      // Reusa processar() via DataTransfer pra manter validação consistente.
+      const dt = new DataTransfer();
+      arquivos.forEach((f) => dt.items.add(f));
+      processar(dt.files);
+    }
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled, onArquivos]);
 
   function onDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();

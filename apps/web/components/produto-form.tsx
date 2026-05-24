@@ -892,7 +892,7 @@ function ImagensInicialSecao({
       <UploadDropzone
         onArquivos={(novos) => onArquivos([...arquivos, ...novos])}
         disabled={desabilitado}
-        label="Arraste imagens aqui ou clique pra selecionar"
+        label="Arraste, clique ou cole (Ctrl+V) pra enviar"
       />
 
       {arquivos.length > 0 && (

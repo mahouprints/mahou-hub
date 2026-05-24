@@ -105,7 +105,7 @@ export function ImagensSection({ produtoId, imagens }: Props) {
         <UploadDropzone
           onArquivos={(arquivos) => upload.mutate(arquivos)}
           disabled={upload.isPending}
-          label={upload.isPending ? 'Enviando…' : 'Arraste imagens aqui ou clique pra selecionar'}
+          label={upload.isPending ? 'Enviando…' : 'Arraste, clique ou cole (Ctrl+V) pra enviar'}
         />
       </div>
     </div>
