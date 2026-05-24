@@ -12,8 +12,9 @@ import type {
   Parametro,
   Produto,
   ProdutoCreate,
+  ProdutoImagem,
 } from '@mahou-hub/contracts';
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, apiUrl, fetchComRetry } from '@/lib/api-client';
 import { centavosParaReais, pct } from '@/lib/format';
 import { parseDecimalBr, parseDecimalParaCentavos } from '@/lib/parsing';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { InputDecimal } from '@/components/ui/input-decimal';
 import { Badge } from '@/components/ui/badge';
 import { UploadDropzone } from '@/components/upload-dropzone';
+import { ImagensSection } from '@/components/imagens-section';
 import {
   Card,
   CardContent,
@@ -37,9 +39,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-/** GET /produtos/:id devolve insumos populados; declaramos local pra não poluir contracts. */
+/** GET /produtos/:id devolve insumos e imagens populados; declaramos local pra não poluir contracts. */
 type ProdutoComInsumos = Produto & {
   insumos?: Array<{ insumoId: string; qtd: number | string }>;
+  imagens?: ProdutoImagem[];
 };
 
 interface Props {
@@ -225,8 +228,8 @@ export function ProdutoForm({ produto, inicial }: Props) {
           try {
             const fd = new FormData();
             imagensPendentes.forEach((f) => fd.append('arquivos', f));
-            const res = await fetch(
-              `/api/produtos/${criado.id}/imagens?origem=${origemImagens}`,
+            const res = await fetchComRetry(
+              apiUrl(`/produtos/${criado.id}/imagens?origem=${origemImagens}`),
               { method: 'POST', body: fd, credentials: 'include' },
             );
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -454,15 +457,22 @@ export function ProdutoForm({ produto, inicial }: Props) {
           </CardContent>
         </Card>
 
-        {!editando && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Imagens</CardTitle>
-              <CardDescription>
-                Opcional · enviadas após criar o produto
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+        {/* Imagens:
+            - criando: buffer File[] enviado depois que o POST devolve o ID
+            - editando: produto já existe, reusa ImagensSection (upload imediato + delete) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Imagens</CardTitle>
+            <CardDescription>
+              {editando
+                ? 'Adicione, troque ou remova — alterações são salvas na hora'
+                : 'Opcional · enviadas após criar o produto'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {editando && produto ? (
+              <ImagensSection produtoId={produto.id} imagens={produto.imagens ?? []} />
+            ) : (
               <ImagensInicialSecao
                 arquivos={imagensPendentes}
                 onArquivos={setImagensPendentes}
@@ -470,9 +480,9 @@ export function ProdutoForm({ produto, inicial }: Props) {
                 onOrigemChange={setOrigemImagens}
                 desabilitado={salvando}
               />
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

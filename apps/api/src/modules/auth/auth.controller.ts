@@ -28,20 +28,15 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ usuarioId: string; email: string }> {
     const { token, usuarioId } = await this.auth.login(body.email, body.senha);
-    res.cookie('mahou_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
+    res.cookie('mahou_token', token, cookieOpts());
     return { usuarioId, email: body.email };
   }
 
   @Post('logout')
   @ApiOperation({ summary: 'Limpa o cookie de sessão' })
   logout(@Res({ passthrough: true }) res: Response): { ok: true } {
-    res.clearCookie('mahou_token', { path: '/' });
+    // clearCookie precisa do MESMO domain do set, senão browser ignora.
+    res.clearCookie('mahou_token', { path: '/', domain: process.env.COOKIE_DOMAIN || undefined });
     return { ok: true };
   }
 
@@ -66,4 +61,25 @@ export class AuthController {
     const user = req.user as { sub: string; email: string };
     return this.auth.gerarApiToken(user.sub, user.email, body.ttlDias);
   }
+}
+
+/**
+ * Em prod o cookie é compartilhado entre `hub.mahouprints.com` (Vercel) e
+ * `api.mahouprints.com` (VPS) via `Domain=.mahouprints.com`, pra permitir
+ * que o frontend chame a API direto sem passar pelo proxy `/api/*` da Vercel
+ * (que dava `ROUTER_EXTERNAL_TARGET_CONNECTION_ERROR` intermitente em uploads).
+ *
+ * Cross-site cookie exige `SameSite=None` + `Secure`. Em dev cai pro `Lax` sem
+ * domain (localhost).
+ */
+function cookieOpts() {
+  const prod = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: prod,
+    sameSite: (prod ? 'none' : 'lax') as 'none' | 'lax',
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
+  };
 }

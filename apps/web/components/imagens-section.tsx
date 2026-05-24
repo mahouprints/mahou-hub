@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UploadDropzone } from '@/components/upload-dropzone';
+import { apiUrl, fetchComRetry } from '@/lib/api-client';
 
 const ORIGEM_LABEL: Record<OrigemImagem, string> = {
   INSPIRACAO: 'Inspiração',
@@ -37,11 +38,11 @@ export function ImagensSection({ produtoId, imagens }: Props) {
       arquivos.forEach((a) => fd.append('arquivos', a));
       // FormData nativo do fetch — não passamos pelo apiFetch pra evitar
       // que adicione Content-Type errado (multipart precisa do boundary auto).
-      const res = await fetch(`/api/produtos/${produtoId}/imagens?origem=${origemPadrao}`, {
-        method: 'POST',
-        body: fd,
-        credentials: 'include',
-      });
+      // fetchComRetry cobre blips de rede transitórios sem expor erro pro user.
+      const res = await fetchComRetry(
+        apiUrl(`/produtos/${produtoId}/imagens?origem=${origemPadrao}`),
+        { method: 'POST', body: fd, credentials: 'include' },
+      );
       if (!res.ok) {
         const corpo = await res.text();
         throw new Error(extrairMensagem(corpo) || `Erro ${res.status}`);
@@ -58,7 +59,7 @@ export function ImagensSection({ produtoId, imagens }: Props) {
 
   const remover = useMutation({
     mutationFn: async (imagemId: string) => {
-      const res = await fetch(`/api/produtos/${produtoId}/imagens/${imagemId}`, {
+      const res = await fetch(apiUrl(`/produtos/${produtoId}/imagens/${imagemId}`), {
         method: 'DELETE',
         credentials: 'include',
       });

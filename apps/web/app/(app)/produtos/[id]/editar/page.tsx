@@ -2,15 +2,21 @@
 
 import { use } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { Produto } from '@mahou-hub/contracts';
+import type { Produto, ProdutoImagem } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { ProdutoForm } from '@/components/produto-form';
+
+/** Backend devolve insumos + imagens no GET /produtos/:id; declaramos local pra não poluir contracts. */
+type ProdutoCompleto = Produto & {
+  insumos?: Array<{ insumoId: string; qtd: number | string }>;
+  imagens?: ProdutoImagem[];
+};
 
 export default function ProdutoEditarPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { data, isLoading, error } = useQuery({
     queryKey: ['produto', id],
-    queryFn: () => apiFetch<Produto>(`/produtos/${id}`),
+    queryFn: () => apiFetch<ProdutoCompleto>(`/produtos/${id}`),
   });
 
   return (
