@@ -78,7 +78,6 @@ export function UploadDropzone({
     }
     document.addEventListener('paste', onPaste);
     return () => document.removeEventListener('paste', onPaste);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [disabled, onArquivos]);
 
   function onDrop(e: DragEvent<HTMLDivElement>) {
