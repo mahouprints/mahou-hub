@@ -96,8 +96,8 @@ apply_path_rewrites() {
   sed \
     -e 's|content/marketplace/|~/Marketplace/|g' \
     -e 's|content/instagram/|~/Instagram/|g' \
-    -e 's|content/imagegen/templates/|~/ImageGen/templates/|g' \
-    -e 's|content/imagegen/|~/ImageGen/|g' \
+    -e 's|content/imagegen/templates/|~/Documents/Mahou Prints/imagegen/templates/|g' \
+    -e 's|content/imagegen/|~/Documents/Mahou Prints/imagegen/|g' \
     -e 's|content/memory/|~/.claude/projects/C--Users-PC/memory/|g' \
     -e 's|\.claude/skills/gerar-imagem/SKILL\.md|~/.claude/commands/gerar-imagem.md|g' \
     -e 's|\.claude/skills/gerar-descricao/SKILL\.md|~/.claude/commands/gerar-descricao.md|g' \

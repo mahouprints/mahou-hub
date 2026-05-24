@@ -57,11 +57,79 @@ Antes de criar projeto Flow para um produto, **identifique a categoria** dele e 
 | Categoria do produto | Cenário | Notas |
 |---|---|---|
 | Banheiro (porta-escova, suporte papel higiênico, gancho toalha, dispenser, bandeja sabonete, porta-escova sanitária, organizador cosmético, cabide) | `bathroom_modern_black_marble` | **3 backgrounds**: `background_closeup.jpeg` (produto pequeno), `background_medium.jpeg` (médio), `background_wide.jpeg` (instalado/contexto amplo) |
+| **Cozinha/Confeitaria** (cortador biscoito, carimbo brigadeiro, marcador, ejetor, topper bolo, molde, porta-tempero, porta-faca, porta-cápsula Nespresso/Dolce, porta-filtro café, cantinho do café, dispenser sabonete cozinha, porta-esponja, suporte panela) | `kitchen_sage_oak_marble` | **5 backgrounds**: ver "Seleção de ângulo" abaixo |
 | Acende/luminária (abajur, mobile com luz, LED, vela, difusor luminoso) | `dark_moody_premium` | Cena Mahou Prints à NOITE com lamparina warm 2700K vinda canto-direito. Produto aceso vira fonte secundária. Layer lines suavizam por causa da translucidez quando iluminado (memória `feedback_mahou_layers_luz_acesa`) |
 | Berço/quarto de bebê | `nursery_soft_pastel` | Sem bg fixo — descrever no prompt: berço VAZIO, teddy, mobile, sem bebês |
-| **Default** (decorativo, organizador mesa, cortador, marca-página, contador, cesta, vaso, brinquedo pet, polaroid) | `wooden_warm_cozy` | Mesa madeira + Mahou Prints logo + suculenta + livros |
+| **Default** (decorativo, organizador mesa, marca-página, contador, cesta, vaso, brinquedo pet, polaroid) | `wooden_warm_cozy` | Mesa madeira + Mahou Prints logo + suculenta + livros |
 
 **Se ambíguo, perguntar ao usuário** antes de gerar.
+
+## Seleção de ÂNGULO (OBRIGATÓRIA pra cenas multi-background)
+
+Cenas como `kitchen_sage_oak_marble` (5 backgrounds) e `bathroom_modern_black_marble` (3 backgrounds) exigem que você escolha o ângulo certo antes de anexar a ref ao Flow. A escolha sai do cruzamento de 3 dimensões — **geometria + tamanho + tipo de shot**. Regras completas em `template.json > como_selecionar_angulo`.
+
+### Heurística de 3 passos
+
+**Passo 1 — Geometria do produto**
+- **PLANO/BAIXO** (h < 5cm): cortador biscoito, carimbo, ímã, plaquinha, marca-página, chaveiro → quase sempre **TOPDOWN**
+- **MÉDIO** (h 5-8cm): porta-treco, porta-óculos, bowl, cesta pequena → **CLOSE-UP** (eye-level) ou **WIDE** (evita topdown)
+- **VERTICAL/ALTO** (h > 8cm): porta-tempero torre, suporte panela, porta-cápsula vertical, dispenser, abajur → **WIDE** ou **CLOSE-UP** (eye-level)
+
+**Passo 2 — Tamanho do produto**
+- **MINI** (maior dimensão < 5cm): chaveiro, brinco, ímã pequeno → **MACRO** (produto fica 50%+ do frame)
+- **PEQUENO** (5-15cm): cortador biscoito, carimbo, mini vaso → **CLOSE-UP padrão**
+- **MÉDIO** (15-25cm): kit cortadores, porta-tempero, abajur pequeno → **WIDE** ou **CLOSE-UP wider**
+- **GRANDE** (>25cm): cesta decorativa, suporte guitarra, expositor cards → **WIDE** (sem close-up)
+
+**Passo 3 — Tipo de shot**
+- **HERO** (foto principal anúncio, produto sozinho): close-up padrão
+- **EM_USO** (produto contextualizado): wide
+- **FLAT_LAY** (kit 3+ itens lado a lado): **TOPDOWN obrigatório**
+- **DETALHE_MACRO** (foco em layer lines/gravação): macro
+
+### Matriz pronta — cozinha (`kitchen_sage_oak_marble`)
+
+| Produto / cenário | Background recomendado |
+|---|---|
+| Cortador biscoito unidade pequena | `background_closeup_wall.jpeg` |
+| Cortador biscoito kit 4-8 peças | **`background_topdown.jpeg`** (flat-lay obrigatório) |
+| Cortador biscoito macro pra layer lines | `background_closeup_macro.jpeg` |
+| Carimbo brigadeiro unidade premium | `background_closeup_cabinet.jpeg` (drama dourado) |
+| Carimbo brigadeiro kit | `background_topdown.jpeg` |
+| Porta-tempero torre vertical | `background.jpeg` (wide) |
+| Porta-cápsula giratória (com rotação) | `background.jpeg` (wide) |
+| Porta-cápsula bandeja plana | `background_topdown.jpeg` |
+| Porta-filtro café | `background_closeup_wall.jpeg` |
+| Cantinho do café (kit Bob + xícara + plant) | `background.jpeg` (wide, mostra cena completa) |
+| Dispenser sabonete cozinha | `background_closeup_wall.jpeg` |
+| Porta-esponja | `background_closeup_wall.jpeg` |
+| Suporte panela | `background.jpeg` (wide) |
+| Topper bolo unidade | `background_closeup_cabinet.jpeg` (premium) |
+| Molde biscoito | `background_closeup_wall.jpeg` |
+| Ímã pequeno personalizado | `background_closeup_macro.jpeg` |
+| Chaveiro kit lembrancinha | `background_topdown.jpeg` |
+
+### Matriz pronta — banheiro (`bathroom_modern_black_marble`)
+
+| Produto / cenário | Background recomendado |
+|---|---|
+| Porta-escova de dente unidade | `background_closeup.jpeg` |
+| Dispenser sabonete líquido | `background_medium.jpeg` |
+| Kit banheiro 3 peças (escova+sabonete+bandeja) | `background_wide.jpeg` |
+| Gancho toalha unidade | `background_closeup.jpeg` |
+| Gancho toalha kit 4 | `background_medium.jpeg` |
+| Cabide adesivo parede (instalado) | `background_wide.jpeg` |
+
+### Regras de desempate
+
+1. **Geometria vem primeiro.** Plano/baixo → topdown na maioria dos casos (mesmo se o produto for "premium" — flat-lay continua sendo a apresentação correta).
+2. **Tamanho filtra.** MINI sempre puxa pra macro; GRANDE sempre puxa pra wide.
+3. **Tipo de shot ajusta.** Em caso de empate, FLAT_LAY=topdown, HERO=closeup, EM_USO=wide.
+4. **Kits ≥ 3 itens visíveis simultâneo → SEMPRE topdown**, não importa categoria.
+5. **Drama vs clean** — quando há 2 close-ups (cabinet/wall, dark/light), use:
+   - **cabinet (kitchen) / wide (bathroom)** pra produtos sofisticados/premium (mais drama)
+   - **wall (kitchen) / closeup (bathroom)** pra produtos clean/minimalistas (mais leve)
+6. **Em dúvida real**, perguntar ao usuário ANTES de gerar — não chutar.
 
 ## Modos de operação
 
@@ -355,7 +423,7 @@ Abra https://labs.google/fx/pt/tools/flow. Login manual se necessário.
 #### Upload BATCH (1 chamada, 2 arquivos)
 ```javascript
 await browser_file_upload({paths: [
-  "C:\\Users\\PC\\ImageGen\\templates\\cenas\\{cena}\\background.jpeg",
+  "C:\\Users\\PC\\Documents\\Mahou Prints\\imagegen\\templates\\cenas\\{cena}\\background.jpeg",
   "{caminho-da-referencia-produto}"
 ]});
 ```

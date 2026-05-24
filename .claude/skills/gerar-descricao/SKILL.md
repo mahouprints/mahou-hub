@@ -75,10 +75,21 @@ Lê os arquivos em `treino/listings_que_funcionaram/` e atualiza o catálogo/key
 
 2. **Verificar pasta do produto:**
    - `C:\Users\PC\Documents\Mahou Prints\products\{produto-slug}\` existe?
-   - Se sim, listar imagens disponíveis em `referencias/` (pode informar visualmente na descrição)
+   - Se sim, listar imagens disponíveis em `referencias/`
    - Se já existe `listings/{marketplace}.md`, **perguntar** se deve sobrescrever ou versionar (`shopee_v2.md`)
 
-3. **Se produto NÃO está no catálogo:**
+3. **🔍 ANÁLISE VISUAL OBRIGATÓRIA da imagem do produto:**
+   - **Sem imagem = sem descrição.** Se `referencias/` está vazia, **PARAR e pedir foto/render ao usuário antes de prosseguir**. Não chutar com base no catálogo — o catálogo é frequentemente incompleto (caso real: catálogo dizia "4 formatos", produto tinha 6).
+   - Se tem imagem(ns), usar a tool Read pra ler o arquivo visualmente (suporta JPG/PNG/WebP). Anotar antes de gerar título/descrição:
+     - **Quantos itens/formatos/peças tem no kit?** (contar visualmente)
+     - **Que formatos/silhuetas exatas?** (listar 1 por 1)
+     - **Cor real** (não confiar no `cor_padrao` do catálogo)
+     - **Dimensões aparentes** (régua, mão, comparativo)
+     - **Detalhes não-óbvios:** gravação, acabamento, encaixe, alto-relevo
+   - Múltiplas imagens? Combinar achados.
+   - **Atualizar `produtos.json`** se a imagem revelar diferenças (quantidade real, nome dos formatos) — próxima geração fica mais precisa.
+
+4. **Se produto NÃO está no catálogo:**
    - Perguntar ao usuário: nome do produto, categoria, dimensões aproximadas, cor padrão, público-alvo, diferenciais
    - **Salvar no `produtos.json`** após confirmação (o catálogo cresce com o uso)
 
