@@ -81,7 +81,9 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - Container roda como user `app` (uid 100, gid 101 no Debian-slim). `/var/mahou-storage` na VPS precisa estar `chown 100:101` pra upload funcionar.
 
 ## Auth e API tokens
-- JWT vai por cookie (`mahou_token`, HttpOnly, SameSite=Lax) ou header `Authorization: Bearer`. JwtStrategy aceita os dois.
+- JWT vai por cookie (`mahou_token`, HttpOnly) ou header `Authorization: Bearer`. JwtStrategy aceita os dois.
+- Cookie em **prod**: `SameSite=None`, `Secure=true`, `Domain=.mahouprints.com` (via env `COOKIE_DOMAIN`). É compartilhado entre `hub.mahouprints.com` e `api.mahouprints.com` pra que o front chame a API direto sem proxy `/api/*` da Vercel (que dava `ROUTER_EXTERNAL_TARGET_CONNECTION_ERROR` intermitente em uploads). Em **dev** cai pro `SameSite=Lax` sem domain (localhost mesma origem via Next rewrite).
+- Frontend resolve URL da API via `apiUrl(path)` em `apps/web/lib/api-client.ts`: usa `NEXT_PUBLIC_API_BASE_URL` se setada (prod) ou `/api/*` (dev, vai pro rewrite). Sempre usar essa função em chamadas novas — não usar `/api/...` cru.
 - `POST /api/v1/auth/api-token` (autenticado) gera JWT de longa duração (TTL 1..365 dias) pra fluxos automáticos. Mesmo payload do login normal — funciona em todos os endpoints protegidos. Sem rastreio/revogação por token: pra invalidar emergencialmente, rotacionar `JWT_SECRET` no servidor (invalida TUDO, incluindo sessões ativas).
 - Token é exibido uma única vez na UI; consumer copia e cola no `.env`.
 
@@ -98,6 +100,7 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
 - **Bulk mark anunciado**: `POST /produtos/bulk-anunciar { ids, anunciado }`.
 - **Hooks de tabela**: `useTableSelection` (modo seleção opcional + Set<id>) e `useTableSort` (asc/desc/idle) em `apps/web/lib/`. Aplicar nas tabelas longas (produtos, vendas, custos, insumos).
 - **Componentes de UI**: `SortableHead`, `SelectionToolbar`, `Checkbox` (shadcn), `DatePicker`, `MonthPicker`, `UploadDropzone`, `ImagensSection`. Reusar; não criar variantes paralelas.
+- **Fetch com retry transitório**: `fetchComRetry(url, init)` em `apps/web/lib/api-client.ts` — 3 tentativas com backoff (1.5s, 3s) em 5xx/erro de rede; não retenta 4xx. Usar em uploads multipart e qualquer chamada onde blip de rede transitório justifica retry transparente. Para JSON normal use `apiFetch` (sem retry).
 
 ## Setup Windows (dev)
 - **Antivirus EPERM no Prisma generate**: Windows Defender (e similares) bloqueiam o rename do `query_engine-windows.dll.node` durante `prisma generate`. Adicione exclusão no PowerShell **como admin** (uma vez por máquina):
