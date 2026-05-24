@@ -114,10 +114,30 @@ describe('ProdutosService.list — filtros', () => {
 
   it('temImagens=true filtra com imagens.some, temImagens=false com imagens.none', async () => {
     await svc.list({ temImagens: true });
-    expect(mock.produto.findMany.mock.calls[0]?.[0].where.imagens).toEqual({ some: {} });
+    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({ imagens: { some: {} } });
     mock.produto.findMany.mockClear();
     await svc.list({ temImagens: false });
-    expect(mock.produto.findMany.mock.calls[0]?.[0].where.imagens).toEqual({ none: {} });
+    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({ imagens: { none: {} } });
+  });
+
+  it('temImagemGerada=true exige origem=GERADA, =false exige ausência', async () => {
+    await svc.list({ temImagemGerada: true });
+    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({
+      imagens: { some: { origem: 'GERADA' } },
+    });
+    mock.produto.findMany.mockClear();
+    await svc.list({ temImagemGerada: false });
+    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({
+      imagens: { none: { origem: 'GERADA' } },
+    });
+  });
+
+  it('temImagens=true + temImagemGerada=false coexistem via AND (fila da skill /gerar-imagem)', async () => {
+    // Regressão: spread duplo na chave `imagens` se sobrescrevia (last-wins).
+    await svc.list({ temImagens: true, temImagemGerada: false });
+    const where = mock.produto.findMany.mock.calls[0]?.[0].where;
+    expect(where.AND).toContainEqual({ imagens: { some: {} } });
+    expect(where.AND).toContainEqual({ imagens: { none: { origem: 'GERADA' } } });
   });
 
   it('combina temReferencia=true + q sem perder nenhum dos dois (regressão: OR direto sobrescreveria)', async () => {

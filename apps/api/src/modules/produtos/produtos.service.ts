@@ -18,6 +18,13 @@ export type ProdutoListOpts = {
   canal?: Canal;
   /** Quando definido, filtra por presença (`true`) ou ausência (`false`) de ProdutoImagem. */
   temImagens?: boolean;
+  /**
+   * Quando definido, filtra por presença (`true`) ou ausência (`false`) de ProdutoImagem
+   * com `origem='GERADA'`. Caso típico do fluxo da skill `/gerar-imagem`: produto que
+   * já tem refs upadas (INSPIRACAO/MODELO_3D) mas falta a foto final → combinar
+   * `temImagens=true & temImagemGerada=false`.
+   */
+  temImagemGerada?: boolean;
   /** Quando definido, filtra por presença (`true`) ou ausência (`false`) de inspiração ou modelo3dUrl. */
   temReferencia?: boolean;
   /** Filtra a fila de trabalho: 'IA' (skill), 'FOTO' (fotografar) ou 'NULL' (sem decisão). */
@@ -45,9 +52,11 @@ export class ProdutosService {
    * quando parar.
    */
   async list(opts?: ProdutoListOpts) {
-    const { anunciado, canal, temImagens, temReferencia, metodoImagem, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
+    const { anunciado, canal, temImagens, temImagemGerada, temReferencia, metodoImagem, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
     // temReferencia=true e busca textual usam ambos a chave `OR` no Prisma — combiná-los
     // direto no where sobrescreve o primeiro. Lista de AND mantém os dois ativos.
+    // Tudo que mira a relação `imagens` precisa ir via AND — múltiplos spreads na chave
+    // `imagens` no `where` se sobrescrevem (last-wins) e perderiam um dos filtros.
     const andClauses: Prisma.ProdutoWhereInput[] = [];
     if (temReferencia === true) {
       andClauses.push({ OR: [{ inspiracao: { not: null } }, { modelo3dUrl: { not: null } }] });
@@ -60,13 +69,14 @@ export class ProdutosService {
         ],
       });
     }
+    if (temImagens === true) andClauses.push({ imagens: { some: {} } });
+    if (temImagens === false) andClauses.push({ imagens: { none: {} } });
+    if (temImagemGerada === true) andClauses.push({ imagens: { some: { origem: 'GERADA' } } });
+    if (temImagemGerada === false) andClauses.push({ imagens: { none: { origem: 'GERADA' } } });
     const where: Prisma.ProdutoWhereInput = {
       ativo: true,
       ...(anunciado != null ? { anunciado } : {}),
       ...(canal ? { canalPrincipal: canal } : {}),
-      // `imagens: { some: {} }` → tem pelo menos 1; `none: {} }` → não tem nenhuma.
-      ...(temImagens === true ? { imagens: { some: {} } } : {}),
-      ...(temImagens === false ? { imagens: { none: {} } } : {}),
       // temReferencia=false → AND implícito (ambos null). =true cai no andClauses acima.
       ...(temReferencia === false ? { inspiracao: null, modelo3dUrl: null } : {}),
       // metodoImagem: 'NULL' filtra produtos sem decisão, IA/FOTO filtram pelo valor.

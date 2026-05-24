@@ -39,11 +39,15 @@ const SORTABLE_FIELDS = ['criadoEm', 'atualizadoEm', 'nome', 'precoCentavos'] as
 const ListQuerySchema = z.object({
   anunciado: z.enum(['true', 'false']).optional(),
   canal: z.nativeEnum(Canal).optional(),
-  // temImagens=true filtra produtos com >=1 ProdutoImagem (foto final hospedada).
+  // temImagens=true filtra produtos com >=1 ProdutoImagem (qualquer origem).
   temImagens: z.enum(['true', 'false']).optional(),
-  // temReferencia=true filtra produtos com `inspiracao` OU `modelo3dUrl` preenchido.
-  // Combinado com `anunciado=false&temImagens=false` dá o set "pendentes de geração
-  // de imagem": tem material de referência mas ainda não tem foto final.
+  // temImagemGerada=true filtra por presença de ProdutoImagem com origem=GERADA
+  // (foto final pra anúncio). Combine `temImagens=true & temImagemGerada=false` pra
+  // fila da skill /gerar-imagem: tem refs upadas (INSPIRACAO/MODELO_3D) mas falta gerar.
+  temImagemGerada: z.enum(['true', 'false']).optional(),
+  // temReferencia=true filtra produtos com `inspiracao` OU `modelo3dUrl` preenchido
+  // (URL textual, NÃO arquivo). Pra a fila da skill prefira `temImagens=true` —
+  // textual sem upload de imagem não dá pra usar como ref no Flow.
   temReferencia: z.enum(['true', 'false']).optional(),
   // metodoImagem filtra a fila de trabalho: IA = gerar via skill, FOTO = fotografar
   // unidade impressa. NULL = produtos sem método decidido ainda.
@@ -72,8 +76,9 @@ export class ProdutosController {
   })
   @ApiQuery({ name: 'anunciado', required: false, enum: ['true', 'false'], description: 'Filtra por flag anunciado' })
   @ApiQuery({ name: 'canal', required: false, enum: Canal, description: 'Filtra por canal principal' })
-  @ApiQuery({ name: 'temImagens', required: false, enum: ['true', 'false'], description: 'Filtra por presença de pelo menos 1 ProdutoImagem (foto final)' })
-  @ApiQuery({ name: 'temReferencia', required: false, enum: ['true', 'false'], description: 'Filtra por presença de inspiração ou modelo3dUrl' })
+  @ApiQuery({ name: 'temImagens', required: false, enum: ['true', 'false'], description: 'Filtra por presença de pelo menos 1 ProdutoImagem (qualquer origem)' })
+  @ApiQuery({ name: 'temImagemGerada', required: false, enum: ['true', 'false'], description: 'Filtra por presença de ProdutoImagem com origem=GERADA (foto final). Combine com temImagens=true pra fila da skill' })
+  @ApiQuery({ name: 'temReferencia', required: false, enum: ['true', 'false'], description: 'Filtra por presença de inspiração ou modelo3dUrl (URL textual, NÃO arquivo)' })
   @ApiQuery({ name: 'metodoImagem', required: false, enum: ['IA', 'FOTO', 'NULL'], description: 'Filtra a fila: IA (skill), FOTO (fotografar) ou NULL (sem decisão)' })
   @ApiQuery({ name: 'q', required: false, description: 'Busca textual (case-insensitive) em nome + inspiração' })
   @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1 } })
@@ -85,7 +90,7 @@ export class ProdutosController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '));
     }
-    const { anunciado, canal, temImagens, temReferencia, metodoImagem, q, page, pageSize, sortBy, sortDir } = parsed.data;
+    const { anunciado, canal, temImagens, temImagemGerada, temReferencia, metodoImagem, q, page, pageSize, sortBy, sortDir } = parsed.data;
     // Se passou page sem pageSize (ou vice-versa), preenche o outro com default
     // sensato — evita armadilha "page=2 sozinho" que devolveria a página inteira.
     const pageNorm = page ?? (pageSize ? 1 : undefined);
@@ -95,6 +100,7 @@ export class ProdutosController {
       anunciado: anunciado === 'true' ? true : anunciado === 'false' ? false : undefined,
       canal,
       temImagens: temImagens === 'true' ? true : temImagens === 'false' ? false : undefined,
+      temImagemGerada: temImagemGerada === 'true' ? true : temImagemGerada === 'false' ? false : undefined,
       temReferencia: temReferencia === 'true' ? true : temReferencia === 'false' ? false : undefined,
       metodoImagem,
       q,

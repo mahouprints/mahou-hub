@@ -89,10 +89,11 @@ export const tools = [
     name: 'listar_produtos_pendentes_imagem',
     description:
       'Atalho pro fluxo da skill de geração de imagem: lista produtos `anunciado=false` ' +
-      'que JÁ TÊM material de referência (inspiração ou modelo3dUrl) MAS AINDA NÃO TÊM ' +
-      'foto final hospedada. Por padrão filtra `metodoImagem=IA` — só puxa produtos ' +
-      'marcados pra geração via skill. Passe `metodoImagem: "FOTO"` pra ver a fila de ' +
-      'fotografia física, ou `"TODOS"` pra ignorar o filtro (inclui produtos sem decisão).',
+      'que JÁ TÊM imagem upada (refs reais — INSPIRACAO/MODELO_3D) MAS AINDA NÃO TÊM ' +
+      'foto final GERADA. Esses são os candidatos imediatos pra skill. Por padrão filtra ' +
+      '`metodoImagem=IA` — só puxa produtos marcados pra geração via skill. Passe ' +
+      '`metodoImagem: "FOTO"` pra ver a fila de fotografia física, ou `"TODOS"` pra ' +
+      'ignorar o filtro (inclui produtos sem decisão).',
     inputSchema: z.object({
       page: z.number().int().positive().optional(),
       pageSize: z.number().int().min(1).max(200).optional(),
@@ -100,10 +101,14 @@ export const tools = [
     }),
     handler: async (input: unknown) => {
       const { metodoImagem, ...rest } = (input ?? {}) as { metodoImagem?: string };
+      // Antes filtrava temReferencia=true & temImagens=false — bug: URL textual em
+      // `inspiracao`/`modelo3dUrl` não dá pra usar como ref no Flow (precisa de pixels),
+      // e `temImagens=false` excluía produtos que JÁ tinham as INSPIRACAO upadas.
+      // Agora exige imagem upada (qualquer origem) E ausência de GERADA.
       const params = new URLSearchParams({
         anunciado: 'false',
-        temReferencia: 'true',
-        temImagens: 'false',
+        temImagens: 'true',
+        temImagemGerada: 'false',
       });
       // Default: filtra fila da skill (IA). 'TODOS' = sem filtro de método.
       const metodo = metodoImagem ?? 'IA';
