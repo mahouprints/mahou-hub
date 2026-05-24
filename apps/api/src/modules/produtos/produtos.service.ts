@@ -20,6 +20,8 @@ export type ProdutoListOpts = {
   temImagens?: boolean;
   /** Quando definido, filtra por presença (`true`) ou ausência (`false`) de inspiração ou modelo3dUrl. */
   temReferencia?: boolean;
+  /** Filtra a fila de trabalho: 'IA' (skill), 'FOTO' (fotografar) ou 'NULL' (sem decisão). */
+  metodoImagem?: 'IA' | 'FOTO' | 'NULL';
   q?: string;
   page?: number;
   pageSize?: number;
@@ -43,7 +45,7 @@ export class ProdutosService {
    * quando parar.
    */
   async list(opts?: ProdutoListOpts) {
-    const { anunciado, canal, temImagens, temReferencia, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
+    const { anunciado, canal, temImagens, temReferencia, metodoImagem, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
     // temReferencia=true e busca textual usam ambos a chave `OR` no Prisma — combiná-los
     // direto no where sobrescreve o primeiro. Lista de AND mantém os dois ativos.
     const andClauses: Prisma.ProdutoWhereInput[] = [];
@@ -67,6 +69,9 @@ export class ProdutosService {
       ...(temImagens === false ? { imagens: { none: {} } } : {}),
       // temReferencia=false → AND implícito (ambos null). =true cai no andClauses acima.
       ...(temReferencia === false ? { inspiracao: null, modelo3dUrl: null } : {}),
+      // metodoImagem: 'NULL' filtra produtos sem decisão, IA/FOTO filtram pelo valor.
+      ...(metodoImagem === 'NULL' ? { metodoImagem: null } : {}),
+      ...(metodoImagem === 'IA' || metodoImagem === 'FOTO' ? { metodoImagem } : {}),
       ...(andClauses.length > 0 ? { AND: andClauses } : {}),
     };
     const skip = page != null && pageSize != null ? (page - 1) * pageSize : undefined;

@@ -2,6 +2,17 @@ import { z } from 'zod';
 import { CanalEnum, ImpressoraEnum } from './enums';
 import { ProdutoInsumoInputSchema } from './insumo';
 
+/**
+ * Método planejado pra obter a foto final do produto:
+ * - IA: gerar via skill /gerar-imagem (Nano Banana Pro). Default pra produtos
+ *   caros/demorados de imprimir ou com geometria difícil de fotografar.
+ * - FOTO: imprimir uma unidade física e fotografar. Default pra produtos
+ *   baratos/rápidos onde o custo de produção é menor que o custo de iterar prompts.
+ * - null/undefined: ainda não decidido.
+ */
+export const MetodoImagemEnum = z.enum(['IA', 'FOTO']);
+export type MetodoImagem = z.infer<typeof MetodoImagemEnum>;
+
 export const ProdutoSchema = z.object({
   id: z.string(),
   nome: z.string().min(1),
@@ -23,6 +34,7 @@ export const ProdutoSchema = z.object({
   // Rascunho = produto incompleto (criado via virar-produto sem todos os campos).
   // Bloqueia o fluxo de anunciar até o usuário completar.
   rascunho: z.boolean(),
+  metodoImagem: MetodoImagemEnum.nullable(),
 });
 
 export const ProdutoCreateSchema = ProdutoSchema.omit({
@@ -30,12 +42,14 @@ export const ProdutoCreateSchema = ProdutoSchema.omit({
   ativo: true,
   anunciado: true,
   rascunho: true,
+  metodoImagem: true,
 }).extend({
   // No create normal (UI manual), peso e tempo voltam a ser obrigatórios positivos.
   pesoG: z.number().positive(),
   tempoH: z.number().positive(),
   ativo: z.boolean().default(true),
   anunciado: z.boolean().default(false),
+  metodoImagem: MetodoImagemEnum.nullable().optional(),
   insumos: z.array(ProdutoInsumoInputSchema).optional(),
 });
 

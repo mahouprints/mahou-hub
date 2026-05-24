@@ -69,6 +69,7 @@ interface FormState {
   embalagemReais: string;
   precoReais: string;
   canalPrincipal: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
+  metodoImagem: 'IA' | 'FOTO' | '';
   insumos: InsumoLinha[];
 }
 
@@ -88,6 +89,7 @@ const VAZIO: FormState = {
   embalagemReais: '0,00',
   precoReais: '',
   canalPrincipal: 'SHOPEE',
+  metodoImagem: '',
   insumos: [],
 };
 
@@ -113,6 +115,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
         embalagemReais: (produto.embalagemCentavos / 100).toFixed(2).replace('.', ','),
         precoReais: (produto.precoCentavos / 100).toFixed(2).replace('.', ','),
         canalPrincipal: produto.canalPrincipal,
+        metodoImagem: produto.metodoImagem ?? '',
         insumos: (produto.insumos ?? []).map((pi) => ({
           insumoId: pi.insumoId,
           qtdStr: String(pi.qtd).replace('.', ','),
@@ -207,6 +210,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
         })(),
         precoCentavos: parseDecimalParaCentavos(form.precoReais),
         canalPrincipal: form.canalPrincipal,
+        metodoImagem: form.metodoImagem === '' ? null : form.metodoImagem,
         ativo: true,
         anunciado: produto?.anunciado ?? false,
         insumos: form.insumos
@@ -397,6 +401,28 @@ export function ProdutoForm({ produto, inicial }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Método da imagem final</Label>
+              <Select
+                value={form.metodoImagem === '' ? 'NULL' : form.metodoImagem}
+                onValueChange={(v) =>
+                  setForm({ ...form, metodoImagem: v === 'NULL' ? '' : (v as 'IA' | 'FOTO') })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NULL">— não decidido —</SelectItem>
+                  <SelectItem value="IA">Gerar via IA (skill /gerar-imagem)</SelectItem>
+                  <SelectItem value="FOTO">Fotografar (imprimir e tirar foto)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Define em qual fila o produto entra. A skill de geração só pega <code>IA</code>.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">

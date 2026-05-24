@@ -49,6 +49,14 @@ enum OrigemImagem {
   OUTRA
 }
 
+/// Método planejado pra gerar a foto final do produto.
+/// IA = gerar via skill /gerar-imagem (Nano Banana Pro). FOTO = imprimir + fotografar.
+/// null = ainda não decidido. Usado pra filtrar filas de trabalho distintas.
+enum MetodoImagem {
+  IA
+  FOTO
+}
+
 enum CategoriaCusto {
   ALUGUEL
   ENERGIA
@@ -135,6 +143,9 @@ model Produto {
   /// Quando true: alguns campos podem estar zerados (peso/tempo) e ativo=false.
   /// Usuário precisa completar antes de anunciar.
   rascunho          Boolean               @default(false)
+  /// IA = gerar via skill. FOTO = imprimir+fotografar. null = ainda não decidido.
+  /// Fluxos da skill /gerar-imagem só pegam metodoImagem=IA + imagens upadas.
+  metodoImagem      MetodoImagem?
   jobs              JobProducao[]
   vendas            Venda[]
   insumos           ProdutoInsumo[]

@@ -90,19 +90,25 @@ export const tools = [
     description:
       'Atalho pro fluxo da skill de geração de imagem: lista produtos `anunciado=false` ' +
       'que JÁ TÊM material de referência (inspiração ou modelo3dUrl) MAS AINDA NÃO TÊM ' +
-      'foto final hospedada. Esses são os candidatos imediatos pro gerador de imagem. ' +
-      'Use `inspiracao` / `modelo3dUrl` de cada item como input pro gerador.',
+      'foto final hospedada. Por padrão filtra `metodoImagem=IA` — só puxa produtos ' +
+      'marcados pra geração via skill. Passe `metodoImagem: "FOTO"` pra ver a fila de ' +
+      'fotografia física, ou `"TODOS"` pra ignorar o filtro (inclui produtos sem decisão).',
     inputSchema: z.object({
       page: z.number().int().positive().optional(),
       pageSize: z.number().int().min(1).max(200).optional(),
+      metodoImagem: z.enum(['IA', 'FOTO', 'NULL', 'TODOS']).optional(),
     }),
     handler: async (input: unknown) => {
+      const { metodoImagem, ...rest } = (input ?? {}) as { metodoImagem?: string };
       const params = new URLSearchParams({
         anunciado: 'false',
         temReferencia: 'true',
         temImagens: 'false',
       });
-      for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+      // Default: filtra fila da skill (IA). 'TODOS' = sem filtro de método.
+      const metodo = metodoImagem ?? 'IA';
+      if (metodo !== 'TODOS') params.set('metodoImagem', metodo);
+      for (const [k, v] of Object.entries(rest)) {
         if (v !== undefined && v !== null) params.set(k, String(v));
       }
       return apiCall('GET', `/produtos?${params.toString()}`);

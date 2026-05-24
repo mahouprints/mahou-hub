@@ -45,6 +45,9 @@ const ListQuerySchema = z.object({
   // Combinado com `anunciado=false&temImagens=false` dá o set "pendentes de geração
   // de imagem": tem material de referência mas ainda não tem foto final.
   temReferencia: z.enum(['true', 'false']).optional(),
+  // metodoImagem filtra a fila de trabalho: IA = gerar via skill, FOTO = fotografar
+  // unidade impressa. NULL = produtos sem método decidido ainda.
+  metodoImagem: z.enum(['IA', 'FOTO', 'NULL']).optional(),
   q: z.string().trim().min(1).max(200).optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(200).optional(),
@@ -71,6 +74,7 @@ export class ProdutosController {
   @ApiQuery({ name: 'canal', required: false, enum: Canal, description: 'Filtra por canal principal' })
   @ApiQuery({ name: 'temImagens', required: false, enum: ['true', 'false'], description: 'Filtra por presença de pelo menos 1 ProdutoImagem (foto final)' })
   @ApiQuery({ name: 'temReferencia', required: false, enum: ['true', 'false'], description: 'Filtra por presença de inspiração ou modelo3dUrl' })
+  @ApiQuery({ name: 'metodoImagem', required: false, enum: ['IA', 'FOTO', 'NULL'], description: 'Filtra a fila: IA (skill), FOTO (fotografar) ou NULL (sem decisão)' })
   @ApiQuery({ name: 'q', required: false, description: 'Busca textual (case-insensitive) em nome + inspiração' })
   @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1 } })
   @ApiQuery({ name: 'pageSize', required: false, schema: { type: 'integer', minimum: 1, maximum: 200 } })
@@ -81,7 +85,7 @@ export class ProdutosController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '));
     }
-    const { anunciado, canal, temImagens, temReferencia, q, page, pageSize, sortBy, sortDir } = parsed.data;
+    const { anunciado, canal, temImagens, temReferencia, metodoImagem, q, page, pageSize, sortBy, sortDir } = parsed.data;
     // Se passou page sem pageSize (ou vice-versa), preenche o outro com default
     // sensato — evita armadilha "page=2 sozinho" que devolveria a página inteira.
     const pageNorm = page ?? (pageSize ? 1 : undefined);
@@ -92,6 +96,7 @@ export class ProdutosController {
       canal,
       temImagens: temImagens === 'true' ? true : temImagens === 'false' ? false : undefined,
       temReferencia: temReferencia === 'true' ? true : temReferencia === 'false' ? false : undefined,
+      metodoImagem,
       q,
       page: pageNorm,
       pageSize: pageSizeNorm,
