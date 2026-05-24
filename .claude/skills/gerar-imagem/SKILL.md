@@ -50,6 +50,52 @@ content/imagegen/                              # templates e histórico global
 └── feedback/historico.json             # log global de aprendizados
 ```
 
+## Análise e seleção de referências (OBRIGATÓRIA antes de gerar)
+
+Quando o produto tem múltiplas referências (caso comum no Modo G — vem do Hub com 3-6 imagens), a skill **NÃO** pega a primeira ou todas cegamente. Faz **análise visual via `Read` multimodal** e seleciona **1-3 refs complementares** baseado em critérios objetivos.
+
+### Por que não anexar todas as refs disponíveis
+- Cada ref adicional dilui o "peso" das outras na geração — 5 refs ≠ 5x melhor
+- Refs com cores muito diferentes confundem o modelo (mix-and-match estranho)
+- Refs com baixa qualidade técnica injetam ruído sem agregar informação
+- Sweet spot empírico: **2-3 refs do produto** (mais que 3 começa a piorar)
+
+### Critérios de seleção (em ordem de prioridade)
+
+1. **🎨 Cor bate com filamento alvo** — TOP prioridade. Se vamos imprimir em PETG **Branco**, refs do produto em **preto** confundem mais que ajudam (modelo tende a misturar tons). Excluir refs com cor obviamente errada.
+
+2. **📐 Clareza da forma** — ângulo claro, produto NÃO ocluído por outros objetos, fundo limpo o suficiente pra silhueta ficar legível.
+
+3. **🔄 Complementaridade entre as escolhidas** — não escolher 3 refs do mesmo ângulo. Idealmente: 1 vista real do produto impresso (textura FDM verdadeira) + 1 render 3D limpo (topologia sem ruído) + opcionalmente 1 vista em uso (se mostrar contexto útil).
+
+4. **📸 Qualidade técnica** — boa resolução, bem iluminada, sem blur/tremida. Refs <500x500px raramente ajudam.
+
+5. **🚫 Sem distractores** — refs com elementos prominentes que NÃO devem aparecer na geração final (outras pessoas, marcas concorrentes, cores conflitantes) podem ser incorporados pelo modelo. Excluir ou recortar antes.
+
+### Tipos de ref e quando preferir cada um
+
+| Tipo | Origem típica | Quando preferir | Quando descartar |
+|---|---|---|---|
+| Render 3D limpo | MODELO_3D (MakerWorld, Printables) | Topologia/forma incomum, produto sem viés de cor | Quando a forma é trivial e o produto real já dá tudo |
+| Foto produto impresso (cor certa) | INSPIRACAO do usuário | Captura textura FDM real + cor correta | Quando foto está borrada / mal iluminada |
+| Foto produto impresso (cor errada) | INSPIRACAO de loja Shopee | Só se for a ÚNICA disponível — senão descartar | Sempre que existir alternativa em cor certa |
+| Foto em uso/contexto | INSPIRACAO ou modelo3d | Quando o produto SOZINHO não comunica a função (ex: bracket under-desk só faz sentido com a fonte dentro) | Quando o uso traz objetos não-queremos no resultado (logos de marca, etc) |
+
+### Documentação obrigatória no `_meta.json`
+
+Sempre registrar a decisão pra rastreabilidade. Campo `refsSelecionadas` (lista de objetos com `arquivo` + `motivo`) e `refsDescartadas` (mesma estrutura). Ver template em G.3 passo 6.
+
+Se TODAS as refs disponíveis caem em "descartar" (raro mas possível), **avisar o usuário** antes de gerar — provavelmente faltou upload de ref decente no Hub.
+
+### Heurística pra Modo F (chamado pela /gerar-post)
+
+Quando Modo F recebe `slug` do produto, ele:
+1. Lista `Documents/Mahou Prints/products/{slug}/referencias/*` (refs locais já baixadas em sessões anteriores)
+2. Aplica análise+seleção descrita acima (filamento alvo passado como param)
+3. Anexa background + refs selecionadas
+
+Se não houver refs locais (slug novo), abortar com mensagem clara — Modo F não baixa do Hub (isso é Modo G).
+
 ## Seleção automática de cenário (OBRIGATÓRIA antes de gerar)
 
 Antes de criar projeto Flow para um produto, **identifique a categoria** dele e selecione o cenário correto. A regra está em `content/imagegen/templates/template.json` na chave `mapeamento_produto_cena` e `como_selecionar_cena`. Resumo:
@@ -131,6 +177,54 @@ Cenas como `kitchen_sage_oak_marble` (5 backgrounds) e `bathroom_modern_black_ma
    - **wall (kitchen) / closeup (bathroom)** pra produtos clean/minimalistas (mais leve)
 6. **Em dúvida real**, perguntar ao usuário ANTES de gerar — não chutar.
 
+## Declaração de ângulo da CÂMERA no prompt (complementar à seleção de background)
+
+Diferente da seção acima (que escolhe **background**), aqui o foco é **declarar EXPLICITAMENTE no prompt o ângulo que a câmera vai assumir** — Nano Banana inventa ângulos estranhos quando isso fica implícito. Sintoma: produto top-down sai em 3/4 oblíquo confuso, produto alto vira top-down esmagado.
+
+**Pipeline:** durante a análise visual de refs (passo G.3.5 do Modo G ou passo 3 do Modo F), infira o ângulo dominante das refs e categorize o produto. Declare o ângulo escolhido EXPLICITAMENTE no prompt, em CAPS, no início do bloco `CAMERA AND LENS`.
+
+| Categoria de produto | Ângulo padrão | Sinal nas refs |
+|---|---|---|
+| Carimbo, cortador, marca-página, polaroid, peça plana decorativa | **TOP-DOWN VIEW (90° from above)** | Maioria das refs em top-down; produto é lido pela face superior (estampa/recorte/texto); uso = mão chega de cima |
+| Vaso, abajur, lamp, copo, suporte vertical, miniatura/figure | **3/4 FRONT ANGLE (~30° elevation)** | Refs mostram altura significativa + silhueta lateral importante |
+| Anel, gancho, clipe, peça que pendura | **STRICT PROFILE/SIDE VIEW** | Função é lateral; top view esconde a alça/anel |
+| Cesta, organizador, bandeja com conteúdo | **HIGH 3/4 (45-60° from above)** | Refs mostram interior + ao redor |
+| Suporte de parede / under-desk bracket | **WORM'S EYE (low angle)** | Refs mostram como instala/segura por baixo |
+
+**Frases pro prompt** (use literalmente — Nano Banana responde bem a caps):
+
+- Top-down:
+  > `CAMERA ANGLE: STRICT TOP-DOWN VIEW (90 degrees from directly above the product). The camera looks STRAIGHT DOWN onto the [product]. The [hero feature on top face] is the hero element — fully visible, parallel to the lens. The handle/base/sides are NOT visible from this angle. This is a flat-lay composition.`
+
+- 3/4 front:
+  > `CAMERA ANGLE: 3/4 FRONT ANGLE at 30 degrees elevation. The product profile and front face are both visible. NOT a top-down shot, NOT a strict side profile.`
+
+- Profile/side:
+  > `CAMERA ANGLE: STRICT PROFILE / SIDE VIEW at eye level. The product silhouette is fully visible from one side. NOT 3/4, NOT top-down.`
+
+- High 3/4:
+  > `CAMERA ANGLE: HIGH 3/4 ANGLE at 50 degrees elevation. The camera looks down into the [product interior] while keeping some of the side profile visible. NOT a strict top-down.`
+
+**Quando override:** se o usuário pede explicitamente outro ângulo ("quero um hero diferente do padrão"), o pedido manda. Em batch autônomo (Modo D/G), default = ângulo inferido das refs.
+
+**Aprendizado registrado em memória global**: `feedback_imagegen_camera_angle.md` (criado 2026-05-24 após hero do Kit Carimbos sair em 3/4 quando devia ser top-down).
+
+## Direção do relevo (CRÍTICO para produtos de carimbar/moldar)
+
+Em **TODO produto com função de carimbar/moldar/estampar** (cookie stamps, cookie cutters com detalhe interno, moldes), o desenho na face funcional **DEVE estar em RELEVO POSITIVO** (raised/protruding/embossed), nunca recessed/engraved. Quando pressionado, o relevo positivo deixa a marca deprimida na massa — o oposto fere a credibilidade do produto.
+
+❌ **NÃO use no prompt**: "engraved/recessed/depressed/etched into the face", "carved out shape"
+
+✅ **Use literalmente**:
+> `DESIGN ON FUNCTIONAL FACE: the [fruit/shape] is in POSITIVE RELIEF — raised/protruding/embossed from the flat face like a stamp design that imprints itself onto soft surfaces. The shape stands proud above the surrounding flat surface, ~0.8mm raised, with crisp edges, ready to press down and leave its mark.`
+
+Reforçar no AVOID:
+> `AVOID: NO recessed/engraved/sunken design — the shape must be RAISED above the flat face, not carved into it.`
+
+**Categorias onde aplicar**: carimbos, cortadores com detalhe interno, moldes, selos. **Quando NÃO aplicar** (engraving estético é correto): placas decorativas, painéis com baixo-relevo, caixas com nome gravado.
+
+**Aprendizado registrado**: `feedback_imagegen_relief_direction.md` (criado 2026-05-24 após 4 rodadas erradas no Kit Carimbos com desenho afundado).
+
 ## Modos de operação
 
 A skill tem **7 modos**. O usuário pode invocar qualquer um, ou a skill detecta pela situação:
@@ -162,15 +256,16 @@ Modo cirúrgico pra gerar **1 imagem específica** a partir de descrição pront
 
 1. **Setup do Flow** (skip se já aberto)
 2. **Verifica config** (Nano Banana Pro + 1:1 + x4 default)
-3. **Upload BATCH** (2 arquivos):
-   - Background do cenário correto (`content/imagegen/templates/cenas/{cena}/background.jpeg`)
-   - Imagem de referência do produto (`Documents/Mahou Prints/products/{slug}/referencias/*` ou imagem existente)
-4. **Anexa ingredientes via "Incluir no comando"** (ordem: background primeiro, produto segundo)
-5. **Digita o prompt** (parágrafo único, sem `\n` — usar separadores tipo "CAMERA:", "LIGHTING:", "PRODUCT:")
-6. **Gera** (Enter)
-7. **Espera download das 4 variações**
-8. **Salva** em `content/instagram/posts/{post-slug}/imagens/variacoes/` com nomes `{slide-name}_var{1-4}.jpeg`
-9. **Retorna lista de paths** pra `/gerar-post` atualizar o producao.md
+3. **Selecionar refs do produto** (ver seção `## Análise e seleção de referências` mais abaixo) — 1 a 3 refs complementares, baseado em cor do filamento alvo + clareza/ângulo + complementaridade.
+4. **Upload BATCH** (2-4 arquivos):
+   - Background do cenário correto (`content/imagegen/templates/cenas/{cena}/background.jpeg`) — SEMPRE primeiro
+   - 1-3 refs do produto selecionadas no passo 3 (caminhos absolutos)
+5. **Anexa ingredientes via "Incluir no comando"** (ordem: background primeiro, depois refs do produto em sequência)
+6. **Digita o prompt** (parágrafo único, sem `\n` — usar separadores tipo "CAMERA:", "LIGHTING:", "PRODUCT:")
+7. **Gera** (Enter)
+8. **Espera download das 4 variações**
+9. **Salva** em `content/instagram/posts/{post-slug}/imagens/variacoes/` com nomes `{slide-name}_var{1-4}.jpeg`
+10. **Retorna lista de paths** pra `/gerar-post` atualizar o producao.md
 
 **Diferenças Modo F vs Modo A:**
 | Aspecto | Modo A (batch geral) | Modo F (single-prompt) |
@@ -253,13 +348,13 @@ Pergunta direta: **"Quais dos PRONTOS quer gerar agora? 1, 2, todos, nenhum?"**
 Quando produtos estão na lista BLOQUEADOS, o user precisa fazer upload manual antes. Skill mostra:
 
 ```bash
-# Via API (1 imagem):
+# Via API (1 imagem) — IMPORTANTE: field é `arquivos` (plural) e origem vai na QUERY STRING:
 source mcp-servers/mahou-hub/.env.local
-curl -X POST "$MAHOU_API_URL/api/v1/produtos/$PRODUTO_ID/imagens" \
+curl -X POST "$MAHOU_API_URL/api/v1/produtos/$PRODUTO_ID/imagens?origem=INSPIRACAO" \
   -H "Authorization: Bearer $MAHOU_API_TOKEN" \
-  -F "arquivo=@caminho/da/inspiracao.jpg" \
-  -F "origem=INSPIRACAO"
+  -F "arquivos=@caminho/da/inspiracao.jpg"
 ```
+**Erro comum**: usar `arquivo` (singular) ou passar `origem` como form field — backend retorna 400 "Unexpected field" ou cai no default `origem=OUTRA`.
 
 Ou via UI: `hub.mahouprints.com/produtos/$PRODUTO_ID` → card Imagens → upload com origem=INSPIRACAO.
 
@@ -273,7 +368,7 @@ Ou via UI: `hub.mahouprints.com/produtos/$PRODUTO_ID` → card Imagens → uploa
 
 3. **Criar pasta local**: `Documents/Mahou Prints/products (em revisão)/<slug>/` + `referencias/`.
 
-4. **Baixar APENAS imagens upadas no Hub** (origem=INSPIRACAO ou MODELO_3D):
+4. **Baixar TODAS as imagens upadas no Hub** (origem=INSPIRACAO ou MODELO_3D):
    ```bash
    # Pra cada img de p.imagens onde origem ∈ {INSPIRACAO, MODELO_3D}:
    curl -L -o "referencias/inspiracao_${i}.jpg" "${img.arquivo}"
@@ -281,7 +376,12 @@ Ou via UI: `hub.mahouprints.com/produtos/$PRODUTO_ID` → card Imagens → uploa
    ```
    **NÃO** tenta baixar do `inspiracao` (URL textual Shopee) nem do `modelo3dUrl` — esses são links pra páginas externas, não imagens diretas.
 
-5. **Salvar `_meta.json`** com:
+5. **Análise visual + seleção de refs** (ver seção `## Análise e seleção de referências`):
+   - `Read` multimodal em CADA ref baixada — Claude enxerga e avalia
+   - Selecionar 1-3 refs complementares baseado em **cor do filamento alvo**, **clareza/ângulo**, **complementaridade** e **qualidade técnica**
+   - Documentar em `_meta.json` quais foram selecionadas e por quê (campo `refsSelecionadas` + `refsDescartadas`)
+
+6. **Salvar `_meta.json`** com:
    ```json
    {
      "produtoId": "cuid-do-hub",
@@ -289,22 +389,29 @@ Ou via UI: `hub.mahouprints.com/produtos/$PRODUTO_ID` → card Imagens → uploa
      "filamento": "PLA Preto Matte",
      "dimensoes": "8x4x12 cm",
      "cenarioEscolhido": "bathroom_modern_black_marble",
-     "criadoEm": "2026-05-23T..."
+     "criadoEm": "2026-05-23T...",
+     "refsSelecionadas": [
+       {"arquivo": "referencias/inspiracao_3.jpg", "motivo": "forma clara + escala da mão + cor preta matte (bate com filamento)"},
+       {"arquivo": "referencias/modelo3d_0.jpg", "motivo": "render 3D limpo mostrando topologia sem ruído"}
+     ],
+     "refsDescartadas": [
+       {"arquivo": "referencias/inspiracao_1.jpg", "motivo": "foto escura, baixa qualidade, cabos ocluem o produto"}
+     ]
    }
    ```
 
-6. **Heurística de cenário** (consulta `content/imagegen/templates/template.json`):
+7. **Heurística de cenário** (consulta `content/imagegen/templates/template.json`):
    - Aplica `mapeamento_produto_cena` cruzando palavras-chave do nome com `categorias_produto` de cada cena
    - Ex: "porta-escova" / "suporte papel higiênico" → `bathroom_modern_black_marble`
    - Ex: "abajur" / "luminária" → `dark_moody_premium`
    - Ex: produto decorativo genérico → `wooden_warm_cozy` (default)
    - **Se ambíguo (mais de 1 cena candidata ou nenhuma)**: pergunta ao usuário pra esse produto
 
-7. **Invocar Modo F**: passa prompt montado (template padrão Mahou + dados do produto) + cenário + slug + pasta `Documents/Mahou Prints/products (em revisão)/<slug>/variacoes/`.
+8. **Invocar Modo F**: passa prompt montado (template padrão Mahou + dados do produto) + cenário + slug + **paths das refs selecionadas no passo 5** + pasta `Documents/Mahou Prints/products (em revisão)/<slug>/variacoes/`.
 
-8. **Aguarda 4 variações** geradas pelo Modo F.
+9. **Aguarda 4 variações** geradas pelo Modo F.
 
-9. **Pergunta qual aprovar**: "var1/var2/var3/var4? (ou 'regerar')"
+10. **Pergunta qual aprovar**: "var1/var2/var3/var4? (ou 'regerar')"
 
 #### G.4 — Após aprovação (auto-upload + salva local)
 
@@ -312,20 +419,61 @@ Pra cada produto aprovado:
 
 1. **Salva final local**: copia variação escolhida pra `Documents/Mahou Prints/products/<slug>/hero.jpeg` + arquiva variações em `variacoes/`.
 
-2. **Upload pro Hub (via curl multipart)**:
+2. **Upload pro Hub (via curl multipart)** — campo é `arquivos` (plural) e `origem` vai na QUERY STRING:
    ```bash
    source mcp-servers/mahou-hub/.env.local  # carrega MAHOU_API_TOKEN
-   curl -X POST "$MAHOU_API_URL/api/v1/produtos/$PRODUTO_ID/imagens" \
+   curl -X POST "$MAHOU_API_URL/api/v1/produtos/$PRODUTO_ID/imagens?origem=GERADA" \
      -H "Authorization: Bearer $MAHOU_API_TOKEN" \
-     -F "arquivo=@Documents/Mahou Prints/products/<slug>/hero.jpeg" \
-     -F "origem=GERADA"
+     -F "arquivos=@Documents/Mahou Prints/products/<slug>/hero.jpeg"
    ```
-   (Endpoint multipart — MCP tools não suportam upload de arquivo binário, então skill usa curl direto.)
+   (Endpoint multipart — MCP tools não suportam upload de arquivo binário, então skill usa curl direto. **Erro comum**: `arquivo` singular ou `origem` como form field → 400 "Unexpected field" ou default `origem=OUTRA`.)
 
 3. **Atualiza `_meta.json`** marcando `imagemFinalSubidaPraHub: true` + timestamp.
 
-4. **NÃO marca anunciado=true automaticamente**. Isso é ato deliberado humano após publicação real no marketplace. Skill só lembra:
+4. **Gerar 4 cenários complementares** (NOVO PADRÃO — ver G.4.5 abaixo).
+
+5. **NÃO marca anunciado=true automaticamente**. Isso é ato deliberado humano após publicação real no marketplace. Skill só lembra:
    > "✅ N imagens uploaded pro Hub. Quando publicar no marketplace, roda `marcar produtos anunciados` com os ids: [...] pra fechar o loop."
+
+#### G.4.5 — Cenários complementares (META: 5+ imagens/produto)
+
+Após hero aprovada + uploaded, **continuar a sessão gerando 4 cenários complementares** baseados na hero como ref de qualidade. Total no Hub: 1 hero + 4 cenários = 5 imagens GERADA.
+
+**Pipeline:**
+
+1. **Upload a hero como nova ref no projeto Flow** (cima a qualidade visual já validada) — segunda ref principal pros próximos prompts
+2. **Pra cada um dos 4 cenários** (sequencial):
+   - Anexar bg + hero como refs principais
+   - Prompt focado no cenário (composição + ângulo + ação)
+   - Gerar x4 variações
+   - Auto-revisão Q4 + apresentar pro user escolher
+   - Salvar `cenarioN_<descricao>.jpeg` localmente + arquivar variações
+   - Upload pro Hub com `?origem=GERADA`
+
+**Template padrão dos 4 cenários** (kit/produto-com-variações):
+
+| Cenário | Foco | Composição |
+|---|---|---|
+| **Cen 2: TOP-DOWN kit** | mostra todas as variações de design do produto | flat-lay 90° das peças + 2-3 exemplares do resultado |
+| **Cen 3: hand + resultado A** | close-up do resultado em uso | mão segura resultado (sabor/variante 1), carimbos/peças MAHOU defocados ao fundo c/ diferentes designs |
+| **Cen 4: hand + resultado B** | mesmo padrão, variar sabor/cor | mão segura resultado (sabor/variante 2), mesmo background pattern |
+| **Cen 5: hand + resultado C** | mesmo padrão, variar de novo | mão segura resultado (sabor/variante 3), mesmo background pattern |
+
+**Template enxuto pro prompt close-up hold** (ver memória `feedback-imagegen-prompts-simplificados`):
+
+```
+CENARIO <FRUTA> HOLD: 3/4 ANGLE macro shot of a HAND (adult, neat nails, NO rings) holding ONE single <RESULTADO COM ESTAMPA> in its <container> between thumb and index, lifted toward camera. The <resultado> shows a CLEAR <DESIGN> imprint on its top.
+On the wooden table BELOW and BEHIND, 5-7 of our white MAHOU 3D-printed stamps with DIFFERENT designs (list 5-7 das variações) SCATTERED, SOFTLY OUT OF FOCUS.
+Same scene as <ref>. CAMERA: Sony 90mm f/2.8 macro, 55% frame on hand+resultado, shallow DOF — resultado tack-sharp, stamps blurred but recognizable as variety.
+LIGHTING: warm key + soft sidelight.
+AVOID: NO single resultado alone, NO sharp focus on background stamps, NO color other than white on stamps, NO rings, NO face.
+```
+
+**Pra produtos únicos (sem kit/variações)** — adaptar: hero + macro detalhe + em uso + lifestyle = 4 imagens basta.
+
+**Se hero não ficou boa**: ANTES de avançar pros 4 cenários, regerar até ter hero forte (forma correta, cor correta, ação clara). Não economize rodadas no hero — é a foundation pros outros 4.
+
+Aprendizado registrado: `feedback_imagegen_5_imagens_padrao.md`.
 
 #### G.5 — Resumo final
 
@@ -342,6 +490,23 @@ Pra cada produto aprovado:
 📋 Lembrete: 5 produtos na Categoria B já estão prontos pra anunciar.
    Não esquecer de marcar anunciado=true via `marcar_produtos_anunciados` após publicar.
 ```
+
+### Princípios de prompt pro Nano Banana Pro (validado em 2026-05-24)
+
+Sempre que possível, mantenha prompts enxutos (~500-700 chars). Prompts longos (2000+) saturam o modelo. Foque em 5 blocos: **ÂNGULO + MATERIAL + FORMA + CENA + AÇÃO**. Bloco AVOID enxuto (3-5 itens). Cada bloco em 1 linha, separados por separadores tipo `CAMERA:`, `LIGHTING:`, `AVOID:`. Detalhe completo em `feedback_imagegen_prompts_simplificados.md`.
+
+### Pool de contas Google pro Flow
+
+O acesso ao Nano Banana Pro vem com a assinatura Google AI Pro. Quando uma conta dá erro/quota/throttle (já aconteceu — Nano Banana esteve instável em 2026-05-24), trocar pra outra conta da pool resolve.
+
+**Contas atuais na pool:**
+- `icaroberger00@gmail.com` (Chrome profile `Default` em `/Users/gabrielberger/ImageGen/playwright-profile/Default/`)
+- `mahouprints@gmail.com` (Chrome profile `Profile 1` no mesmo userDataDir — usado pelo MCP atual via `--config /Users/gabrielberger/ImageGen/playwright-mcp.config.json` que passa `--profile-directory=Profile 1` ao Chrome)
+- `gabrielbfbr1@gmail.com` (terceira conta — Chrome profile separado, ainda não configurada na pool do Playwright)
+
+Pra alternar de conta na pool: editar `~/ImageGen/playwright-mcp.config.json` trocando `--profile-directory=Profile 1` pelo nome do profile desejado, e reconectar MCP via `/mcp`.
+
+Pra trocar de conta no Flow: clicar no avatar de perfil (canto superior direito) → "Adicionar outra conta" se primeira vez, ou selecionar a outra já logada. Recarregar Flow → projetos da nova conta aparecem.
 
 **Critérios de match nome→cenário (heurística):**
 
