@@ -5,7 +5,7 @@ import { Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const MIMES_ACEITOS = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/avif'];
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 100 * 1024 * 1024;
 
 interface Props {
   onArquivos: (arquivos: File[]) => void;
@@ -86,7 +86,7 @@ export function UploadDropzone({
         <Upload className="h-5 w-5" />
         <span className="text-center">{label}</span>
         <span className="text-xs text-muted-foreground/70">
-          JPG, PNG, WebP, HEIC ou AVIF · máx. 10MB cada
+          JPG, PNG, WebP, HEIC ou AVIF · máx. 100MB cada
         </span>
       </div>
       <input

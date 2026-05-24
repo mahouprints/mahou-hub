@@ -11,7 +11,9 @@ import { MediaUrlService } from './media-url.service';
     // só persiste o resultado final em disco (sem arquivo temporário).
     MulterModule.register({
       storage: memoryStorage(),
-      limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+      // 100MB/arquivo é teto pragmático pra uso pessoal — fotos de celular/câmera
+      // raramente passam disso. Sharp normaliza tudo pra ~500KB-2MB no final.
+      limits: { fileSize: 100 * 1024 * 1024, files: 10 },
     }),
   ],
   providers: [ImagensService, MediaUrlService],

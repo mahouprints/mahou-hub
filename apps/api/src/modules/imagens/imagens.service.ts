@@ -13,8 +13,8 @@ import type { OrigemImagem, ProdutoImagem, ProdutoImagemUpdate } from '@mahou-hu
 import { PrismaService } from '../../prisma/prisma.service';
 import { MediaUrlService } from './media-url.service';
 
-/** Limite por arquivo + total — bate com o que o multer rejeita upstream. */
-const MAX_IMAGEM_BYTES = 10 * 1024 * 1024; // 10MB
+/** Limite por arquivo — bate com o multer upstream. 100MB cobre fotos brutas de celular/DSLR. */
+const MAX_IMAGEM_BYTES = 100 * 1024 * 1024; // 100MB
 
 /** Mime types aceitos no upload. Tudo é normalizado pra JPG depois do sharp. */
 const MIMES_ACEITOS = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/avif']);
