@@ -8,10 +8,20 @@ export const FilamentoSchema = z.object({
   potenciaH2cW: z.number().int().nonnegative(),
   observacao: z.string().nullable(),
   ativo: z.boolean(),
+  // Saldo em gramas (somente leitura — muda via movimento de estoque).
+  estoqueGramas: z.number().nonnegative(),
+  // Limiar de alerta de reposição, em gramas.
+  estoqueMinGramas: z.number().nonnegative(),
 });
 
-export const FilamentoCreateSchema = FilamentoSchema.omit({ id: true, ativo: true }).extend({
+export const FilamentoCreateSchema = FilamentoSchema.omit({
+  id: true,
+  ativo: true,
+  estoqueGramas: true,
+  estoqueMinGramas: true,
+}).extend({
   ativo: z.boolean().default(true),
+  estoqueMinGramas: z.number().nonnegative().optional(),
 });
 
 export const FilamentoUpdateSchema = FilamentoCreateSchema.partial();

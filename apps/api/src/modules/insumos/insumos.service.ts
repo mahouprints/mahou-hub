@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { InsumoCreate, InsumoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -13,25 +14,31 @@ export class InsumosService {
    */
   async list(incluirInativos = false) {
     const where = incluirInativos ? {} : { ativo: true };
-    return this.prisma.insumo.findMany({
+    const insumos = await this.prisma.insumo.findMany({
       where,
       orderBy: { nome: 'asc' },
       include: { _count: { select: { produtos: true } } },
     });
+    return insumos.map((i) => this.toDto(i));
   }
 
   async get(id: string) {
     const i = await this.prisma.insumo.findUnique({ where: { id } });
     if (!i) throw new NotFoundException(`Insumo ${id} não existe`);
-    return i;
+    return this.toDto(i);
   }
 
-  create(data: InsumoCreate) {
-    return this.prisma.insumo.create({ data });
+  async create(data: InsumoCreate) {
+    return this.toDto(await this.prisma.insumo.create({ data }));
   }
 
-  update(id: string, data: InsumoUpdate) {
-    return this.prisma.insumo.update({ where: { id }, data });
+  async update(id: string, data: InsumoUpdate) {
+    return this.toDto(await this.prisma.insumo.update({ where: { id }, data }));
+  }
+
+  // Decimal (estoque) vira number na borda — UI não recebe string.
+  private toDto<T extends { estoqueAtual: Prisma.Decimal; estoqueMinimo: Prisma.Decimal }>(i: T) {
+    return { ...i, estoqueAtual: Number(i.estoqueAtual), estoqueMinimo: Number(i.estoqueMinimo) };
   }
 
   /** Soft-delete: produtos antigos podem referenciar e queremos preservar histórico. */

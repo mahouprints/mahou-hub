@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'r
 import { Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const MIMES_ACEITOS = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/avif'];
+const MIMES_IMG_PADRAO = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/avif'];
 const MAX_BYTES = 100 * 1024 * 1024;
 
 interface Props {
@@ -13,6 +13,10 @@ interface Props {
   /** Texto exibido no estado idle. Default: "Arraste, clique ou cole (Ctrl+V) pra enviar". */
   label?: string;
   multiplos?: boolean;
+  /** Mime types aceitos. Default: imagens. Recibos passam imagens + application/pdf. */
+  mimes?: string[];
+  /** Subtítulo descritivo. Default fala de imagens. */
+  descricao?: string;
 }
 
 /**
@@ -25,6 +29,8 @@ export function UploadDropzone({
   disabled,
   label = 'Arraste, clique ou cole (Ctrl+V) pra enviar',
   multiplos = true,
+  mimes = MIMES_IMG_PADRAO,
+  descricao = 'JPG, PNG, WebP, HEIC ou AVIF · máx. 100MB cada',
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [arrastando, setArrastando] = useState(false);
@@ -35,7 +41,7 @@ export function UploadDropzone({
     const arquivos: File[] = [];
     const rejeitados: string[] = [];
     Array.from(lista).forEach((f) => {
-      if (!MIMES_ACEITOS.includes(f.type)) {
+      if (!mimes.includes(f.type)) {
         rejeitados.push(`${f.name} (tipo ${f.type || 'desconhecido'})`);
         return;
       }
@@ -56,7 +62,6 @@ export function UploadDropzone({
   // Paste global: enquanto o dropzone está montado, Ctrl+V em qualquer lugar
   // da página captura imagens do clipboard. NÃO atrapalha paste de texto em
   // inputs — clipboard items só são tratados quando kind==='file' + type=image/*.
-  // Screenshots colam como image/png com nome "image.png" gerado pelo browser.
   useEffect(() => {
     if (disabled) return;
     function onPaste(e: ClipboardEvent) {
@@ -71,7 +76,6 @@ export function UploadDropzone({
       }
       if (arquivos.length === 0) return; // não era imagem, deixa o paste seguir
       e.preventDefault();
-      // Reusa processar() via DataTransfer pra manter validação consistente.
       const dt = new DataTransfer();
       arquivos.forEach((f) => dt.items.add(f));
       processar(dt.files);
@@ -89,7 +93,6 @@ export function UploadDropzone({
 
   function onSelect(e: ChangeEvent<HTMLInputElement>) {
     processar(e.target.files);
-    // permite re-selecionar o mesmo arquivo
     e.target.value = '';
   }
 
@@ -113,14 +116,12 @@ export function UploadDropzone({
       >
         <Upload className="h-5 w-5" />
         <span className="text-center">{label}</span>
-        <span className="text-xs text-muted-foreground/70">
-          JPG, PNG, WebP, HEIC ou AVIF · máx. 100MB cada
-        </span>
+        <span className="text-xs text-muted-foreground/70">{descricao}</span>
       </div>
       <input
         ref={inputRef}
         type="file"
-        accept={MIMES_ACEITOS.join(',')}
+        accept={mimes.join(',')}
         multiple={multiplos}
         className="hidden"
         onChange={onSelect}

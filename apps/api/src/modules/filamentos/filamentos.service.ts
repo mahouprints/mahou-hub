@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type { FilamentoCreate, FilamentoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -6,22 +7,32 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class FilamentosService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.filamento.findMany({ orderBy: { nome: 'asc' } });
+  async list() {
+    const filamentos = await this.prisma.filamento.findMany({ orderBy: { nome: 'asc' } });
+    return filamentos.map((f) => this.toDto(f));
   }
 
   async get(id: string) {
     const f = await this.prisma.filamento.findUnique({ where: { id } });
     if (!f) throw new NotFoundException(`Filamento ${id} não existe`);
-    return f;
+    return this.toDto(f);
   }
 
-  create(data: FilamentoCreate) {
-    return this.prisma.filamento.create({ data });
+  async create(data: FilamentoCreate) {
+    return this.toDto(await this.prisma.filamento.create({ data }));
   }
 
-  update(id: string, data: FilamentoUpdate) {
-    return this.prisma.filamento.update({ where: { id }, data });
+  async update(id: string, data: FilamentoUpdate) {
+    return this.toDto(await this.prisma.filamento.update({ where: { id }, data }));
+  }
+
+  // Decimal (gramas) vira number na borda — UI não recebe string.
+  private toDto<T extends { estoqueGramas: Prisma.Decimal; estoqueMinGramas: Prisma.Decimal }>(f: T) {
+    return {
+      ...f,
+      estoqueGramas: Number(f.estoqueGramas),
+      estoqueMinGramas: Number(f.estoqueMinGramas),
+    };
   }
 
   /** Filamento nunca é deletado (produtos antigos podem referenciá-lo) — só desativado. */

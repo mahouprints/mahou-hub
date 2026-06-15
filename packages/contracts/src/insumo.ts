@@ -7,10 +7,20 @@ export const InsumoSchema = z.object({
   custoUnitarioCentavos: z.number().int().positive(),
   observacao: z.string().nullable(),
   ativo: z.boolean(),
+  // Saldo na unidade do insumo (somente leitura — muda via movimento de estoque).
+  estoqueAtual: z.number().nonnegative(),
+  // Limiar de alerta de reposição.
+  estoqueMinimo: z.number().nonnegative(),
 });
 
-export const InsumoCreateSchema = InsumoSchema.omit({ id: true, ativo: true }).extend({
+export const InsumoCreateSchema = InsumoSchema.omit({
+  id: true,
+  ativo: true,
+  estoqueAtual: true,
+  estoqueMinimo: true,
+}).extend({
   ativo: z.boolean().default(true),
+  estoqueMinimo: z.number().nonnegative().optional(),
 });
 
 export const InsumoUpdateSchema = InsumoCreateSchema.partial();

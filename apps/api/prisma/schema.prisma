@@ -99,6 +99,21 @@ enum OportunidadeStatus {
   VIRARAM_PRODUTO
 }
 
+enum TipoItemEstoque {
+  PRODUTO
+  FILAMENTO
+  INSUMO
+}
+
+enum MotivoMovimento {
+  ESTOQUE_INICIAL
+  COMPRA
+  PRODUCAO
+  VENDA
+  AJUSTE
+  PERDA
+}
+
 model Usuario {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -107,16 +122,22 @@ model Usuario {
 }
 
 model Filamento {
-  id              String    @id @default(cuid())
-  nome            String    @unique
-  custoKgCentavos Int
-  potenciaA1W     Int
-  potenciaH2cW    Int
-  observacao      String?
-  ativo           Boolean   @default(true)
-  produtos        Produto[]
-  criadoEm        DateTime  @default(now())
-  atualizadoEm    DateTime  @updatedAt
+  id               String             @id @default(cuid())
+  nome             String             @unique
+  custoKgCentavos  Int
+  potenciaA1W      Int
+  potenciaH2cW     Int
+  observacao       String?
+  ativo            Boolean            @default(true)
+  // Estoque do rolo em gramas; baixa automática quando um job de produção é confirmado.
+  estoqueGramas    Decimal            @default(0) @db.Decimal(10, 2)
+  // Alerta de reposição: avisa quando estoqueGramas <= estoqueMinGramas.
+  estoqueMinGramas Decimal            @default(0) @db.Decimal(10, 2)
+  produtos         Produto[]
+  variacoes        ProdutoVariacao[]
+  movimentos       MovimentoEstoque[]
+  criadoEm         DateTime           @default(now())
+  atualizadoEm     DateTime           @updatedAt
 }
 
 model Produto {
@@ -151,6 +172,7 @@ model Produto {
   insumos           ProdutoInsumo[]
   imagens           ProdutoImagem[]
   oportunidades     ProdutoOportunidade[]
+  variacoes         ProdutoVariacao[]
   criadoEm          DateTime              @default(now())
   atualizadoEm      DateTime              @updatedAt
 }
@@ -158,15 +180,19 @@ model Produto {
 /// Insumo reutilizável usado em vários produtos (caixa, fita, etiqueta).
 /// Soft-delete via ativo=false — produtos antigos referenciam insumos antigos.
 model Insumo {
-  id                    String          @id @default(cuid())
-  nome                  String          @unique
+  id                    String             @id @default(cuid())
+  nome                  String             @unique
   unidade               String // texto livre: "un", "m", "kg", "ml"
   custoUnitarioCentavos Int
   observacao            String?
-  ativo                 Boolean         @default(true)
+  ativo                 Boolean            @default(true)
+  // Estoque na unidade do campo `unidade` (frações: 1.5 m de fita, 0.25 kg).
+  estoqueAtual          Decimal            @default(0) @db.Decimal(10, 3)
+  estoqueMinimo         Decimal            @default(0) @db.Decimal(10, 3)
   produtos              ProdutoInsumo[]
-  criadoEm              DateTime        @default(now())
-  atualizadoEm          DateTime        @updatedAt
+  movimentos            MovimentoEstoque[]
+  criadoEm              DateTime           @default(now())
+  atualizadoEm          DateTime           @updatedAt
 }
 
 /// Pivot Produto↔Insumo com quantidade consumida por unidade de produto.
@@ -364,20 +390,20 @@ model ProdutoOportunidade {
   /// itemId Shopee, productId TikTok etc. String pra acomodar BigInt/UUID/etc.
   externalId  String
 
-  productName        String
-  priceMinCentavos   Int
-  priceMaxCentavos   Int
-  imageUrl           String
-  productLink        String
+  productName       String
+  priceMinCentavos  Int
+  priceMaxCentavos  Int
+  imageUrl          String
+  productLink       String
   /// `sales` da Shopee Affiliate normalizado pra base mensal — NÃO histórico total. Antes inflava com 1/0.05; agora é só sales do afiliado projetado pra 30 dias.
-  vendasAfiliadoMes  Int
+  vendasAfiliadoMes Int
   /// Vendas totais reais (enriquecimento manual via Seller Center, opcional). Null = ainda não preenchido.
-  vendasReais        Int?
-  ratingStar         Decimal? @db.Decimal(3, 2)
+  vendasReais       Int?
+  ratingStar        Decimal? @db.Decimal(3, 2)
   /// IDs de categoria no marketplace (genérico — Shopee usa productCatIds).
-  categoriaIds       Int[]
-  lojaExternalId     String?
-  lojaNome           String?
+  categoriaIds      Int[]
+  lojaExternalId    String?
+  lojaNome          String?
 
   fonte             OportunidadeFonte
   /// keyword, catId ou outro parâmetro que originou a oportunidade.
@@ -448,3 +474,79 @@ model JobProducao {
   @@index([dataInicio])
 }
 
+/// Variação vendável de um Produto (ex.: cor). Cada variação tem SKU próprio,
+/// pode sobrescrever filamento (cor) e preço, e carrega o estoque de peças prontas.
+/// SKU é a chave que casa o item do pedido do marketplace com a variação certa.
+model ProdutoVariacao {
+  id            String             @id @default(cuid())
+  produtoId     String
+  produto       Produto            @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  nome          String
+  sku           String             @unique
+  // Overrides opcionais — quando null, herda do Produto.
+  filamentoId   String?
+  filamento     Filamento?         @relation(fields: [filamentoId], references: [id])
+  precoCentavos Int?
+  // Estoque de peças prontas (unidades inteiras).
+  estoqueAtual  Int                @default(0)
+  estoqueMinimo Int                @default(0)
+  ativo         Boolean            @default(true)
+  movimentos    MovimentoEstoque[]
+  criadoEm      DateTime           @default(now())
+  atualizadoEm  DateTime           @updatedAt
+
+  @@index([produtoId])
+}
+
+/// Lançamento no histórico de estoque (append-only). `quantidade` é com sinal:
+/// positivo = entrada, negativo = saída. `saldoApos` guarda o saldo do item após
+/// o lançamento (auditoria). Exatamente um dos três FKs é preenchido, conforme `tipoItem`.
+model MovimentoEstoque {
+  id                String           @id @default(cuid())
+  tipoItem          TipoItemEstoque
+  variacaoId        String?
+  variacao          ProdutoVariacao? @relation(fields: [variacaoId], references: [id], onDelete: Cascade)
+  filamentoId       String?
+  filamento         Filamento?       @relation(fields: [filamentoId], references: [id])
+  insumoId          String?
+  insumo            Insumo?          @relation(fields: [insumoId], references: [id])
+  quantidade        Decimal          @db.Decimal(12, 3)
+  saldoApos         Decimal          @db.Decimal(12, 3)
+  motivo            MotivoMovimento
+  custoUnitCentavos Int?
+  observacao        String?
+  criadoEm          DateTime         @default(now())
+
+  @@index([tipoItem, criadoEm(sort: Desc)])
+  @@index([variacaoId])
+  @@index([filamentoId])
+  @@index([insumoId])
+}
+
+/// Recibo / nota de compra. Metadados + arquivos anexados (foto ou PDF).
+model Recibo {
+  id            String          @id @default(cuid())
+  data          DateTime
+  fornecedor    String?
+  valorCentavos Int?
+  observacao    String?
+  arquivos      ReciboArquivo[]
+  criadoEm      DateTime        @default(now())
+  atualizadoEm  DateTime        @updatedAt
+
+  @@index([data(sort: Desc)])
+}
+
+/// Arquivo anexado a um Recibo (imagem ou PDF). `arquivo` é path relativo a STORAGE_DIR.
+model ReciboArquivo {
+  id           String   @id @default(cuid())
+  reciboId     String
+  recibo       Recibo   @relation(fields: [reciboId], references: [id], onDelete: Cascade)
+  arquivo      String
+  nomeOriginal String
+  mimeType     String
+  bytes        Int
+  criadoEm     DateTime @default(now())
+
+  @@index([reciboId])
+}
