@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Search } from 'lucide-react';
 import type { Filamento, Insumo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, tempoRelativo } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { cn, normalizarBusca } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -74,6 +75,7 @@ export default function EstoquePage() {
   const [aba, setAba] = useState<Aba>('saldos');
   const [mov, setMov] = useState<ItemMov | null>(null);
   const [custoEdit, setCustoEdit] = useState<Filamento | null>(null);
+  const [buscaFilamento, setBuscaFilamento] = useState('');
 
   const alertas = useQuery({
     queryKey: ['estoque', 'alertas'],
@@ -93,6 +95,10 @@ export default function EstoquePage() {
   });
 
   const filamentosAtivos = filamentos.data?.filter((f) => f.ativo) ?? [];
+  const buscaNorm = normalizarBusca(buscaFilamento.trim());
+  const filamentosFiltrados = buscaNorm
+    ? filamentosAtivos.filter((f) => normalizarBusca(f.nome).includes(buscaNorm))
+    : filamentosAtivos;
 
   return (
     <div className="space-y-6">
@@ -151,7 +157,20 @@ export default function EstoquePage() {
 
       {aba === 'saldos' && (
         <div className="space-y-6">
-          <Secao titulo="Filamentos">
+          <Secao
+            titulo="Filamentos"
+            acao={
+              <div className="relative w-56">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={buscaFilamento}
+                  onChange={(e) => setBuscaFilamento(e.target.value)}
+                  placeholder="Buscar filamento…"
+                  className="h-9 pl-8"
+                />
+              </div>
+            }
+          >
             <Table>
               <TableHeader>
                 <TableRow>
@@ -162,7 +181,7 @@ export default function EstoquePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filamentosAtivos.map((f) => {
+                {filamentosFiltrados.map((f) => {
                   const baixo = f.estoqueMinGramas > 0 && f.estoqueGramas <= f.estoqueMinGramas;
                   return (
                     <TableRow key={f.id}>
@@ -202,6 +221,13 @@ export default function EstoquePage() {
                     </TableRow>
                   );
                 })}
+                {filamentosFiltrados.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">
+                      {buscaNorm ? 'Nenhum filamento encontrado.' : 'Nenhum filamento cadastrado.'}
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </Secao>
@@ -373,12 +399,23 @@ export default function EstoquePage() {
   );
 }
 
-function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Secao({
+  titulo,
+  acao,
+  children,
+}: {
+  titulo: string;
+  acao?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="space-y-2">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {titulo}
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {titulo}
+        </h2>
+        {acao}
+      </div>
       <Card>{children}</Card>
     </section>
   );

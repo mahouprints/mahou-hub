@@ -79,3 +79,46 @@ describe('ProducaoService.mudarStatus — baixa automática de filamento', () =>
     expect(estoque.registrarMovimento).not.toHaveBeenCalled();
   });
 });
+
+describe('ProducaoService.remove — estorno de filamento ao excluir', () => {
+  // Regressão: excluir um job já impresso deixava o filamento descontado pra sempre.
+  it('devolve o filamento ao estoque quando o consumo já tinha sido registrado', async () => {
+    const { mock } = makePrismaMock();
+    mock.jobProducao.findUnique.mockResolvedValue({
+      id: 'j1',
+      qtd: 3,
+      consumoRegistrado: true,
+      produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
+    });
+    mock.jobProducao.delete.mockResolvedValue({ id: 'j1' });
+    const estoque = makeEstoqueMock();
+    const svc = new ProducaoService(asPrisma(mock), estoque);
+
+    const res = await svc.remove('j1');
+
+    // 120 × 3 = 360g de volta (sinal POSITIVO), motivo PRODUCAO, sem permitirNegativo (entrada)
+    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+      expect.objectContaining({ tipoItem: 'FILAMENTO', filamentoId: 'f1', quantidade: 360 }),
+    );
+    expect(res).toEqual({ ok: true, estornado: true, gramas: 360 });
+    expect(mock.jobProducao.delete).toHaveBeenCalledWith({ where: { id: 'j1' } });
+  });
+
+  it('não estorna nada quando o job nunca chegou a baixar filamento', async () => {
+    const { mock } = makePrismaMock();
+    mock.jobProducao.findUnique.mockResolvedValue({
+      id: 'j2',
+      qtd: 2,
+      consumoRegistrado: false,
+      produto: { nome: 'X', pesoG: new Prisma.Decimal(50), filamentoId: 'f1' },
+    });
+    mock.jobProducao.delete.mockResolvedValue({ id: 'j2' });
+    const estoque = makeEstoqueMock();
+    const svc = new ProducaoService(asPrisma(mock), estoque);
+
+    const res = await svc.remove('j2');
+
+    expect(estoque.registrarMovimento).not.toHaveBeenCalled();
+    expect(res).toEqual({ ok: true, estornado: false, gramas: 0 });
+  });
+});

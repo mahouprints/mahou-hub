@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { JobStatus } from '@prisma/client';
 import type { JobCreate } from '@mahou-hub/contracts';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
 
@@ -40,17 +41,27 @@ export class ProducaoService {
   }
 
   create(data: JobCreate) {
-    return this.prisma.jobProducao.create({
-      data: {
-        dataInicio: new Date(data.dataInicio),
-        origem: data.origem,
-        produtoId: data.produtoId,
-        qtd: data.qtd,
-        prioridade: data.prioridade,
-        impressora: data.impressora,
-        observacao: data.observacao,
-      },
+    return this.prisma.jobProducao.create({ data: this.paraJobData(data) });
+  }
+
+  /** Cria uma leva: cada item vira um job/card próprio na fila (não é 1 job com N produtos). */
+  async createMany(itens: JobCreate[]) {
+    const { count } = await this.prisma.jobProducao.createMany({
+      data: itens.map((item) => this.paraJobData(item)),
     });
+    return { count };
+  }
+
+  private paraJobData(data: JobCreate): Prisma.JobProducaoCreateManyInput {
+    return {
+      dataInicio: new Date(data.dataInicio),
+      origem: data.origem,
+      produtoId: data.produtoId,
+      qtd: data.qtd,
+      prioridade: data.prioridade,
+      impressora: data.impressora,
+      observacao: data.observacao,
+    };
   }
 
   /**
@@ -93,10 +104,31 @@ export class ProducaoService {
     });
   }
 
+  /**
+   * Exclui um job. Se a baixa de filamento já tinha sido registrada (o job passou por
+   * "Impresso"), ESTORNA o consumo — devolve o filamento ao estoque — antes de apagar.
+   * Sem isso o filamento ficava descontado pra sempre por um job que nem existe mais.
+   * Entrada de estoque nunca fica negativa, então não precisa de `permitirNegativo`.
+   */
   async remove(id: string) {
-    const job = await this.prisma.jobProducao.findUnique({ where: { id }, select: { id: true } });
+    const job = await this.prisma.jobProducao.findUnique({
+      where: { id },
+      include: { produto: { select: { nome: true, pesoG: true, filamentoId: true } } },
+    });
     if (!job) throw new NotFoundException(`Job ${id} não existe`);
+
+    const gramas = job.consumoRegistrado ? Math.round(Number(job.produto.pesoG) * job.qtd) : 0;
+    if (gramas > 0) {
+      await this.estoque.registrarMovimento({
+        tipoItem: 'FILAMENTO',
+        filamentoId: job.produto.filamentoId,
+        quantidade: gramas, // positivo: devolve ao estoque o que a impressão tinha baixado
+        motivo: 'PRODUCAO',
+        observacao: `Estorno (job excluído): ${job.produto.nome} x${job.qtd}`,
+      });
+    }
+
     await this.prisma.jobProducao.delete({ where: { id } });
-    return { ok: true };
+    return { ok: true, estornado: gramas > 0, gramas };
   }
 }

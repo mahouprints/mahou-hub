@@ -10,8 +10,10 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  JobBulkCreateSchema,
   JobCreateSchema,
   JobStatusUpdateSchema,
+  type JobBulkCreate,
   type JobCreate,
   type JobStatusUpdate,
 } from '@mahou-hub/contracts';
@@ -34,6 +36,15 @@ export class ProducaoController {
   @Post()
   create(@Body(new ZodValidationPipe(JobCreateSchema)) data: JobCreate) {
     return this.service.create(data);
+  }
+
+  @Post('bulk')
+  @ApiOperation({
+    summary: 'Cria vários jobs de uma vez (uma leva)',
+    description: 'Cada item vira um card próprio na fila. Útil pra enfileirar várias peças juntas.',
+  })
+  createMany(@Body(new ZodValidationPipe(JobBulkCreateSchema)) data: JobBulkCreate) {
+    return this.service.createMany(data.itens);
   }
 
   @Patch(':id/status')

@@ -7,6 +7,14 @@ import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { JobDialog } from '@/components/job-dialog';
 
 type JobStatus = 'FILA' | 'IMPRIMINDO' | 'CONCLUIDO' | 'EMBALADO' | 'ENVIADO' | 'CANCELADO';
@@ -36,6 +44,7 @@ const ORDEM: JobStatus[] = ['FILA', 'IMPRIMINDO', 'CONCLUIDO', 'EMBALADO', 'ENVI
 export default function ProducaoPage() {
   const qc = useQueryClient();
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [jobParaExcluir, setJobParaExcluir] = useState<Job | null>(null);
 
   const { data } = useQuery({ queryKey: ['producao'], queryFn: () => apiFetch<Job[]>('/producao') });
 
@@ -57,10 +66,20 @@ export default function ProducaoPage() {
   });
 
   const remover = useMutation({
-    mutationFn: (id: string) => apiFetch(`/producao/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
+    mutationFn: (id: string) =>
+      apiFetch<{ ok: boolean; estornado: boolean; gramas: number }>(`/producao/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['producao'] });
-      toast.success('Job removido');
+      // se o job já tinha baixado filamento, o estorno devolve ao estoque
+      qc.invalidateQueries({ queryKey: ['filamentos'] });
+      qc.invalidateQueries({ queryKey: ['estoque', 'alertas'] });
+      qc.invalidateQueries({ queryKey: ['estoque', 'movimentos'] });
+      toast.success(
+        res.estornado ? `Job removido — ${res.gramas}g devolvidos ao estoque` : 'Job removido',
+      );
+      setJobParaExcluir(null);
     },
   });
 
@@ -139,8 +158,8 @@ export default function ProducaoPage() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => remover.mutate(job.id)}
-                          title="Remover"
+                          onClick={() => setJobParaExcluir(job)}
+                          title="Excluir"
                           className="inline-flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:text-destructive"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -159,6 +178,47 @@ export default function ProducaoPage() {
       </div>
 
       <JobDialog open={dialogAberto} onOpenChange={setDialogAberto} />
+
+      <Dialog
+        open={!!jobParaExcluir}
+        onOpenChange={(v) => {
+          if (!v) setJobParaExcluir(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir job de produção?</DialogTitle>
+            <DialogDescription>
+              {jobParaExcluir && (
+                <>
+                  Excluir <strong>{jobParaExcluir.produtoNome}</strong> (x{jobParaExcluir.qtd}).{' '}
+                  {jobParaExcluir.consumoRegistrado
+                    ? `Como já foi marcado como impresso, os ~${jobParaExcluir.consumoGramas}g de ${jobParaExcluir.filamentoNome} voltam pro estoque.`
+                    : 'Essa ação não pode ser desfeita.'}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setJobParaExcluir(null)}
+              disabled={remover.isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => jobParaExcluir && remover.mutate(jobParaExcluir.id)}
+              disabled={remover.isPending}
+            >
+              {remover.isPending ? 'Excluindo…' : 'Excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
