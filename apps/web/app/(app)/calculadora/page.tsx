@@ -114,7 +114,7 @@ export default function CalculadoraPage() {
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Entrada</CardTitle>
@@ -285,11 +285,11 @@ function Resultado({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Badge variant={variantBadge} className="text-sm">
           {label}
         </Badge>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(['SHOPEE', 'ML', 'SITE', 'TIKTOK'] as const).map((c) => (
             <Button
               key={c}
