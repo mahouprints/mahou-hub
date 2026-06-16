@@ -454,21 +454,23 @@ model OportunidadeLog {
 }
 
 model JobProducao {
-  id            String     @id @default(cuid())
-  dataInicio    DateTime
-  dataFim       DateTime?
-  origem        Origem
-  produtoId     String
-  produto       Produto    @relation(fields: [produtoId], references: [id])
-  qtd           Int
-  prioridade    Int        @default(0)
-  impressora    Impressora
-  status        JobStatus  @default(FILA)
-  anuncioCriado Boolean    @default(false)
-  anunciado     Boolean    @default(false)
-  observacao    String?
-  criadoEm      DateTime   @default(now())
-  atualizadoEm  DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  dataInicio        DateTime
+  dataFim           DateTime?
+  origem            Origem
+  produtoId         String
+  produto           Produto    @relation(fields: [produtoId], references: [id])
+  qtd               Int
+  prioridade        Int        @default(0)
+  impressora        Impressora
+  status            JobStatus  @default(FILA)
+  /// true após a baixa automática de filamento ter sido registrada (evita baixa dupla).
+  consumoRegistrado Boolean    @default(false)
+  anuncioCriado     Boolean    @default(false)
+  anunciado         Boolean    @default(false)
+  observacao        String?
+  criadoEm          DateTime   @default(now())
+  atualizadoEm      DateTime   @updatedAt
 
   @@index([status])
   @@index([dataInicio])

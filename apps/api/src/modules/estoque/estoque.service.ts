@@ -20,27 +20,32 @@ export class EstoqueService {
    * `quantidade` é com sinal: positivo = entrada, negativo = saída.
    * Saída que deixaria o saldo negativo é bloqueada (derruba a transação).
    */
-  async registrarMovimento(input: MovimentoCreate) {
+  async registrarMovimento(input: MovimentoCreate, opts: { permitirNegativo?: boolean } = {}) {
+    const permitir = opts.permitirNegativo ?? false;
     return this.prisma.$transaction(async (tx) => {
       switch (input.tipoItem) {
         case 'PRODUTO':
-          return this.moverVariacao(tx, input);
+          return this.moverVariacao(tx, input, permitir);
         case 'FILAMENTO':
-          return this.moverFilamento(tx, input);
+          return this.moverFilamento(tx, input, permitir);
         case 'INSUMO':
-          return this.moverInsumo(tx, input);
+          return this.moverInsumo(tx, input, permitir);
         default:
           throw new BadRequestException('tipoItem inválido');
       }
     });
   }
 
-  private async moverVariacao(tx: Prisma.TransactionClient, input: MovimentoCreate) {
+  private async moverVariacao(
+    tx: Prisma.TransactionClient,
+    input: MovimentoCreate,
+    permitirNegativo: boolean,
+  ) {
     if (!input.variacaoId) throw new BadRequestException('variacaoId é obrigatório para PRODUTO');
     const variacao = await tx.produtoVariacao.findUnique({ where: { id: input.variacaoId } });
     if (!variacao) throw new NotFoundException(`Variação ${input.variacaoId} não existe`);
     const novoSaldo = variacao.estoqueAtual + input.quantidade;
-    this.bloquearNegativo(novoSaldo < 0, variacao.estoqueAtual, input.quantidade);
+    this.bloquearNegativo(novoSaldo < 0 && !permitirNegativo, variacao.estoqueAtual, input.quantidade);
     await tx.produtoVariacao.update({
       where: { id: variacao.id },
       data: { estoqueAtual: novoSaldo },
@@ -48,12 +53,20 @@ export class EstoqueService {
     return this.criarMovimento(tx, input, { variacaoId: variacao.id }, novoSaldo);
   }
 
-  private async moverFilamento(tx: Prisma.TransactionClient, input: MovimentoCreate) {
+  private async moverFilamento(
+    tx: Prisma.TransactionClient,
+    input: MovimentoCreate,
+    permitirNegativo: boolean,
+  ) {
     if (!input.filamentoId) throw new BadRequestException('filamentoId é obrigatório para FILAMENTO');
     const filamento = await tx.filamento.findUnique({ where: { id: input.filamentoId } });
     if (!filamento) throw new NotFoundException(`Filamento ${input.filamentoId} não existe`);
     const novoSaldo = filamento.estoqueGramas.plus(input.quantidade);
-    this.bloquearNegativo(novoSaldo.lessThan(0), filamento.estoqueGramas, input.quantidade);
+    this.bloquearNegativo(
+      novoSaldo.lessThan(0) && !permitirNegativo,
+      filamento.estoqueGramas,
+      input.quantidade,
+    );
     await tx.filamento.update({
       where: { id: filamento.id },
       data: { estoqueGramas: novoSaldo },
@@ -61,12 +74,20 @@ export class EstoqueService {
     return this.criarMovimento(tx, input, { filamentoId: filamento.id }, novoSaldo);
   }
 
-  private async moverInsumo(tx: Prisma.TransactionClient, input: MovimentoCreate) {
+  private async moverInsumo(
+    tx: Prisma.TransactionClient,
+    input: MovimentoCreate,
+    permitirNegativo: boolean,
+  ) {
     if (!input.insumoId) throw new BadRequestException('insumoId é obrigatório para INSUMO');
     const insumo = await tx.insumo.findUnique({ where: { id: input.insumoId } });
     if (!insumo) throw new NotFoundException(`Insumo ${input.insumoId} não existe`);
     const novoSaldo = insumo.estoqueAtual.plus(input.quantidade);
-    this.bloquearNegativo(novoSaldo.lessThan(0), insumo.estoqueAtual, input.quantidade);
+    this.bloquearNegativo(
+      novoSaldo.lessThan(0) && !permitirNegativo,
+      insumo.estoqueAtual,
+      input.quantidade,
+    );
     await tx.insumo.update({
       where: { id: insumo.id },
       data: { estoqueAtual: novoSaldo },

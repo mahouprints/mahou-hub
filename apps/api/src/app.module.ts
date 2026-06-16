@@ -22,6 +22,7 @@ import { OportunidadesModule } from './modules/oportunidades/oportunidades.modul
 import { VariacoesModule } from './modules/variacoes/variacoes.module';
 import { EstoqueModule } from './modules/estoque/estoque.module';
 import { RecibosModule } from './modules/recibos/recibos.module';
+import { ProducaoModule } from './modules/producao/producao.module';
 import { HealthController } from './modules/health/health.controller';
 
 @Module({
@@ -64,6 +65,7 @@ import { HealthController } from './modules/health/health.controller';
     VariacoesModule,
     EstoqueModule,
     RecibosModule,
+    ProducaoModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

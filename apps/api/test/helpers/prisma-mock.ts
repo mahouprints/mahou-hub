@@ -50,7 +50,14 @@ export function makePrismaMock() {
     taxaShopee: { findMany: vi.fn() },
     taxaMercadoLivre: { findMany: vi.fn() },
     venda: { aggregate: vi.fn(), findMany: vi.fn() },
-    jobProducao: { aggregate: vi.fn() },
+    jobProducao: {
+      aggregate: vi.fn(),
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
     // $transaction aceita: (1) array de promises ou (2) callback com tx.
     // Pra (1) Promise.all; pra (2) executa o callback com txDelegate.
     $transaction: vi.fn(async (arg: unknown) => {
