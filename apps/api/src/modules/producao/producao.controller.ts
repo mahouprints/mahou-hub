@@ -6,10 +6,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  HistoricoPeriodoEnum,
   JobBulkCreateSchema,
   JobCreateSchema,
   JobStatusUpdateSchema,
@@ -31,6 +33,15 @@ export class ProducaoController {
   @Get()
   list() {
     return this.service.list();
+  }
+
+  @Get('historico')
+  @ApiOperation({
+    summary: 'Histórico de produção agregado no tempo',
+    description: 'Série de buckets {inicio,total}. periodo = diario | semanal | mensal | anual (default mensal).',
+  })
+  historico(@Query('periodo') periodo?: string) {
+    return this.service.historico(HistoricoPeriodoEnum.catch('mensal').parse(periodo));
   }
 
   @Post()

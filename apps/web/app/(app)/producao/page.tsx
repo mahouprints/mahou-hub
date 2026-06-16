@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { JobDialog } from '@/components/job-dialog';
+import { HistoricoProducao } from '@/components/historico-producao';
 
 type JobStatus = 'FILA' | 'IMPRIMINDO' | 'CONCLUIDO' | 'EMBALADO' | 'ENVIADO' | 'CANCELADO';
 
@@ -27,7 +28,10 @@ type Job = {
   impressora: string;
   observacao: string | null;
   consumoRegistrado: boolean;
+  consumoProdutoRegistrado: boolean;
+  daEstoque: boolean;
   produtoNome: string;
+  variacaoNome: string | null;
   filamentoNome: string;
   consumoGramas: number;
 };
@@ -41,6 +45,15 @@ const COLUNAS: [JobStatus, string][] = [
 ];
 const ORDEM: JobStatus[] = ['FILA', 'IMPRIMINDO', 'CONCLUIDO', 'EMBALADO', 'ENVIADO'];
 
+// Mover pra cá baixa o estoque de prontos (cards do estoque) — invalida tudo que muda.
+const INVALIDAR_ESTOQUE: unknown[][] = [
+  ['producao'],
+  ['filamentos'],
+  ['variacoes'],
+  ['estoque', 'alertas'],
+  ['estoque', 'movimentos'],
+];
+
 export default function ProducaoPage() {
   const qc = useQueryClient();
   const [dialogAberto, setDialogAberto] = useState(false);
@@ -48,37 +61,38 @@ export default function ProducaoPage() {
 
   const { data } = useQuery({ queryKey: ['producao'], queryFn: () => apiFetch<Job[]>('/producao') });
 
+  function invalidarEstoque() {
+    for (const key of INVALIDAR_ESTOQUE) qc.invalidateQueries({ queryKey: key });
+  }
+
   const mudarStatus = useMutation({
     mutationFn: (v: { id: string; status: JobStatus }) =>
       apiFetch(`/producao/${v.id}/status`, { method: 'PATCH', json: { status: v.status } }),
     onSuccess: (_d, v) => {
-      qc.invalidateQueries({ queryKey: ['producao'] });
-      // a baixa de filamento mexe no estoque
-      qc.invalidateQueries({ queryKey: ['filamentos'] });
-      qc.invalidateQueries({ queryKey: ['estoque', 'alertas'] });
-      qc.invalidateQueries({ queryKey: ['estoque', 'movimentos'] });
+      invalidarEstoque();
       toast.success(
         v.status === 'CONCLUIDO'
           ? 'Impresso! Filamento baixado automaticamente ✓'
-          : 'Status atualizado',
+          : v.status === 'EMBALADO'
+            ? 'Embalado ✓'
+            : 'Status atualizado',
       );
     },
   });
 
   const remover = useMutation({
     mutationFn: (id: string) =>
-      apiFetch<{ ok: boolean; estornado: boolean; gramas: number }>(`/producao/${id}`, {
-        method: 'DELETE',
-      }),
+      apiFetch<{ ok: boolean; estornado: boolean; gramas: number; prontosEstornados: number }>(
+        `/producao/${id}`,
+        { method: 'DELETE' },
+      ),
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ['producao'] });
-      // se o job já tinha baixado filamento, o estorno devolve ao estoque
-      qc.invalidateQueries({ queryKey: ['filamentos'] });
-      qc.invalidateQueries({ queryKey: ['estoque', 'alertas'] });
-      qc.invalidateQueries({ queryKey: ['estoque', 'movimentos'] });
-      toast.success(
-        res.estornado ? `Job removido — ${res.gramas}g devolvidos ao estoque` : 'Job removido',
-      );
+      invalidarEstoque();
+      const partes: string[] = [];
+      if (res.gramas > 0) partes.push(`${res.gramas}g de filamento`);
+      if (res.prontosEstornados > 0)
+        partes.push(`${res.prontosEstornados} ${res.prontosEstornados === 1 ? 'peça' : 'peças'}`);
+      toast.success(partes.length ? `Job removido — devolvido: ${partes.join(' + ')}` : 'Job removido');
       setJobParaExcluir(null);
     },
   });
@@ -89,13 +103,14 @@ export default function ProducaoPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Produção</h1>
           <p className="text-sm text-muted-foreground">
-            Fila de impressão. Ao mover pra <strong>Impresso</strong>, o filamento baixa sozinho
-            (peso da peça × quantidade).
+            Ao mover pra <strong>Impresso</strong>, o filamento baixa sozinho. Cards{' '}
+            <strong>do estoque</strong> pulam a impressão e baixam o estoque de peças prontas ao{' '}
+            <strong>Embalar</strong>.
           </p>
         </div>
         <Button onClick={() => setDialogAberto(true)}>
@@ -118,12 +133,26 @@ export default function ProducaoPage() {
                   return (
                     <div key={job.id} className="rounded-lg border border-border bg-card p-3 text-sm">
                       <div className="flex items-start justify-between gap-2">
-                        <span className="font-medium">{job.produtoNome}</span>
+                        <span className="font-medium">
+                          {job.produtoNome}
+                          {job.variacaoNome && (
+                            <span className="text-muted-foreground"> · {job.variacaoNome}</span>
+                          )}
+                        </span>
                         <span className="shrink-0 text-muted-foreground">x{job.qtd}</span>
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        {job.impressora} · {job.filamentoNome} · ~{job.consumoGramas}g
+                        {job.impressora} · {job.filamentoNome}
+                        {!job.daEstoque && ` · ~${job.consumoGramas}g`}
                       </p>
+                      {job.daEstoque && (
+                        <Badge
+                          variant="default"
+                          className="mt-1.5 bg-sky-500/15 text-sky-600 dark:text-sky-400"
+                        >
+                          do estoque
+                        </Badge>
+                      )}
                       <div className="mt-2 flex items-center justify-between">
                         <div className="flex items-center gap-1">
                           <button
@@ -177,6 +206,8 @@ export default function ProducaoPage() {
         })}
       </div>
 
+      <HistoricoProducao />
+
       <JobDialog open={dialogAberto} onOpenChange={setDialogAberto} />
 
       <Dialog
@@ -191,10 +222,14 @@ export default function ProducaoPage() {
             <DialogDescription>
               {jobParaExcluir && (
                 <>
-                  Excluir <strong>{jobParaExcluir.produtoNome}</strong> (x{jobParaExcluir.qtd}).{' '}
-                  {jobParaExcluir.consumoRegistrado
-                    ? `Como já foi marcado como impresso, os ~${jobParaExcluir.consumoGramas}g de ${jobParaExcluir.filamentoNome} voltam pro estoque.`
-                    : 'Essa ação não pode ser desfeita.'}
+                  Excluir <strong>{jobParaExcluir.produtoNome}</strong>
+                  {jobParaExcluir.variacaoNome ? ` (${jobParaExcluir.variacaoNome})` : ''} x
+                  {jobParaExcluir.qtd}.{' '}
+                  {jobParaExcluir.consumoProdutoRegistrado
+                    ? `Como já foi embalado, as ${jobParaExcluir.qtd} peças voltam ao estoque de prontos.`
+                    : jobParaExcluir.consumoRegistrado
+                      ? `Como já foi impresso, os ~${jobParaExcluir.consumoGramas}g de ${jobParaExcluir.filamentoNome} voltam pro estoque.`
+                      : 'Essa ação não pode ser desfeita.'}
                 </>
               )}
             </DialogDescription>

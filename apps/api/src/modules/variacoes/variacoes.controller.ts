@@ -29,9 +29,11 @@ export class VariacoesController {
 
   @Get()
   list(
-    @Query('produtoId') produtoId: string,
+    @Query('produtoId') produtoId?: string,
     @Query('incluirInativos') incluirInativos?: string,
   ) {
+    // Sem produtoId = listagem global (estoque de prontos / diálogo de job).
+    if (!produtoId) return this.service.listParaEstoque();
     return this.service.listByProduto(produtoId, incluirInativos === 'true');
   }
 

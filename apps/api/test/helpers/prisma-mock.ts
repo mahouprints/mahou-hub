@@ -17,6 +17,7 @@ export function makePrismaMock() {
     filamento: { findUnique: vi.fn(), update: vi.fn() },
     insumo: { findUnique: vi.fn(), update: vi.fn() },
     movimentoEstoque: { create: vi.fn() },
+    jobProducao: { createMany: vi.fn() },
   };
 
   const mock = {

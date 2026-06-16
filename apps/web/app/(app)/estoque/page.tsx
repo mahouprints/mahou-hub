@@ -31,8 +31,17 @@ type AlertaEstoque = {
   minimo: number;
 };
 type InsumoComEstoque = Insumo & { _count?: { produtos: number } };
+type VariacaoProntos = {
+  id: string;
+  nome: string;
+  sku: string;
+  estoqueAtual: number;
+  estoqueMinimo: number;
+  produto: { nome: string };
+  filamento: { nome: string } | null;
+};
 type ItemMov = {
-  tipoItem: 'FILAMENTO' | 'INSUMO';
+  tipoItem: 'FILAMENTO' | 'INSUMO' | 'PRODUTO';
   id: string;
   nome: string;
   unidade: string;
@@ -50,13 +59,14 @@ type Movimento = {
   filamento: { nome: string } | null;
   insumo: { nome: string; unidade: string } | null;
 };
-type Aba = 'saldos' | 'historico' | 'custos';
+type Aba = 'saldos' | 'produtos' | 'historico' | 'custos';
 
 const INVALIDAR: unknown[][] = [
   ['estoque', 'alertas'],
   ['estoque', 'movimentos'],
   ['filamentos'],
   ['insumos'],
+  ['variacoes'],
 ];
 const MOTIVO_LABEL: Record<string, string> = {
   ESTOQUE_INICIAL: 'Estoque inicial',
@@ -76,6 +86,7 @@ export default function EstoquePage() {
   const [mov, setMov] = useState<ItemMov | null>(null);
   const [custoEdit, setCustoEdit] = useState<Filamento | null>(null);
   const [buscaFilamento, setBuscaFilamento] = useState('');
+  const [buscaProduto, setBuscaProduto] = useState('');
 
   const alertas = useQuery({
     queryKey: ['estoque', 'alertas'],
@@ -93,12 +104,22 @@ export default function EstoquePage() {
     queryKey: ['estoque', 'movimentos'],
     queryFn: () => apiFetch<Movimento[]>('/estoque/movimentos?limit=80'),
   });
+  const variacoes = useQuery({
+    queryKey: ['variacoes'],
+    queryFn: () => apiFetch<VariacaoProntos[]>('/variacoes'),
+  });
 
   const filamentosAtivos = filamentos.data?.filter((f) => f.ativo) ?? [];
   const buscaNorm = normalizarBusca(buscaFilamento.trim());
   const filamentosFiltrados = buscaNorm
     ? filamentosAtivos.filter((f) => normalizarBusca(f.nome).includes(buscaNorm))
     : filamentosAtivos;
+  const buscaProdNorm = normalizarBusca(buscaProduto.trim());
+  const variacoesFiltradas = (variacoes.data ?? []).filter((v) =>
+    buscaProdNorm
+      ? normalizarBusca(`${v.produto.nome} ${v.nome} ${v.sku}`).includes(buscaProdNorm)
+      : true,
+  );
 
   return (
     <div className="space-y-6">
@@ -135,6 +156,7 @@ export default function EstoquePage() {
         {(
           [
             ['saldos', 'Saldos'],
+            ['produtos', 'Produtos prontos'],
             ['historico', 'Histórico'],
             ['custos', 'Custos'],
           ] as [Aba, string][]
@@ -282,6 +304,89 @@ export default function EstoquePage() {
             </Table>
           </Secao>
         </div>
+      )}
+
+      {aba === 'produtos' && (
+        <Secao
+          titulo="Produtos prontos"
+          acao={
+            <div className="relative w-56">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={buscaProduto}
+                onChange={(e) => setBuscaProduto(e.target.value)}
+                placeholder="Buscar produto/cor/SKU…"
+                className="h-9 pl-8"
+              />
+            </div>
+          }
+        >
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Produto</TableHead>
+                <TableHead>Cor</TableHead>
+                <TableHead>SKU</TableHead>
+                <TableHead className="text-right">Em estoque</TableHead>
+                <TableHead className="text-right">Mínimo</TableHead>
+                <TableHead className="w-32 text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {variacoesFiltradas.map((v) => {
+                const baixo = v.estoqueMinimo > 0 && v.estoqueAtual <= v.estoqueMinimo;
+                return (
+                  <TableRow key={v.id}>
+                    <TableCell className="font-medium">{v.produto.nome}</TableCell>
+                    <TableCell>{v.nome}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{v.sku}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <span
+                        className={baixo ? 'font-medium text-amber-600 dark:text-amber-500' : ''}
+                      >
+                        {v.estoqueAtual} un
+                      </span>
+                      {baixo && (
+                        <Badge variant="default" className="ml-2 bg-amber-500/15 text-amber-600">
+                          baixo
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {v.estoqueMinimo > 0 ? `${v.estoqueMinimo} un` : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setMov({
+                            tipoItem: 'PRODUTO',
+                            id: v.id,
+                            nome: `${v.produto.nome} — ${v.nome}`,
+                            unidade: 'un',
+                            saldo: v.estoqueAtual,
+                          })
+                        }
+                      >
+                        Movimentar
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {variacoesFiltradas.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                    {buscaProdNorm
+                      ? 'Nenhuma variação encontrada.'
+                      : 'Nenhuma variação cadastrada. Crie variações no detalhe do produto.'}
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </Secao>
       )}
 
       {aba === 'historico' && (

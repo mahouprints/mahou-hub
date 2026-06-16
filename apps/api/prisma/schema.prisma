@@ -454,26 +454,35 @@ model OportunidadeLog {
 }
 
 model JobProducao {
-  id                String     @id @default(cuid())
-  dataInicio        DateTime
-  dataFim           DateTime?
-  origem            Origem
-  produtoId         String
-  produto           Produto    @relation(fields: [produtoId], references: [id])
-  qtd               Int
-  prioridade        Int        @default(0)
-  impressora        Impressora
-  status            JobStatus  @default(FILA)
+  id                       String           @id @default(cuid())
+  dataInicio               DateTime
+  dataFim                  DateTime?
+  origem                   Origem
+  produtoId                String
+  produto                  Produto          @relation(fields: [produtoId], references: [id])
+  /// Variação (cor) opcional. Quando setada, a baixa de filamento usa o filamento da variação.
+  variacaoId               String?
+  variacao                 ProdutoVariacao? @relation(fields: [variacaoId], references: [id])
+  qtd                      Int
+  prioridade               Int              @default(0)
+  impressora               Impressora
+  status                   JobStatus        @default(FILA)
   /// true após a baixa automática de filamento ter sido registrada (evita baixa dupla).
-  consumoRegistrado Boolean    @default(false)
-  anuncioCriado     Boolean    @default(false)
-  anunciado         Boolean    @default(false)
-  observacao        String?
-  criadoEm          DateTime   @default(now())
-  atualizadoEm      DateTime   @updatedAt
+  consumoRegistrado        Boolean          @default(false)
+  /// true = card atendido pelo ESTOQUE DE PEÇAS PRONTAS: pula impressão, NÃO baixa filamento e
+  /// baixa o estoque de prontos ao Embalar. Ortogonal a `origem` (canal do pedido, que pode ser ESTOQUE).
+  daEstoque                Boolean          @default(false)
+  /// true após a baixa do estoque de prontos ter sido registrada (no Embalado). Evita baixa dupla.
+  consumoProdutoRegistrado Boolean          @default(false)
+  anuncioCriado            Boolean          @default(false)
+  anunciado                Boolean          @default(false)
+  observacao               String?
+  criadoEm                 DateTime         @default(now())
+  atualizadoEm             DateTime         @updatedAt
 
   @@index([status])
   @@index([dataInicio])
+  @@index([variacaoId])
 }
 
 /// Variação vendável de um Produto (ex.: cor). Cada variação tem SKU próprio,
@@ -494,6 +503,7 @@ model ProdutoVariacao {
   estoqueMinimo Int                @default(0)
   ativo         Boolean            @default(true)
   movimentos    MovimentoEstoque[]
+  jobs          JobProducao[]
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
 

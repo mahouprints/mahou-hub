@@ -15,6 +15,21 @@ export class VariacoesService {
     });
   }
 
+  /**
+   * Todas as variações ativas com produto e cor (filamento). Alimenta a aba "Produtos
+   * prontos" do estoque e o diálogo de job (que indexa por produtoId pra mostrar a qtd por cor).
+   */
+  listParaEstoque() {
+    return this.prisma.produtoVariacao.findMany({
+      where: { ativo: true },
+      include: {
+        filamento: { select: { nome: true } },
+        produto: { select: { nome: true } },
+      },
+      orderBy: [{ produto: { nome: 'asc' } }, { nome: 'asc' }],
+    });
+  }
+
   async create(data: ProdutoVariacaoCreate) {
     const produto = await this.prisma.produto.findUnique({
       where: { id: data.produtoId },

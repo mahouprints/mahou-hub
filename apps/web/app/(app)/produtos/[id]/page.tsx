@@ -37,6 +37,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ImagensSection } from '@/components/imagens-section';
+import { VariacoesSection } from '@/components/variacoes-section';
 
 type ProdutoComFilamento = Produto & {
   filamento: { id: string; nome: string };
@@ -159,6 +160,18 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
         <EspecificacoesCard produto={produto} />
         <EstatisticasCard stats={stats} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Variações (cores / SKU)</CardTitle>
+          <CardDescription>
+            Cores vendáveis com SKU e estoque de peças prontas — usadas no job de produção.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <VariacoesSection produtoId={id} produtoNome={produto.nome} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

@@ -190,7 +190,8 @@ export class ProdutosService {
    * Estatísticas agregadas pra exibir no detalhe do produto:
    * - vendidos = soma de qtd nas Vendas
    * - faturamentoCentavos = soma de preço × qtd nas Vendas
-   * - produzidos = soma de qtd nos JobProducao com status terminal (CONCLUIDO/EMBALADO/ENVIADO)
+   * - produzidos = soma de qtd nos JobProducao impressos (status terminal e daEstoque=false;
+   *   cards atendidos pelo estoque de prontos não contam como produção)
    * - emProducao = soma nos status ativos (FILA/IMPRIMINDO)
    * - ultimaVendaEm = data da venda mais recente, ou null
    */
@@ -217,7 +218,7 @@ export class ProdutosService {
     const ultimaVendaEm = vendas[0]?.dataVenda ?? null;
 
     const produzidos = await this.prisma.jobProducao.aggregate({
-      where: { produtoId: id, status: { in: ['CONCLUIDO', 'EMBALADO', 'ENVIADO'] } },
+      where: { produtoId: id, daEstoque: false, status: { in: ['CONCLUIDO', 'EMBALADO', 'ENVIADO'] } },
       _sum: { qtd: true },
     });
 
