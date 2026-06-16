@@ -114,10 +114,21 @@ enum MotivoMovimento {
   PERDA
 }
 
+/// ADMIN = acesso total. VISUALIZADOR = somente leitura (bloqueado em qualquer mutação).
+enum Papel {
+  ADMIN
+  VISUALIZADOR
+}
+
 model Usuario {
   id        String   @id @default(cuid())
-  email     String   @unique
+  /// Opcional: usuários internos (ex.: visualizador) podem logar só por `login`.
+  email     String?  @unique
+  /// Username alternativo pro login (ex.: "roniberger"). O admin loga pelo e-mail.
+  login     String?  @unique
+  nome      String?
   senhaHash String
+  papel     Papel    @default(ADMIN)
   criadoEm  DateTime @default(now())
 }
 

@@ -60,6 +60,13 @@ export function makePrismaMock() {
       update: vi.fn(),
       delete: vi.fn(),
     },
+    usuario: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    },
     // $transaction aceita: (1) array de promises ou (2) callback com tx.
     // Pra (1) Promise.all; pra (2) executa o callback com txDelegate.
     $transaction: vi.fn(async (arg: unknown) => {

@@ -1,6 +1,7 @@
 import { Body, Controller, Post, Req, Res, UseGuards, UsePipes } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import type { Papel } from '@prisma/client';
 import {
   ApiTokenInputSchema,
   LoginInputSchema,
@@ -58,8 +59,8 @@ export class AuthController {
     @Req() req: Request,
     @Body(new ZodValidationPipe(ApiTokenInputSchema)) body: ApiTokenInput,
   ): ApiTokenOutput {
-    const user = req.user as { sub: string; email: string };
-    return this.auth.gerarApiToken(user.sub, user.email, body.ttlDias);
+    const user = req.user as { sub: string; email: string; papel?: Papel };
+    return this.auth.gerarApiToken(user.sub, user.email, user.papel, body.ttlDias);
   }
 }
 

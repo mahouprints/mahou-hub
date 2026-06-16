@@ -1,13 +1,15 @@
 import { z } from 'zod';
 
+// `email` aceita e-mail OU username (ex.: "roniberger") — o campo mantém o nome
+// por compat com o front; o service casa por email OU login.
 export const LoginInputSchema = z.object({
-  email: z.string().email(),
+  email: z.string().min(1),
   senha: z.string().min(8),
 });
 
 export const LoginOutputSchema = z.object({
   usuarioId: z.string(),
-  email: z.string().email(),
+  email: z.string(),
 });
 
 export type LoginInput = z.infer<typeof LoginInputSchema>;

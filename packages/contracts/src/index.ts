@@ -13,6 +13,7 @@ export * from './producao';
 export * from './concorrente';
 export * from './oportunidade';
 export * from './auth';
+export * from './usuario';
 export * from './venda';
 export * from './custo';
 export * from './financeiro';
