@@ -251,6 +251,9 @@ export class ProdutosService {
       const custoInsumos = somarCustoInsumos(p.insumos);
       return {
         ...p,
+        // Safeguard: sinaliza produto usando filamento desativado, pra corrigir na mão
+        // (em vez de quebrar). O pricing ainda calcula com o filamento inativo.
+        filamentoInativo: !p.filamento.ativo,
         pesoG: Number(p.pesoG),
         tempoH: Number(p.tempoH),
         custoInsumosCentavos: custoInsumos,

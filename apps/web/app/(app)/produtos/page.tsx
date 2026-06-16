@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   Box,
   Check,
   CheckSquare,
@@ -60,6 +61,7 @@ import { SelectionToolbar } from '@/components/selection-toolbar';
 
 type ProdutoComPricing = Produto & {
   filamento: { id: string; nome: string };
+  filamentoInativo?: boolean;
   pesoG: number;
   tempoH: number;
   pricing: CalcularOutput;
@@ -235,6 +237,19 @@ export default function ProdutosPage() {
         </div>
       </header>
 
+      {data && data.some((p) => p.filamentoInativo) && (
+        <Card className="border-amber-500/40 bg-amber-500/5 p-3">
+          <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-500">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              <strong>{data.filter((p) => p.filamentoInativo).length}</strong> produto(s) usando
+              filamento desativado — edite o produto e escolha um filamento ativo. O cálculo ainda
+              funciona, mas o custo pode estar errado.
+            </span>
+          </div>
+        </Card>
+      )}
+
       <div className="space-y-3">
         <BuscaInput valor={filtroBusca} onChange={setFiltroBusca} />
         <FiltrosBar
@@ -407,6 +422,11 @@ export default function ProdutosPage() {
                         {p.rascunho && (
                           <Badge variant="warning" className="shrink-0 font-normal">
                             Rascunho
+                          </Badge>
+                        )}
+                        {p.filamentoInativo && (
+                          <Badge variant="danger" className="shrink-0 font-normal">
+                            filamento inativo
                           </Badge>
                         )}
                       </div>
