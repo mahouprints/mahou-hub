@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  calcularPlanoAds,
   calcularProduto,
   simularCenario,
   type CalculoSaida,
@@ -7,8 +8,15 @@ import {
   type FaixaShopee as FaixaShopeePricing,
   type Filamento as FilamentoPricing,
   type ParametrosGlobais,
+  type ParamsAds,
 } from '@mahou-hub/pricing';
-import type { CalcularInput, SimularInput, SimularOutput } from '@mahou-hub/contracts';
+import type {
+  CalcularInput,
+  PlanoAdsInput,
+  PlanoAdsOutput,
+  SimularInput,
+  SimularOutput,
+} from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -67,6 +75,38 @@ export class PricingService {
       precoCentavos: produto.precoCentavos,
       liquidoUnitarioCentavos: liquidoUnitario,
     });
+  }
+
+  /**
+   * Plano de anúncios (Teste + Escalonamento). Stateless: o cliente já calculou a
+   * economia (precoCentavos + líquido do canal) e manda como margem de contribuição.
+   * `input.params` parcial sobrescreve os defaults globais do Parametro.
+   */
+  async planoAds(input: PlanoAdsInput): Promise<PlanoAdsOutput> {
+    const defaults = await this.carregarParamsAds();
+    const params: ParamsAds = { ...defaults, ...input.params };
+    return calcularPlanoAds({
+      precoCentavos: input.precoCentavos,
+      margemContribuicaoCentavos: input.margemContribuicaoCentavos,
+      params,
+    });
+  }
+
+  private async carregarParamsAds(): Promise<ParamsAds> {
+    const p = await this.prisma.parametro.findUnique({ where: { id: 1 } });
+    if (!p) throw new NotFoundException('Parâmetros não inicializados (GET /api/parametros)');
+    return {
+      cpcMedioCentavos: p.adsCpcMedioCentavos,
+      taxaRetornoPct: Number(p.adsTaxaRetornoPct),
+      janelaTesteDias: p.adsJanelaTesteDias,
+      nivelConfianca: p.adsNivelConfianca === 99 ? 99 : 95,
+      fatorMargemEscala: Number(p.adsFatorMargemEscala),
+      passoIncrementoPct: Number(p.adsPassoIncrementoPct),
+      cadenciaIncrementoDias: p.adsCadenciaIncrementoDias,
+      nDegraus: p.adsNDegraus,
+      budgetDiarioMinimoCentavos: p.adsBudgetDiarioMinimoCentavos,
+      tetoBudgetDiarioCentavos: p.adsTetoBudgetDiarioCentavos,
+    };
   }
 
   private async resolverFilamento(input: CalcularInput): Promise<FilamentoPricing> {

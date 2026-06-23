@@ -10,13 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { InputDecimal } from '@/components/ui/input-decimal';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -24,6 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RoasCalculadora } from '@/components/roas-calculadora';
+
+const CANAL_LABEL: Record<'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK', string> = {
+  SHOPEE: 'Shopee',
+  ML: 'Mercado Livre',
+  SITE: 'Site próprio',
+  TIKTOK: 'TikTok Shop',
+};
 
 interface FormState {
   filamentoId: string;
@@ -66,7 +68,15 @@ export default function CalculadoraPage() {
     const preco = parseDecimalParaCentavos(form.precoReais);
     const embalagem = parseDecimalParaCentavos(form.embalagemReais);
 
-    if (!form.filamentoId || !Number.isFinite(peso) || peso <= 0 || !Number.isFinite(tempo) || tempo <= 0 || !Number.isFinite(preco) || preco <= 0) {
+    if (
+      !form.filamentoId ||
+      !Number.isFinite(peso) ||
+      peso <= 0 ||
+      !Number.isFinite(tempo) ||
+      tempo <= 0 ||
+      !Number.isFinite(preco) ||
+      preco <= 0
+    ) {
       setResultado(null);
       setErro(null);
       return;
@@ -104,6 +114,19 @@ export default function CalculadoraPage() {
     });
     window.location.href = `/produtos/novo?${params.toString()}`;
   }
+
+  const precoCentavosRaw = parseDecimalParaCentavos(form.precoReais);
+  const precoCentavos =
+    Number.isFinite(precoCentavosRaw) && precoCentavosRaw > 0 ? precoCentavosRaw : null;
+  const liquidoCanal = !resultado
+    ? null
+    : canal === 'SHOPEE'
+      ? resultado.liquidoShopeeCentavos
+      : canal === 'ML'
+        ? resultado.liquidoMlCentavos
+        : canal === 'TIKTOK'
+          ? resultado.liquidoTikTokCentavos
+          : resultado.liquidoSiteCentavos;
 
   return (
     <div className="space-y-6">
@@ -215,6 +238,23 @@ export default function CalculadoraPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>ROAS de Anúncios</CardTitle>
+          <CardDescription>
+            Quanto investir no teste e como escalonar o orçamento — a partir da economia acima.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RoasCalculadora
+            precoCentavos={precoCentavos}
+            liquidoCentavos={liquidoCanal}
+            canalLabel={CANAL_LABEL[canal]}
+            defaults={parametros}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -306,7 +346,10 @@ function Resultado({
       <dl className="grid grid-cols-2 gap-y-2 text-sm">
         <Linha rotulo="Custo filamento" valor={valorOuVazio(resultado?.custoFilamentoCentavos)} />
         <Linha rotulo="Custo energia" valor={valorOuVazio(resultado?.custoEnergiaCentavos)} />
-        <Linha rotulo="Custo produção" valor={valorOuVazio(resultado?.custoTotalProducaoCentavos)} />
+        <Linha
+          rotulo="Custo produção"
+          valor={valorOuVazio(resultado?.custoTotalProducaoCentavos)}
+        />
         <Linha rotulo="Imposto" valor={valorOuVazio(resultado?.impostoCentavos)} />
         {canal === 'SHOPEE' && (
           <Linha rotulo="Taxa Shopee" valor={valorOuVazio(resultado?.taxaShopeeCentavos)} />
@@ -329,15 +372,7 @@ function Resultado({
   );
 }
 
-function Linha({
-  rotulo,
-  valor,
-  destaque,
-}: {
-  rotulo: string;
-  valor: string;
-  destaque?: boolean;
-}) {
+function Linha({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
   return (
     <>
       <dt className="text-muted-foreground">{rotulo}</dt>

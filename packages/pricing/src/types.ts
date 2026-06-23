@@ -84,3 +84,62 @@ export interface CalculoSaida {
   lucroPorHoraSiteCentavos: number;
   lucroPorHoraTikTokCentavos: number;
 }
+
+export type NivelConfianca = 95 | 99;
+
+/**
+ * Parâmetros do plano de anúncios (Shopee Ads). Os defaults globais vivem no
+ * Parametro singleton; a Calculadora permite override local sem persistir.
+ */
+export interface ParamsAds {
+  cpcMedioCentavos: number;
+  taxaRetornoPct: number;
+  janelaTesteDias: number;
+  nivelConfianca: NivelConfianca;
+  fatorMargemEscala: number;
+  passoIncrementoPct: number;
+  cadenciaIncrementoDias: number;
+  nDegraus: number;
+  /** Orçamento diário mínimo da plataforma (Shopee). Abaixo dele, gera aviso. */
+  budgetDiarioMinimoCentavos?: number | null;
+  /** Teto de orçamento diário: a escada para antes de ultrapassar. */
+  tetoBudgetDiarioCentavos?: number | null;
+}
+
+export interface PlanoAdsEntrada {
+  precoCentavos: number;
+  /**
+   * Margem de contribuição por venda bruta (centavos), ANTES do desconto de devoluções.
+   * No app real = líquido do canal (já líquido de taxa marketplace + imposto).
+   * No caminho hipotético/override = preço − cmv − taxa (margemContribuicaoBrutaCentavos).
+   */
+  margemContribuicaoCentavos: number;
+  params: ParamsAds;
+}
+
+/** Um degrau da escada de escalonamento de orçamento diário. */
+export interface DegrauEscala {
+  /** 0-indexed. */
+  degrau: number;
+  diaInicio: number;
+  diaFim: number;
+  budgetDiarioCentavos: number;
+}
+
+export interface PlanoAdsSaida {
+  inviavel: boolean;
+  avisoInviavel: string | null;
+  /** Margem líquida de devoluções como fração (0.4363 = 43,63%). */
+  mcLiquidaPct: number;
+  roasBreakeven: number;
+  roasAlvoTeste: number;
+  roasAlvoEscala: number;
+  cpaAlvoCentavos: number;
+  vendasEsperadas: number;
+  orcamentoTesteTotalCentavos: number;
+  investimentoDiarioTesteCentavos: number;
+  cliquesEstimadosTeste: number;
+  investimentoDiarioEscalaInicialCentavos: number;
+  escada: DegrauEscala[];
+  avisos: string[];
+}

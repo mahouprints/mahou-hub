@@ -44,6 +44,16 @@ interface FormState {
   tiktokTaxaPagamentoPct: string;
   margemThresholdVerdePct: string;
   margemThresholdAmareloPct: string;
+  adsCpcReais: string;
+  adsRetornoPct: string;
+  adsJanelaDias: string;
+  adsConfianca: '95' | '99';
+  adsFatorEscala: string;
+  adsPassoPct: string;
+  adsCadenciaDias: string;
+  adsNDegraus: string;
+  adsBudgetMinReais: string;
+  adsTetoReais: string;
 }
 
 function paraStr(n: number, casas = 2): string {
@@ -72,6 +82,22 @@ export function ParametrosDialog({ open, onOpenChange, parametros }: Props) {
       tiktokTaxaPagamentoPct: paraStr(Number(parametros.tiktokTaxaPagamentoPct), 2),
       margemThresholdVerdePct: paraStr(Number(parametros.margemThresholdVerde) * 100, 0),
       margemThresholdAmareloPct: paraStr(Number(parametros.margemThresholdAmarelo) * 100, 0),
+      adsCpcReais: paraStr(parametros.adsCpcMedioCentavos / 100),
+      adsRetornoPct: paraStr(Number(parametros.adsTaxaRetornoPct), 2),
+      adsJanelaDias: String(parametros.adsJanelaTesteDias),
+      adsConfianca: Number(parametros.adsNivelConfianca) === 99 ? '99' : '95',
+      adsFatorEscala: paraStr(Number(parametros.adsFatorMargemEscala), 2),
+      adsPassoPct: paraStr(Number(parametros.adsPassoIncrementoPct), 2),
+      adsCadenciaDias: String(parametros.adsCadenciaIncrementoDias),
+      adsNDegraus: String(parametros.adsNDegraus),
+      adsBudgetMinReais:
+        parametros.adsBudgetDiarioMinimoCentavos != null
+          ? paraStr(parametros.adsBudgetDiarioMinimoCentavos / 100)
+          : '',
+      adsTetoReais:
+        parametros.adsTetoBudgetDiarioCentavos != null
+          ? paraStr(parametros.adsTetoBudgetDiarioCentavos / 100)
+          : '',
     });
     setErro(null);
   }, [open, parametros]);
@@ -96,6 +122,20 @@ export function ParametrosDialog({ open, onOpenChange, parametros }: Props) {
         tiktokTaxaPagamentoPct: parseDecimalBr(form.tiktokTaxaPagamentoPct),
         margemThresholdVerde: parseDecimalBr(form.margemThresholdVerdePct) / 100,
         margemThresholdAmarelo: parseDecimalBr(form.margemThresholdAmareloPct) / 100,
+        adsCpcMedioCentavos: parseDecimalParaCentavos(form.adsCpcReais),
+        adsTaxaRetornoPct: parseDecimalBr(form.adsRetornoPct),
+        adsJanelaTesteDias: Math.round(parseDecimalBr(form.adsJanelaDias)),
+        adsNivelConfianca: form.adsConfianca === '99' ? 99 : 95,
+        adsFatorMargemEscala: parseDecimalBr(form.adsFatorEscala),
+        adsPassoIncrementoPct: parseDecimalBr(form.adsPassoPct),
+        adsCadenciaIncrementoDias: Math.round(parseDecimalBr(form.adsCadenciaDias)),
+        adsNDegraus: Math.round(parseDecimalBr(form.adsNDegraus)),
+        adsBudgetDiarioMinimoCentavos: form.adsBudgetMinReais.trim()
+          ? parseDecimalParaCentavos(form.adsBudgetMinReais)
+          : null,
+        adsTetoBudgetDiarioCentavos: form.adsTetoReais.trim()
+          ? parseDecimalParaCentavos(form.adsTetoReais)
+          : null,
       };
       await apiFetch('/parametros', { method: 'PATCH', json: payload });
       await qc.invalidateQueries({ queryKey: ['parametros'] });
@@ -270,6 +310,98 @@ export function ParametrosDialog({ open, onOpenChange, parametros }: Props) {
                 onChange={(s) => setForm({ ...form, margemThresholdAmareloPct: s })}
                 decimals={0}
               />
+            </div>
+          </div>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            <Label className="text-sm font-medium">Anúncios (Shopee Ads)</Label>
+            <p className="text-xs text-muted-foreground">
+              Defaults do ROAS de anúncios usados em produtos e na Calculadora.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">CPC médio (R$)</Label>
+                <InputDecimal
+                  value={form.adsCpcReais}
+                  onChange={(s) => setForm({ ...form, adsCpcReais: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Taxa de retorno (%)</Label>
+                <InputDecimal
+                  value={form.adsRetornoPct}
+                  onChange={(s) => setForm({ ...form, adsRetornoPct: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Janela de teste (dias)</Label>
+                <InputDecimal
+                  value={form.adsJanelaDias}
+                  decimals={0}
+                  onChange={(s) => setForm({ ...form, adsJanelaDias: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Confiança</Label>
+                <Select
+                  value={form.adsConfianca}
+                  onValueChange={(v) => setForm({ ...form, adsConfianca: v as '95' | '99' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="95">95%</SelectItem>
+                    <SelectItem value="99">99%</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Fator margem (escala)</Label>
+                <InputDecimal
+                  value={form.adsFatorEscala}
+                  onChange={(s) => setForm({ ...form, adsFatorEscala: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Passo da escala (%)</Label>
+                <InputDecimal
+                  value={form.adsPassoPct}
+                  onChange={(s) => setForm({ ...form, adsPassoPct: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Cadência (dias)</Label>
+                <InputDecimal
+                  value={form.adsCadenciaDias}
+                  decimals={0}
+                  onChange={(s) => setForm({ ...form, adsCadenciaDias: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Degraus da escala</Label>
+                <InputDecimal
+                  value={form.adsNDegraus}
+                  decimals={0}
+                  onChange={(s) => setForm({ ...form, adsNDegraus: s })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Budget mín. Shopee (R$)</Label>
+                <InputDecimal
+                  value={form.adsBudgetMinReais}
+                  onChange={(s) => setForm({ ...form, adsBudgetMinReais: s })}
+                  placeholder="opcional"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Teto budget/dia (R$)</Label>
+                <InputDecimal
+                  value={form.adsTetoReais}
+                  onChange={(s) => setForm({ ...form, adsTetoReais: s })}
+                  placeholder="opcional"
+                />
+              </div>
             </div>
           </div>
 

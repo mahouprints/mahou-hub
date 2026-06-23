@@ -288,6 +288,18 @@ model Parametro {
   tiktokTaxaPagamentoPct      Decimal            @default(3.00) @db.Decimal(5, 2)
   margemThresholdVerde        Decimal            @default(0.30) @db.Decimal(4, 3)
   margemThresholdAmarelo      Decimal            @default(0.15) @db.Decimal(4, 3)
+  // Defaults globais do plano de anúncios (Shopee Ads), tunáveis pelo usuário.
+  // A Calculadora permite override local sem persistir. Lógica em @mahou-hub/pricing planoAds.
+  adsCpcMedioCentavos           Int                @default(50)
+  adsTaxaRetornoPct             Decimal            @default(8.00) @db.Decimal(5, 2)
+  adsJanelaTesteDias            Int                @default(5)
+  adsNivelConfianca             Int                @default(95)
+  adsFatorMargemEscala          Decimal            @default(1.40) @db.Decimal(4, 2)
+  adsPassoIncrementoPct         Decimal            @default(25.00) @db.Decimal(5, 2)
+  adsCadenciaIncrementoDias     Int                @default(3)
+  adsNDegraus                   Int                @default(5)
+  adsBudgetDiarioMinimoCentavos Int?
+  adsTetoBudgetDiarioCentavos   Int?
   atualizadoEm                DateTime           @updatedAt
 }
 

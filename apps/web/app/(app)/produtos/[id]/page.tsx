@@ -21,6 +21,7 @@ import type {
   CalcularOutput,
   EstatisticasProduto,
   Parametro,
+  PlanoAdsOutput,
   Produto,
   ProdutoImagem,
 } from '@mahou-hub/contracts';
@@ -29,15 +30,10 @@ import { centavosParaReais, isUrl, pct } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ImagensSection } from '@/components/imagens-section';
 import { VariacoesSection } from '@/components/variacoes-section';
+import { PlanoAdsPaineis } from '@/components/plano-ads-paineis';
 
 type ProdutoComFilamento = Produto & {
   filamento: { id: string; nome: string };
@@ -110,6 +106,21 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
     queryFn: () => apiFetch<EstatisticasProduto>(`/produtos/${id}/estatisticas`),
   });
 
+  // ROAS derivado da economia real do canal principal, usando os defaults globais de anúncio.
+  const liquidoPrincipalCentavos = pricing ? canalLiquido(pricing, produto!.canalPrincipal) : null;
+  const { data: planoAds, isFetching: planoCarregando } = useQuery({
+    queryKey: ['produto-plano-ads', id, liquidoPrincipalCentavos, produto?.precoCentavos],
+    enabled: liquidoPrincipalCentavos != null && !!produto,
+    queryFn: () =>
+      apiFetch<PlanoAdsOutput>('/pricing/plano-ads', {
+        method: 'POST',
+        json: {
+          precoCentavos: produto!.precoCentavos,
+          margemContribuicaoCentavos: liquidoPrincipalCentavos!,
+        },
+      }),
+  });
+
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
   if (!produto) return <p className="text-sm text-muted-foreground">Produto não encontrado.</p>;
 
@@ -117,7 +128,12 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-2">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 h-7 px-2 text-muted-foreground">
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="-ml-2 h-7 px-2 text-muted-foreground"
+          >
             <Link href="/produtos">
               <ArrowLeft className="h-4 w-4" /> Produtos
             </Link>
@@ -207,8 +223,36 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Anúncios — ROAS, teste e escalonamento</CardTitle>
+          <CardDescription>
+            Quanto investir para validar e como escalar o orçamento, a partir do líquido de{' '}
+            {CANAL_LABEL[produto.canalPrincipal]}. Os defaults vêm de Parâmetros; simule outros na
+            Calculadora.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PlanoAdsPaineis
+            plano={planoAds}
+            nivelConfianca={Number(parametros?.adsNivelConfianca ?? 95)}
+            carregando={planoCarregando || !pricing}
+          />
+        </CardContent>
+      </Card>
     </div>
   );
+}
+
+function canalLiquido(p: CalcularOutput, canal: Canal): number {
+  return canal === 'SHOPEE'
+    ? p.liquidoShopeeCentavos
+    : canal === 'ML'
+      ? p.liquidoMlCentavos
+      : canal === 'TIKTOK'
+        ? p.liquidoTikTokCentavos
+        : p.liquidoSiteCentavos;
 }
 
 function EspecificacoesCard({ produto }: { produto: ProdutoComFilamento }) {
@@ -583,15 +627,7 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {
   );
 }
 
-function Item({
-  rotulo,
-  valor,
-  destaque,
-}: {
-  rotulo: string;
-  valor: string;
-  destaque?: boolean;
-}) {
+function Item({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: boolean }) {
   return (
     <div
       className={cn(

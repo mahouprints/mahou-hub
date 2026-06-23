@@ -17,6 +17,18 @@ export const ParametroSchema = z.object({
   tiktokTaxaPagamentoPct: z.number().nonnegative().default(3),
   margemThresholdVerde: z.number().min(0).max(1).default(0.3),
   margemThresholdAmarelo: z.number().min(0).max(1).default(0.15),
+  // Defaults globais do plano de anúncios (Shopee Ads). Tunáveis pelo usuário; a
+  // Calculadora permite override local sem persistir. Ver @mahou-hub/pricing planoAds.
+  adsCpcMedioCentavos: z.number().int().positive().default(50),
+  adsTaxaRetornoPct: z.number().min(0).max(100).default(8),
+  adsJanelaTesteDias: z.number().int().min(1).default(5),
+  adsNivelConfianca: z.union([z.literal(95), z.literal(99)]).default(95),
+  adsFatorMargemEscala: z.number().min(1).default(1.4),
+  adsPassoIncrementoPct: z.number().min(0).default(25),
+  adsCadenciaIncrementoDias: z.number().int().min(1).default(3),
+  adsNDegraus: z.number().int().min(1).max(20).default(5),
+  adsBudgetDiarioMinimoCentavos: z.number().int().positive().nullable().default(null),
+  adsTetoBudgetDiarioCentavos: z.number().int().positive().nullable().default(null),
 });
 
 export const ParametroUpdateSchema = ParametroSchema.partial({ id: true });

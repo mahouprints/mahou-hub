@@ -2,8 +2,10 @@ import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   CalcularInputSchema,
+  PlanoAdsInputSchema,
   SimularInputSchema,
   type CalcularInput,
+  type PlanoAdsInput,
   type SimularInput,
 } from '@mahou-hub/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
@@ -25,5 +27,10 @@ export class PricingController {
   @Post('simular')
   simular(@Body(new ZodValidationPipe(SimularInputSchema)) input: SimularInput) {
     return this.service.simular(input);
+  }
+
+  @Post('plano-ads')
+  planoAds(@Body(new ZodValidationPipe(PlanoAdsInputSchema)) input: PlanoAdsInput) {
+    return this.service.planoAds(input);
   }
 }
