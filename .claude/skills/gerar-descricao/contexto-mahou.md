@@ -118,8 +118,7 @@ coisa que exija o comprador já ter comprado outra coisa antes.
 |---|---|
 | Produtos, custos, margem, estoque | Hub (MCP tools `listar_produtos`, `obter_produto`) |
 | Regras de cada marketplace | `content/marketplace/regras/{shopee,mercado-livre,tiktok-shop}.md` |
-| Keywords por categoria | `content/marketplace/treino/keywords/` |
-| Listings que funcionaram | `content/marketplace/treino/listings_que_funcionaram/` |
+| Keywords por categoria | `content/marketplace/treino/keywords/` (hoje só `gamer`) |
 | Acervo criativo e fotos | `~/Documents/Mahou Prints/` |
 | Saída dos anúncios gerados | `~/Documents/Mahou Prints/products/{slug}/listings/` |
 

@@ -4,7 +4,8 @@ Leva um produto do Hub até o anúncio pronto: **confere a economia**, **sugere 
 **calcula o ROAS alvo do teste e da escala**, e **escreve título + descrição + tags** para
 Shopee, Mercado Livre e TikTok Shop.
 
-**Leia sempre `contexto-mahou.md` (ao lado deste arquivo) antes de qualquer coisa.** Ele
+**Leia sempre o `contexto-mahou.md` antes de qualquer coisa** — ele fica ao lado deste
+arquivo no repo, e vem concatenado no fim quando a skill é sincronizada pro uso global. Ele
 tem as regras de negócio — degrau de taxa da Shopee, marcas proibidas, tom de voz, o que
 vende e o que não vende. Sem ele você vai gerar copy bonita para um produto que não fecha conta.
 
@@ -223,10 +224,6 @@ literal: cada algoritmo quer coisa diferente.
 
 **`lote`** — vários produtos em sequência. Use `listar_produtos` com `anunciado: false`.
 Em lote, use o modo rápido de título e só aprofunde nos que o Gabriel marcar.
-
-**`aprender`** — lê `content/marketplace/treino/listings_que_funcionaram/{marketplace}/`,
-extrai padrão (ordem de palavras, blocos, vocabulário, emojis) e consolida em
-`treino/_padrao_aprendido_{marketplace}.md`. Esse arquivo passa a ser lido antes de gerar.
 
 ---
 

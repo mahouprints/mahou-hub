@@ -2,7 +2,7 @@
 
 Expõe o backend do Mahou Hub como tools MCP pro Claude (Desktop, Code, web).
 
-22 tools que cobrem dois domínios:
+24 tools que cobrem dois domínios:
 - **Inteligência de Oportunidades** — descoberta no Shopee Affiliate, gestão de backlog, geração de ideias autorais.
 - **Catálogo Mahou** — produtos, filamentos, insumos e calculadora de pricing.
 
@@ -42,7 +42,7 @@ EOF
 claude
 ```
 
-O `.mcp.json` na raiz aponta pro MCP local via `node --env-file=./mcp-servers/mahou-hub/.env.local`. As 22 tools `mcp__mahou-hub__*` ficam disponíveis na primeira mensagem. Teste com:
+O `.mcp.json` na raiz aponta pro MCP local via `node --env-file=./mcp-servers/mahou-hub/.env.local`. As 24 tools `mcp__mahou-hub__*` ficam disponíveis na primeira mensagem. Teste com:
 
 > Quantas oportunidades temos no backlog?
 

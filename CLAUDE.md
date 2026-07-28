@@ -115,11 +115,11 @@ Monorepo pnpm + Turborepo. `apps/web` = Next.js 15 (Vercel, domínio `hub.mahoup
   Em Linux/Docker (prod) não acontece.
 
 ## MCP server (Claude Code/Desktop)
-- `mcp-servers/mahou-hub/` expõe **22 tools** pro Claude (10 oportunidades + 12 catálogo).
+- `mcp-servers/mahou-hub/` expõe **24 tools** pro Claude (10 oportunidades + 13 catálogo + 1 concorrentes).
 - Onboarding completo + lista de tools agrupadas + fluxos típicos em `mcp-servers/mahou-hub/README.md` (passo-a-passo 5min).
 - Pra adicionar novas áreas de tools: criar `tools-<area>.ts`, importar em `src/index.ts`. Schemas Zod replicados localmente (sem dep em contracts) pra manter o MCP server publicável standalone.
 - **`.mcp.json` usa `node --env-file=./mcp-servers/mahou-hub/.env.local`** (Node 20.6+ nativo). `${VAR}` no `.mcp.json` **NÃO é interpolado** pelo Claude Code — usar shell env causa 401 silencioso (passou string literal pro filho).
-- **`zodToJsonSchema(s)` sem `target: 'openApi3'`** — OpenAPI 3.0 gera `nullable: true` que viola JSON Schema draft 2020-12 (exigido pela Anthropic API). Erro 400 derruba TODAS as 22 tools de uma vez.
+- **`zodToJsonSchema(s)` sem `target: 'openApi3'`** — OpenAPI 3.0 gera `nullable: true` que viola JSON Schema draft 2020-12 (exigido pela Anthropic API). Erro 400 derruba TODAS as 24 tools de uma vez.
 
 ## Skills de conteúdo (Claude Code slash commands)
 - `.claude/skills/<nome>/SKILL.md` — skills slash command que automatizam tarefas editoriais. **Diferente do MCP server**: skills são instruções em texto pro agente seguir (sem código); MCP tools são funções TypeScript que retornam dados. Skills usam MCP tools quando precisam ler do banco.
