@@ -38,6 +38,23 @@ num marketplace.
 - Arma realista, item ofensivo, conteúdo adulto.
 - Peça de reposição de um aparelho específico (a dobradiça daquele micro-ondas): público
   bom, mas o anúncio não escala.
+- **Acessório de ecossistema maker.** Peça que só serve a quem JÁ possui um sistema
+  específico: Gridfinity, IKEA Skadis, openGrid, Multiboard, Dummy 13, racks de home lab,
+  suportes de bobina. São bem executadas e fotografam bem — e é por isso que enganam. No
+  Brasil o público que tem esses sistemas é minúsculo, e quem tem imprime sozinho. Pergunte
+  sempre: **o comprador precisa já ter comprado outra coisa pra isto fazer sentido?** Se
+  sim, reprove ou marque TALVEZ, por melhor que a peça pareça.
+
+## Armadilhas de foto (olhe a imagem, não a ficha)
+
+- **Pintura à mão esconde o resultado real.** Foto de miniatura pintada com detalhe mostra
+  o trabalho do autor, não o que sai da impressora. Imagine a peça em cor sólida: se virar
+  um blob sem definição, a nota é a do blob.
+- **A ficha erra o número de cores.** Se a foto mostra duas ou mais cores e a ficha diz
+  "1 cor", marque MULTICOR — o resultado em cor única sai mais liso que o anunciado.
+- **Peso que não bate com o objeto.** Se a ficha diz 3g mas a foto mostra uma caixa
+  funcional de tamanho real, o perfil provavelmente cobre só uma peça de um conjunto.
+  Desconfie e sinalize na justificativa.
 
 ## Sinalize em \`alertas\` quando notar na imagem
 

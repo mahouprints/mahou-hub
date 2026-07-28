@@ -38,8 +38,9 @@ function ficha(modelo: ModeloCandidato, posicao: number): string {
 - Custo estimado: ${reais(e.custoTotalCentavos)} · Preço sugerido: ${reais(e.precoSugeridoCentavos)} · Margem: ${e.margemEstimadaPct}% · ${reais(e.lucroPorHoraCentavos)}/hora de impressora
 - Licença: ${modelo.licenca}
 - Tags: ${modelo.tags.slice(0, 10).join(', ') || '(sem tags)'}
-- Foto real do autor: ${modelo.temFotoReal ? 'sim' : 'não — só render'}
-- Imagens para avaliar:
+- Imagens para avaliar (julgue você se é foto real ou render — o campo
+  \`isRealLifePhoto\` do MakerWorld marca só 10% do acervo e erra pra menos com frequência,
+  então não informamos aqui pra não enviesar):
 ${imagens}
 `;
 }

@@ -10,6 +10,7 @@
     "filtrar": "npx -y tsx src/cli.ts filtrar",
     "imagens": "npx -y tsx src/cli.ts imagens",
     "lotes": "npx -y tsx src/cli.ts lotes",
+    "segunda-opiniao": "npx -y tsx src/cli.ts segunda-opiniao",
     "consolidar": "npx -y tsx src/cli.ts consolidar",
     "subir": "npx -y tsx src/cli.ts subir",
     "status": "npx -y tsx src/cli.ts status"

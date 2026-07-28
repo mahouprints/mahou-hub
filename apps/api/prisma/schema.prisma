@@ -273,22 +273,22 @@ model Custo {
 
 /// Singleton: sempre id=1. Configurações globais do Hub.
 model Parametro {
-  id                          Int                @id @default(1)
-  tarifaKwhCentavos           Int
-  vendedorShopee              VendedorShopeeTipo
-  emCampanhaShopee            Boolean            @default(false)
-  adicionalCampanhaPct        Decimal            @db.Decimal(5, 2)
-  comissaoMlPct               Decimal            @db.Decimal(5, 2)
-  impostoAtivo                Boolean            @default(false)
-  impostoPct                  Decimal            @db.Decimal(5, 2)
+  id                            Int                @id @default(1)
+  tarifaKwhCentavos             Int
+  vendedorShopee                VendedorShopeeTipo
+  emCampanhaShopee              Boolean            @default(false)
+  adicionalCampanhaPct          Decimal            @db.Decimal(5, 2)
+  comissaoMlPct                 Decimal            @db.Decimal(5, 2)
+  impostoAtivo                  Boolean            @default(false)
+  impostoPct                    Decimal            @db.Decimal(5, 2)
   // Taxas do TikTok Shop são percentuais simples (sem faixa por preço).
   // Defaults batem com a estrutura padrão (jul/2026): comissão+SFP+afiliado+pagamento.
-  tiktokComissaoPlataformaPct Decimal            @default(6.00) @db.Decimal(5, 2)
-  tiktokTaxaSfpPct            Decimal            @default(6.00) @db.Decimal(5, 2)
-  tiktokComissaoAfiliadoPct   Decimal            @default(30.00) @db.Decimal(5, 2)
-  tiktokTaxaPagamentoPct      Decimal            @default(3.00) @db.Decimal(5, 2)
-  margemThresholdVerde        Decimal            @default(0.30) @db.Decimal(4, 3)
-  margemThresholdAmarelo      Decimal            @default(0.15) @db.Decimal(4, 3)
+  tiktokComissaoPlataformaPct   Decimal            @default(6.00) @db.Decimal(5, 2)
+  tiktokTaxaSfpPct              Decimal            @default(6.00) @db.Decimal(5, 2)
+  tiktokComissaoAfiliadoPct     Decimal            @default(30.00) @db.Decimal(5, 2)
+  tiktokTaxaPagamentoPct        Decimal            @default(3.00) @db.Decimal(5, 2)
+  margemThresholdVerde          Decimal            @default(0.30) @db.Decimal(4, 3)
+  margemThresholdAmarelo        Decimal            @default(0.15) @db.Decimal(4, 3)
   // Defaults globais do plano de anúncios (Shopee Ads), tunáveis pelo usuário.
   // A Calculadora permite override local sem persistir. Lógica em @mahou-hub/pricing planoAds.
   adsCpcMedioCentavos           Int                @default(50)
@@ -301,7 +301,7 @@ model Parametro {
   adsNDegraus                   Int                @default(5)
   adsBudgetDiarioMinimoCentavos Int?
   adsTetoBudgetDiarioCentavos   Int?
-  atualizadoEm                DateTime           @updatedAt
+  atualizadoEm                  DateTime           @updatedAt
 }
 
 model TaxaShopee {
@@ -500,6 +500,7 @@ model JobProducao {
   consumoProdutoRegistrado Boolean          @default(false)
   anuncioCriado            Boolean          @default(false)
   anunciado                Boolean          @default(false)
+  itensPedido              PedidoItem[]
   observacao               String?
   criadoEm                 DateTime         @default(now())
   atualizadoEm             DateTime         @updatedAt
@@ -528,6 +529,7 @@ model ProdutoVariacao {
   ativo         Boolean            @default(true)
   movimentos    MovimentoEstoque[]
   jobs          JobProducao[]
+  itensPedido   PedidoItem[]
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
 
@@ -611,7 +613,7 @@ model ModeloMakerWorld {
   colecoes  Int @default(0)
 
   /// String crua da licença ("CC0", "BY-NC-SA", "Standard Digital File License"...).
-  licenca String
+  licenca          String
   /// Veredicto comercial derivado: LIVRE / ATRIBUICAO / SEM_DERIVADAS / PROIBIDA.
   /// Só entram no banco os vendáveis — PROIBIDA aqui indicaria reclassificação posterior.
   licencaVeredicto String
@@ -622,11 +624,11 @@ model ModeloMakerWorld {
   nicho String
 
   /// Peso e tempo DO ANÚNCIO (peça × unidadesPorKit), não da peça isolada.
-  pesoGramas Decimal @db.Decimal(10, 2)
-  tempoHoras Decimal @db.Decimal(10, 2)
+  pesoGramas     Decimal @db.Decimal(10, 2)
+  tempoHoras     Decimal @db.Decimal(10, 2)
   /// Quantas peças o anúncio vende junto. 1 = avulsa. Peça abaixo de 18g não se
   /// sustenta como anúncio próprio na Shopee (taxa fixa + frete), então vira kit.
-  unidadesPorKit Int @default(1)
+  unidadesPorKit Int     @default(1)
 
   /// Estimativas de triagem, recalculadas pelo `packages/pricing` quando virar Produto.
   custoEstimadoCentavos Int
@@ -636,19 +638,19 @@ model ModeloMakerWorld {
   lucroPorHoraCentavos  Int
 
   /// 0..100 por regra (tração + rendimento + peso do nicho). Não é a nota da IA.
-  scoreObjetivo Int
+  scoreObjetivo   Int
   /// 0..100 dado pela avaliação visual. Curadoria do Opus sobrescreve a triagem do Haiku.
-  notaIa        Int
+  notaIa          Int
   /// APROVADO / TALVEZ / REPROVADO
-  veredictoIa   String
+  veredictoIa     String
   justificativaIa String
   /// IP_TERCEIRO, PRECISA_SUPORTE, FRAGIL, MUITO_GENERICO, MULTICOR, SO_RENDER...
-  alertas       String[]
-  tags          String[]
-  temFotoReal   Boolean @default(false)
+  alertas         String[]
+  tags            String[]
+  temFotoReal     Boolean  @default(false)
 
   /// Revisão do Gabriel — é a palavra final, sobrepõe o veredicto da IA.
-  status    ModeloMakerWorldStatus @default(NOVO)
+  status     ModeloMakerWorldStatus @default(NOVO)
   observacao String?
 
   produtoId String?  @unique
@@ -667,4 +669,92 @@ enum ModeloMakerWorldStatus {
   FAVORITO
   DESCARTADO
   VIROU_PRODUTO
+}
+
+/// Pedido importado de um marketplace (Shopee Open Platform ou Mercado Livre).
+///
+/// NÃO existe "aceitar pedido" em nenhum dos dois: pedido pago já entra pronto pra
+/// despachar. A única recusa possível é cancelar, e cancelar por falta de estoque
+/// penaliza a reputação da loja — por isso o Hub nunca cancela automaticamente.
+/// O que ele faz é atender: baixa do estoque de prontos quando há peça, ou põe na
+/// fila de produção quando não há.
+model PedidoMarketplace {
+  id String @id @default(cuid())
+
+  canal         Canal
+  /// `order_sn` na Shopee, `id` no Mercado Livre.
+  externalId    String
+  /// Status cru do marketplace (READY_TO_SHIP, paid, cancelled...). Guardado sem
+  /// normalizar de propósito: cada marketplace tem seu vocabulário e traduzir cedo
+  /// perde informação que ajuda a depurar divergência.
+  statusExterno String
+
+  compradorNome String?
+  totalCentavos Int
+  /// Prazo de despacho do marketplace. É o que decide a prioridade na fila —
+  /// estourar isso é penalidade na reputação.
+  prazoEnvio    DateTime?
+  dataPedido    DateTime
+
+  status     PedidoStatus @default(PENDENTE)
+  /// Preenchido quando algum item não pôde ser atendido (SKU sem vínculo, por exemplo).
+  observacao String?
+
+  itens        PedidoItem[]
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+
+  @@unique([canal, externalId])
+  @@index([status, prazoEnvio])
+  @@index([dataPedido(sort: Desc)])
+}
+
+/// Item de um pedido. `variacaoId` só é preenchido quando o SKU do marketplace
+/// casou com um SKU do catálogo — quando não casa, o item fica SEM_VINCULO
+/// esperando o humano ligar os dois. Nunca adivinhamos por semelhança de nome:
+/// errar o vínculo baixa estoque do produto errado.
+model PedidoItem {
+  id       String            @id @default(cuid())
+  pedidoId String
+  pedido   PedidoMarketplace @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  /// SKU exatamente como o marketplace enviou.
+  skuExterno            String
+  nomeExterno           String
+  qtd                   Int
+  precoUnitarioCentavos Int
+
+  variacaoId String?
+  variacao   ProdutoVariacao? @relation(fields: [variacaoId], references: [id], onDelete: SetNull)
+
+  atendimento   PedidoItemAtendimento @default(SEM_VINCULO)
+  /// Job criado quando não havia peça pronta. Permite acompanhar da venda até a impressora.
+  jobProducaoId String?
+  jobProducao   JobProducao?          @relation(fields: [jobProducaoId], references: [id], onDelete: SetNull)
+
+  criadoEm DateTime @default(now())
+
+  @@index([pedidoId])
+  @@index([atendimento])
+}
+
+enum PedidoStatus {
+  /// Chegou, ainda não processado.
+  PENDENTE
+  /// Todos os itens atendidos (estoque baixado ou job criado).
+  ATENDIDO
+  /// Pelo menos um item sem vínculo de SKU — exige ação humana.
+  BLOQUEADO
+  /// Cancelado no marketplace.
+  CANCELADO
+  ENVIADO
+}
+
+enum PedidoItemAtendimento {
+  /// SKU do marketplace não casou com nenhuma variação do catálogo.
+  SEM_VINCULO
+  /// Havia peça pronta; estoque baixado.
+  BAIXADO_ESTOQUE
+  /// Não havia peça pronta; job criado na fila de produção.
+  EM_PRODUCAO
 }

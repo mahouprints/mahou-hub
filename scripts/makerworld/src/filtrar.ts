@@ -59,10 +59,12 @@ function pontuar(modelo: ModeloEnriquecido, lucroHora: number, margem: number): 
   // Coleção vale mais que like: salvar um modelo é intenção de imprimir, curtir é cortesia.
   const provaSocial = Math.min((modelo.colecoes * 2 + modelo.likes) / 8000, 1) * 15;
 
-  const bonusFoto = modelo.temFotoReal ? 4 : 0;
+  // Sem bônus por foto real: o `isRealLifePhoto` da API marca só ~10% do acervo e erra
+  // pra menos com frequência (revisões de 2026-07-28 acharam foto real em dezenas de
+  // modelos marcados como render). Premiar por esse campo premiava o ruído.
   const penalidadeMargem = margem < 45 ? -5 : 0;
 
-  const bruto = tracao + rendimento + pesoNicho + provaSocial + bonusFoto + penalidadeMargem;
+  const bruto = tracao + rendimento + pesoNicho + provaSocial + penalidadeMargem;
   return Math.max(0, Math.min(100, Math.round(bruto)));
 }
 

@@ -6,6 +6,7 @@
 //   npm run filtrar      corta inviáveis e pontua por regra
 //   npm run imagens      baixa e reduz as imagens dos candidatos
 //   npm run lotes        gera os arquivos de lote pros avaliadores
+//   npm run segunda-opiniao  gera lotes de revisão da zona cinzenta (TALVEZ + nota 60-79)
 //   npm run consolidar   junta os vereditos da IA com os candidatos
 //   npm run subir        envia os aprovados pro Mahou Hub
 //   npm run status       mostra onde o pipeline está
@@ -16,6 +17,7 @@ import { enriquecer } from './enriquecer.js';
 import { filtrar, LIMITES_PADRAO } from './filtrar.js';
 import { baixarImagens } from './imagens.js';
 import { gerarLotes } from './lotes.js';
+import { gerarLotesSegundaOpiniao } from './segunda-opiniao.js';
 import { consolidar } from './consolidar.js';
 import { subirParaHub } from './subir-hub.js';
 import type { ModeloAvaliado, ModeloCandidato, ModeloColetado } from './tipos.js';
@@ -90,6 +92,14 @@ async function principal(): Promise<void> {
       console.log(`\n${r.lotes} lotes com ${r.modelos} modelos em dados/lotes/.`);
       break;
     }
+    case 'segunda-opiniao': {
+      const r = await gerarLotesSegundaOpiniao({
+        limite,
+        porLote: numeroDoArgumento('--por-lote'),
+      });
+      console.log(`\n${r.lotes} lotes de revisão com ${r.modelos} modelos em dados/lotes/.`);
+      break;
+    }
     case 'consolidar': {
       const r = await consolidar();
       console.log(
@@ -108,7 +118,8 @@ async function principal(): Promise<void> {
       break;
     default:
       console.log(
-        'Comandos: coletar [--rapido] | enriquecer | filtrar | imagens | lotes | consolidar | subir | status',
+        'Comandos: coletar [--rapido] | enriquecer | filtrar | imagens | lotes | ' +
+          'segunda-opiniao | consolidar | subir | status',
       );
       process.exitCode = 1;
   }
