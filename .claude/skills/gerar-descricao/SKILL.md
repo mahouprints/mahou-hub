@@ -1,336 +1,251 @@
-# Skill: Gerador de Descrições e Títulos para Marketplaces (Mahou Prints)
+# Skill: Anunciar Produto (Mahou Prints)
 
-Gera **descrições completas** e **títulos otimizados** de produtos Mahou Prints para **Shopee**, **Mercado Livre** e **TikTok Shop**. Tom **misto SEO-first**: combina otimização agressiva de busca + benefícios funcionais/emocionais.
+Leva um produto do Hub até o anúncio pronto: **confere a economia**, **sugere preço**,
+**calcula o ROAS alvo do teste e da escala**, e **escreve título + descrição + tags** para
+Shopee, Mercado Livre e TikTok Shop.
 
-## 🎯 Quando usar
-- Acabou de cadastrar um produto novo e precisa da descrição
-- Quer **refinar** uma descrição existente que não está vendendo
-- Quer **traduzir** uma descrição entre marketplaces (já tem na Shopee, quer no ML)
-- Quer um **lote** de descrições (vários produtos, vários marketplaces de uma vez)
+**Leia sempre `contexto-mahou.md` (ao lado deste arquivo) antes de qualquer coisa.** Ele
+tem as regras de negócio — degrau de taxa da Shopee, marcas proibidas, tom de voz, o que
+vende e o que não vende. Sem ele você vai gerar copy bonita para um produto que não fecha conta.
 
-## 📂 Estrutura de pastas
+## Quando usar
 
-```
-content/marketplace/
-├── regras/                          # 📜 regras técnicas e SEO por marketplace
-│   ├── shopee.md
-│   ├── mercado-livre.md
-│   └── tiktok-shop.md
-├── catalogo/
-│   └── produtos.json                # 🧠 catálogo Mahou Prints com keywords por produto
-└── treino/                          # 🎓 base de aprendizado (preenchida pelo usuário)
-    ├── COMO_TREINAR.md
-    ├── template_listing.md
-    ├── listings_que_funcionaram/    # 🟢 exemplos de sucesso por marketplace
-    ├── concorrentes/                # 🔵 análise de concorrentes
-    └── keywords/                    # 🟡 banco de palavras-chave por categoria
+- Produto novo cadastrado e você quer anunciar
+- Descrição que não está vendendo e precisa ser refeita
+- Já tem anúncio na Shopee e quer levar pro ML
+- Quer saber **quanto investir em anúncio** e **qual ROAS perseguir** antes de apertar o play
+- Lote de produtos de uma vez
 
-C:\Users\PC\Documents\Mahou Prints\products\{produto-slug}\
-└── listings\                        # 📤 OUTPUT — descrições + títulos salvos aqui
-    ├── shopee.md
-    ├── mercado-livre.md
-    └── tiktok-shop.md
-```
+## A fonte de verdade é o Hub, não arquivo
 
-> Nota: o nome da skill é `gerar-descricao` (sem cedilha para compatibilidade com filesystem), mas a saída cobre **descrição + título + tags + atributos** — pacote completo pra você só copiar e colar no marketplace.
+O Hub (`hub.mahouprints.com`) tem os produtos reais com custo, peso, tempo, margem por canal
+e estoque. **Puxe de lá via MCP tools** — nunca invente número nem confie em catálogo estático:
 
-## 🚀 Modos de operação
+| Precisa de | Tool |
+|---|---|
+| Lista de produtos | `listar_produtos` (filtro `anunciado: false` pega os pendentes) |
+| Um produto com custos e margem por canal | `obter_produto` |
+| Testar preço hipotético | `calcular_preco` |
+| **ROAS e plano de anúncio** | `calcular_plano_ads` |
+| Marcar como anunciado depois | `marcar_produtos_anunciados` |
 
-### Modo 1 — `gerar` (1 produto, marketplaces escolhidos)
-Gera descrição + título para 1 produto em 1 ou mais marketplaces.
-
-**Comando típico:** "gera descrição pra Shopee e ML do produto suporte-controle-ps5"
-
-### Modo 2 — `gerar-batch` (vários produtos)
-Processa N produtos em sequência. Útil quando cadastra muitos de uma vez.
-
-**Comando típico:** "gera descrições de todos os produtos novos pra Shopee" → processa `products/` que ainda não têm `listings/shopee.md`.
-
-### Modo 3 — `refinar` (atualizar descrição existente)
-Lê uma descrição já gerada, reescreve com base em feedback ou novas keywords.
-
-**Comando típico:** "refina a descrição do abajur-bubble na Shopee, foca mais em 'aesthetic' e 'cantinho cozy'"
-
-### Modo 4 — `traduzir` (já tenho num marketplace, quero noutro)
-Lê a descrição existente de um marketplace e adapta às regras do outro (não traduz literal — re-otimiza pro algoritmo do destino).
-
-**Comando típico:** "transforma a descrição da Shopee do abajur-wave em descrição do ML"
-
-### Modo 5 — `aprender` (extrai padrão de exemplos)
-Lê os arquivos em `treino/listings_que_funcionaram/` e atualiza o catálogo/keywords com o estilo encontrado.
-
-**Comando típico:** "aprende com as descrições que botei na pasta de treino"
+Se o produto ainda não existe no Hub, pergunte os dados e ofereça criar com `criar_produto`
+antes de seguir — anunciar produto que não está no ERP quebra o controle de estoque depois.
 
 ---
 
-## 🛠️ Fluxo de execução (Modo 1 — gerar)
+## Fluxo
 
-### Passo 1 — Coleta de contexto
+### Fase 1 — Economia (antes de escrever qualquer palavra)
 
-1. **Ler obrigatoriamente:**
-   - `content/marketplace/catalogo/produtos.json` — buscar o produto pelo slug
-   - `content/marketplace/regras/{marketplace}.md` — para CADA marketplace pedido
-   - `content/marketplace/treino/keywords/{categoria}.md` — se existir para a categoria do produto
-   - `content/marketplace/treino/listings_que_funcionaram/{marketplace}/` — listar arquivos pra ver se há exemplo similar
+**Não escreva copy de produto que não fecha conta.** Comece por aqui:
 
-2. **Verificar pasta do produto:**
-   - `C:\Users\PC\Documents\Mahou Prints\products\{produto-slug}\` existe?
-   - Se sim, listar imagens disponíveis em `referencias/`
-   - Se já existe `listings/{marketplace}.md`, **perguntar** se deve sobrescrever ou versionar (`shopee_v2.md`)
+1. `obter_produto` para pegar preço atual, custo total e líquido por canal.
+2. Confira contra o **degrau de R$ 80 da Shopee** (ver `contexto-mahou.md`). Se o preço
+   estiver entre R$ 80 e R$ 100, quase sempre há um preço melhor abaixo de R$ 79,90 —
+   simule com `calcular_preco` e mostre a comparação.
+3. Calcule o **lucro por hora de impressão**: `líquido ÷ tempo de impressão`. É a métrica
+   que decide se vale ocupar a fila. Abaixo de ~R$ 4/hora, diga isso ao Gabriel antes de
+   continuar.
+4. Margem negativa ou lucro/hora ruim → **pare e reporte**. Não gere anúncio para produto
+   que dá prejuízo; proponha preço ou peça revisão do custo.
 
-3. **🔍 ANÁLISE VISUAL OBRIGATÓRIA da imagem do produto:**
-   - **Sem imagem = sem descrição.** Se `referencias/` está vazia, **PARAR e pedir foto/render ao usuário antes de prosseguir**. Não chutar com base no catálogo — o catálogo é frequentemente incompleto (caso real: catálogo dizia "4 formatos", produto tinha 6).
-   - Se tem imagem(ns), usar a tool Read pra ler o arquivo visualmente (suporta JPG/PNG/WebP). Anotar antes de gerar título/descrição:
-     - **Quantos itens/formatos/peças tem no kit?** (contar visualmente)
-     - **Que formatos/silhuetas exatas?** (listar 1 por 1)
-     - **Cor real** (não confiar no `cor_padrao` do catálogo)
-     - **Dimensões aparentes** (régua, mão, comparativo)
-     - **Detalhes não-óbvios:** gravação, acabamento, encaixe, alto-relevo
-   - Múltiplas imagens? Combinar achados.
-   - **Atualizar `produtos.json`** se a imagem revelar diferenças (quantidade real, nome dos formatos) — próxima geração fica mais precisa.
+### Fase 2 — Plano de anúncio (ROAS)
 
-4. **Se produto NÃO está no catálogo:**
-   - Perguntar ao usuário: nome do produto, categoria, dimensões aproximadas, cor padrão, público-alvo, diferenciais
-   - **Salvar no `produtos.json`** após confirmação (o catálogo cresce com o uso)
+Rode `calcular_plano_ads` com `precoCentavos` e o `liquidoCentavos` do canal (Shopee, salvo
+indicação contrária). Apresente assim:
 
-### Passo 2 — Geração
+```
+Plano de anúncio — {produto}
 
-Para cada marketplace solicitado, gerar **conforme regras do arquivo de regras correspondente**.
+  TESTE (comprar dados)
+    ROAS alvo:        {roasAlvoTeste}    ← empatar já é aprovar
+    Orçamento total:  R$ {orcamentoTeste} em {janela} dias
+    Por dia:          R$ {investimentoDiario}
+    CPA máximo:       R$ {cpaAlvo}
+    Cliques previstos: {cliques}
 
-**Princípios universais (todos os marketplaces):**
-- **FÓRMULA UNIVERSAL do título Mahou Prints (CRÍTICO):**
+  ESCALA (se passar no teste)
+    ROAS alvo:        {roasAlvoEscala}   ← aqui exige folga
+    Escada de budget: R$ x → R$ y → R$ z ...  (+{passo}% a cada {cadência} dias)
+```
 
-  ```
-  [Descrição curta-detalhada do produto + USP] [Keywords SEO empilhadas]
-  ```
+**Explique a diferença entre os dois ROAS toda vez** — é o ponto que mais confunde:
+no teste você compra informação, então break-even basta; na escala você quer lucro, por
+isso o alvo é 1,4× maior.
 
-  Sem caractere separador (sem "/", "|", "—", vírgula). A transição entre os 2 blocos é natural: descrição fluida → keywords secas. O leitor humano percebe pela mudança de tom; o algoritmo lê tudo junto.
+**Se vier `inviavel: true`** — a margem não paga anúncio nenhum. Diga isso direto e sugira
+rever preço ou custo. Não maquie.
 
-  Consultar `catalogo/produtos.json > produtos.{slug}.descricao_curta_titulo` ANTES de gerar. Se o campo não existir, **perguntar ao usuário** a descrição curta antes de gerar.
+**Se vier aviso de amostra magra** (menos de 60 cliques) — o teste não vai concluir nada
+confiável. Ofereça: subir o lance, alongar a janela, ou aceitar rodar sabendo que o
+resultado será inconclusivo.
 
-  **Exemplos:**
-  - ML (53 chars): `Suporte de Controle e Headset 3 em 1 Ps5 Xbox Gamer 3d`
-  - Shopee (90 chars): `Suporte de Controle e Headset 3 em 1 Ps5 Xbox Dualsense Gamer Setup Decoração Quarto 3d`
-  - TikTok (115 chars): `Suporte de Controle e Headset 3 em 1 Ps5 Xbox Dualsense Gamer Setup Aesthetic Decoração Quarto Gamer Geek 3d`
+### Fase 3 — Análise visual (obrigatória)
 
-- **Adaptação do bloco de keywords por marketplace:** ML prioriza keywords técnicas secas (60 chars). Shopee permite expandir com sinônimos. TikTok amplifica com lifestyle/trend.
-- **Tom misto SEO-first:** primeira parte do título = USP + keywords; descrição = SEO + benefício + emoção em mix
-- **Sempre incluir:** "3D" ou "Impressão 3D" + "PLA" + 1 termo da marca quando couber
-- **Densidade de keyword principal:** 3-5x ao longo da descrição (sem soar artificial)
-- **Mahou Prints:** mencionar a marca pelo menos 1x na descrição (de preferência num bloco "Sobre nós")
-- **Respeitar marcas registradas:** consultar `catalogo/produtos.json > regras_marcas_registradas` antes de usar termos como Pokemon, Patrulha Canina, Disney, etc.
+**Sem imagem, sem descrição.** Abra as fotos com `Read` antes de escrever. Anote:
 
-**Estruturas específicas:**
-- **Shopee:** título 60-80 chars, descrição com blocos emoji-separados, tags no final, sem links externos
-- **ML:** título HARD ≤60 chars, descrição com separadores `▬▬▬`, ficha técnica obrigatória
-- **TikTok Shop:** título 80-120 chars (pode ser mais longo), hashtags são CRÍTICAS, tom mais jovem
+- Quantas peças/formatos tem no kit? (conte na imagem, não confie no cadastro)
+- Que formatos exatos? Liste um a um.
+- Cor real.
+- Dimensões aparentes (compare com mão, régua, objeto conhecido).
+- Detalhes não-óbvios: gravação, encaixe, articulação, acabamento.
+- **A peça precisa de algo que não vem junto?** Ímã, parafuso, fio, elástico, soquete,
+  pilha. Isso muda custo e precisa aparecer na descrição — cliente que recebe menos do que
+  esperava abre reclamação.
 
-### Passo 3 — Gerar título via fan-out Sonnet + avaliação Opus (padrão)
+Se a foto contradiz o cadastro, **a foto vence** e vale avisar o Gabriel.
 
-**Arquitetura generator-evaluator** — usar como modo padrão pra produtos hero/importantes.
+Fotos ficam em `~/Documents/Mahou Prints/products/{slug}/referencias/`. Se não houver
+nenhuma, pare e peça — chutar pelo nome do produto gera anúncio errado.
 
-**3.1 Fan-out (paralelo, Sonnet 4.6):**
+### Fase 4 — Título
 
-Disparar 8 agentes Sonnet em paralelo via tool `Agent` com `model: "sonnet"`, cada um com um brief especializado:
+**Fórmula universal Mahou Prints:**
 
-| # | Foco do agente | Brief curto |
-|---|---|---|
-| 1 | SEO máximo | Maximiza keywords técnicas exatas — palavras-chave de busca direta empilhadas |
-| 2 | Híbrido balanceado | Mistura keyword + benefício (mesma proporção) |
-| 3 | Lifestyle/aesthetic | Termos emocionais, vibe, descoberta no feed |
-| 4 | Cross-compatibility | Maximiza cobertura cross-produto (ex: PS5+Xbox, Kindle+e-reader, etc) |
-| 5 | Long-tail descritivo | Frases mais completas, captura buscas conversacionais |
-| 6 | Sinônimos & plural | Usa variações ("suporte" + "apoio" + "stand") e plural quando aplicável |
-| 7 | Presente / gift | Posiciona como item de presente (aniversário, Dia das Mães, Natal) |
-| 8 | Nicho específico | Mira em sub-segmento (streamer, decorador, colecionador, etc) |
+```
+[Descrição curta do produto + USP] [Keywords SEO empilhadas]
+```
 
-**Cada brief passa ao Sonnet:**
-- Regras do marketplace (limite de chars, palavras restritas, marcas registradas a evitar)
-- Dados do produto (do catálogo)
-- **USP/diferencial do produto** (campo `usp_titulo` do catálogo) — TODOS os agentes devem abrir o título com o USP. O que varia entre agentes é o ângulo das keywords que vêm depois, não o USP.
-- Keywords da categoria (do banco de treino)
-- Pede 1-2 títulos no formato exato (sem decoração, só o título nu, com count de chars no final)
+Sem separador (`/`, `|`, `—`, vírgula). A transição é natural: descrição fluida → keywords
+secas. O humano percebe pela mudança de tom; o algoritmo lê tudo junto.
 
-**3.2 Avaliação (Opus 4.7 — eu):**
+Exemplos reais:
+- ML (53): `Suporte de Controle e Headset 3 em 1 Ps5 Xbox Gamer 3d`
+- Shopee (87): `Suporte de Controle e Headset 3 em 1 Ps5 Xbox Dualsense Gamer Setup Decoração Quarto 3d`
+- TikTok (108): `Suporte de Controle e Headset 3 em 1 Ps5 Xbox Dualsense Gamer Setup Aesthetic Decoração Quarto Gamer Geek 3d`
 
-Recebo ~10-16 títulos brutos. Filtro e pontuo cada um:
+**Limites duros:** ML ≤60 · Shopee ≤100 · TikTok 34–200.
 
-| Critério | Peso | Como medir |
-|---|---|---|
-| Chars dentro do limite | bloqueante | rejeita se > limite |
-| Marca registrada evitada | bloqueante | rejeita se contém termo proibido |
-| Palavra restrita evitada | bloqueante | rejeita se contém "promoção/melhor/oficial" |
-| Densidade keyword principal | alto | termo primário aparece nos 25 chars iniciais |
-| Cobertura de buscas | alto | quantos termos distintos de busca o título captura |
-| Naturalidade (não-spam) | alto | não soa stuffed/repetitivo |
-| Diversidade no grupo final | médio | 3 finalistas cobrem perfis diferentes |
+#### Geração por fan-out (padrão para produto importante)
 
-**3.3 Seleção dos 3 finalistas:**
+Dispare 8 subagentes **Sonnet** em paralelo via `Agent`, cada um com um ângulo:
 
-Agrupo por padrão semântico. Escolho 1 título de cada cluster forte (geralmente: 1 SEO-puro, 1 híbrido, 1 lifestyle). Se houver um cross-compatibility excepcional, ele substitui o híbrido.
+| # | Ângulo |
+|---|---|
+| 1 | SEO máximo — keywords técnicas empilhadas |
+| 2 | Híbrido — keyword + benefício meio a meio |
+| 3 | Lifestyle — vibe, descoberta no feed |
+| 4 | Cross-compatibility — cobre múltiplos casos (PS5+Xbox, Kindle+e-reader) |
+| 5 | Long-tail — captura busca conversacional |
+| 6 | Sinônimos e plural — "suporte" + "apoio" + "stand" |
+| 7 | Presente — aniversário, Dia das Mães, Natal |
+| 8 | Nicho — streamer, colecionador, decorador |
 
-**3.4 Apresentação ao usuário:**
-- 3 finalistas, cada um com: texto do título, char count, foco principal, exemplos de buscas que vai pegar
-- Mostro em tabela compacta + uma frase do "por que esse" pra cada
-- Usuário escolhe — vou pro Passo 4
+Passe a cada agente: regras do marketplace, dados do produto, o **USP** (todos abrem com
+ele; o que varia é o ângulo das keywords depois) e as keywords da categoria.
 
-**Modo rápido (opcional):** se o usuário pedir "gera rápido" ou estiver em batch grande, pulo o fan-out e gero 3 títulos direto via Opus (comportamento anterior).
+Depois **avalie você mesmo** os ~12 títulos:
 
-### Passo 4 — Salvar output
+| Critério | Peso |
+|---|---|
+| Dentro do limite de chars | bloqueante |
+| Sem marca registrada proibida | bloqueante |
+| Sem palavra restrita ("promoção", "melhor", "oficial") | bloqueante |
+| Keyword principal nos primeiros 25 chars | alto |
+| Cobertura de buscas distintas | alto |
+| Naturalidade (não parece spam) | alto |
+| Diversidade entre os 3 finalistas | médio |
 
-Salvar em `C:\Users\PC\Documents\Mahou Prints\products\{produto-slug}\listings\{marketplace}.md`.
+Apresente **3 finalistas** de clusters diferentes, com char count e que buscas cada um pega.
 
-**Formato do arquivo de output:**
+**Modo rápido:** em lote grande ou se o Gabriel pedir, pule o fan-out e gere 3 títulos direto.
+
+### Fase 5 — Descrição, tags e ficha
+
+Siga as regras de `content/marketplace/regras/{marketplace}.md`. Princípios que valem sempre:
+
+- Keyword principal 3–5× ao longo do texto, sem soar forçado
+- Mencionar **Mahou Prints** pelo menos uma vez
+- Sempre citar "3D" / "Impressão 3D" e "PLA"
+- Declarar o que **não** vem junto, se for o caso
+- Consultar as marcas proibidas em `contexto-mahou.md` antes de escrever
+
+Estruturas: **Shopee** blocos separados por emoji, tags no fim, sem link externo ·
+**ML** separadores `▬▬▬` e ficha técnica obrigatória · **TikTok** hashtags são críticas,
+tom mais jovem.
+
+### Fase 6 — Salvar e apresentar
+
+Salve em `~/Documents/Mahou Prints/products/{slug}/listings/{marketplace}.md`:
 
 ```markdown
-# Descrição: {Nome do produto} — {Marketplace}
+# {Produto} — {Marketplace}
 
-**Gerado em:** {AAAA-MM-DD}
-**Versão:** 1
-**Status:** rascunho (aguarda revisão)
+**Gerado em:** {AAAA-MM-DD} · **Versão:** {n} · **Status:** rascunho
 
----
+## Economia
+| | |
+|---|---|
+| Preço sugerido | R$ {preço} |
+| Custo total | R$ {custo} |
+| Líquido {canal} | R$ {líquido} |
+| Margem | {margem}% |
+| Lucro por hora | R$ {lucroHora} |
 
-## 🏷️ Títulos (escolha 1)
+## Plano de anúncio
+| | Teste | Escala |
+|---|---|---|
+| ROAS alvo | {teste} | {escala} |
+| Budget diário | R$ {diário} | R$ {inicial} → R$ {final} |
+| CPA máximo | R$ {cpa} | — |
+| Duração | {janela} dias | {passo}% a cada {cadência} dias |
 
-### Opção A — SEO máximo ({X chars})
-{título A}
+## Títulos
+### A — SEO máximo ({n} chars)
+### B — Híbrido ({n} chars)
+### C — Lifestyle ({n} chars)
 
-### Opção B — Híbrido (RECOMENDADO) ({X chars})
-{título B}
-
-### Opção C — Lifestyle ({X chars})
-{título C}
-
----
-
-## 📝 Descrição
-
-{descrição completa formatada conforme regras do marketplace}
-
----
-
-## 🏷️ Tags / Hashtags
-
-{tags ou hashtags conforme marketplace}
-
----
-
-## 📋 Atributos / Ficha técnica
-
-- Categoria: {caminho}
-- Marca: Mahou Prints
-- Material: PLA premium
-- Cor: {cor}
-- Dimensões: {dimensões}
-- {outros atributos específicos do marketplace}
-
----
-
-## 🧠 Análise SEO
-
-- **Keyword principal:** {keyword} — densidade {X}x na descrição
-- **Keywords secundárias usadas:** {lista}
-- **Caracteres do título escolhido:** {X}/100 (limite Shopee)
-- **Marca registrada — atenção:** {se aplicável, nota sobre evitar termos}
-
----
-
-## 💡 Observações para o usuário
-
-{notas livres — ex: "sugiro precificar entre R$ X e Y baseado em concorrentes", "considera oferecer kit com 2 unidades"}
-
----
-
-## 🔗 Imagens disponíveis
-{lista de paths se houver — útil pro upload}
+## Descrição
+## Tags
+## Ficha técnica
+## Observações
+## Imagens disponíveis
 ```
 
-### Passo 5 — Apresentar pro usuário
+Depois: apresente no chat os 3 títulos lado a lado, o resumo da economia e o plano de ROAS.
+Quando o Gabriel escolher o título, **marque com ✅ no arquivo e mova pro topo**.
 
-Apresentar resumo no chat:
-- Quais marketplaces foram gerados
-- Path de cada arquivo
-- 3 opções de título (lado a lado)
-- Perguntar qual título prefere por marketplace
-- Após escolha, **atualizar o arquivo** marcando título escolhido (mover ele pro topo, marcar com ✅)
+### Fase 7 — Depois de publicar
 
----
-
-## 🛠️ Fluxo Modo 5 — `aprender`
-
-1. Listar arquivos em `content/marketplace/treino/listings_que_funcionaram/{marketplace}/*.md`
-2. Para cada arquivo, extrair:
-   - Padrão do título (ordem de palavras, comprimento, uso de números, separadores)
-   - Estrutura da descrição (quais blocos, em que ordem)
-   - Vocabulário recorrente (verbos, adjetivos preferidos)
-   - Emojis utilizados
-3. Consolidar aprendizado em `content/marketplace/treino/_padrao_aprendido_{marketplace}.md`
-4. Esse arquivo é lido pela skill ANTES de gerar — vira a "voz" do usuário
+Quando o Gabriel confirmar que subiu o anúncio, rode `marcar_produtos_anunciados` para o
+Hub parar de listar o produto como pendente.
 
 ---
 
-## 📚 Catálogo de produtos disponíveis
+## Outros modos
 
-O catálogo completo está em `content/marketplace/catalogo/produtos.json`. Produtos atualmente mapeados (2026-05):
+**`refinar`** — lê o listing existente e reescreve com base em feedback ou keywords novas.
+Preserve o que funcionava; mude só o que foi apontado.
 
-**Aprovados (em `Documents\Mahou Prints\products\`):**
-- `suporte-controle-ps5` — Suporte 2 controles PS5 + headset
-- `suporte-kindle-livro` — Suporte Kindle tema livro
-- `suporte-kindle-nuvem` — Suporte Kindle tema nuvem
-- `suporte-placa-video` — GPU Holder (anti-sag)
-- `suporte-polaroid-coracao` — Porta polaroid coração
-- `suporte-toalha` — Gancho de toalha banheiro
-- `abajur-bubble`, `abajur-wave`, `abajur-triangular` — Luminárias decorativas
-- `brinquedo-gato` — Brinquedo pet
-- `contador-livros-lidos` — Contador para leitores
-- `cortador-biscoito-copa`, `cortador-biscoito-patrulha-canina`, `cortador-biscoito-pokemon` — Cortadores temáticos
+**`traduzir`** — pega o listing de um marketplace e re-otimiza para outro. Não é tradução
+literal: cada algoritmo quer coisa diferente.
 
-**Em revisão (em `products (em revisão)\`):**
-- `cesta-decorativa`, `marca-pagina-quarta-asa`, `suporte-mobile-bebe`
+**`lote`** — vários produtos em sequência. Use `listar_produtos` com `anunciado: false`.
+Em lote, use o modo rápido de título e só aprofunde nos que o Gabriel marcar.
 
-Para produtos não listados, a skill pergunta os dados básicos antes de gerar.
+**`aprender`** — lê `content/marketplace/treino/listings_que_funcionaram/{marketplace}/`,
+extrai padrão (ordem de palavras, blocos, vocabulário, emojis) e consolida em
+`treino/_padrao_aprendido_{marketplace}.md`. Esse arquivo passa a ser lido antes de gerar.
 
 ---
 
-## ⚠️ Regras críticas — marcas registradas
+## Regras que não se quebram
 
-**NUNCA usar no título:**
-- "Pokemon" → usar "monstrinho colecionável"
-- "Patrulha Canina" → usar "cachorrinho" / "patinha"
-- "Disney", "Marvel", "Pixar", personagens reconhecíveis → mencionar "inspirado em" só na descrição
-- "PlayStation" / "PS5" → OK pra "compatível com PS5/DualSense", mas NUNCA "PlayStation original"
-- "Kindle" → OK pra "compatível com Kindle" (Amazon não barra uso descritivo)
+- **Nunca publique anúncio.** A skill gera; o Gabriel publica.
+- **Nunca grave em produção sem pedir.** Vale para `criar_produto`, `atualizar_produto` e
+  qualquer escrita no Hub.
+- **Nunca invente número.** Custo, margem e ROAS vêm do Hub. Se faltar dado, pergunte.
+- **Nunca escreva copy antes de conferir a economia.** Produto que dá prejuízo não precisa
+  de descrição bonita, precisa de preço novo.
+- **Marca registrada nunca no título.** Ver a tabela em `contexto-mahou.md`.
 
-ML é o mais rigoroso — denúncia derruba anúncio em <24h. Shopee/TikTok são mais lentos mas também removem.
+## Pronto quando
 
----
-
-## 🎨 Tom de voz Mahou Prints
-
-- **Premium mas acessível** — não "luxuoso", mas "cuidadoso", "artesanal", "design autoral"
-- **Funcional + decorativo** — sempre destacar os 2 lados
-- **Foco no 3D como diferencial** — "feito sob demanda", "impresso camada por camada"
-- **Sustentável** — PLA é biodegradável, mencionar quando couber
-- **Para presente** — vários produtos viram presente, sempre considerar essa abordagem
-
----
-
-## 🔄 Workflow recomendado para o usuário
-
-1. **Primeira vez:** pedir 1 descrição dum produto que você já tem na loja → comparar com o que estava antes → ajustar [keywords/](../../Marketplace/treino/keywords/) se a skill errar o tom
-2. **A cada produto novo:** roda a skill, escolhe título, sobe pro marketplace
-3. **Periodicamente:** rodar Modo 5 (`aprender`) se você adicionou novos exemplos em `treino/`
-4. **Após 1-2 meses:** ver o que vendeu, atualizar `listings_que_funcionaram/` com os campeões → próxima geração fica ainda melhor
-
----
-
-## ✅ Quando o trabalho está "pronto"
-
-- [ ] Arquivo `listings/{marketplace}.md` salvo na pasta do produto
-- [ ] 3 títulos gerados com tamanhos validados (Shopee ≤100, ML ≤60, TikTok 34-200)
-- [ ] Descrição com keyword principal aparecendo 3-5x
-- [ ] Marca Mahou Prints mencionada na descrição
-- [ ] Atributos/categoria sugeridos preenchidos
-- [ ] Marcas registradas evitadas no título
-- [ ] Usuário escolheu título final → marcado com ✅ no arquivo
+- [ ] Economia conferida — margem e lucro/hora aceitáveis, degrau de R$ 80 respeitado
+- [ ] Plano de ROAS calculado e explicado (teste ≠ escala)
+- [ ] Imagens abertas e conferidas contra o cadastro
+- [ ] 3 títulos dentro do limite, sem marca proibida
+- [ ] Descrição com keyword 3–5×, marca mencionada, itens que não vêm junto declarados
+- [ ] Arquivo salvo em `listings/{marketplace}.md`
+- [ ] Gabriel escolheu o título → marcado com ✅

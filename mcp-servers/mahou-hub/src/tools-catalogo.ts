@@ -5,6 +5,27 @@ import { apiCall } from './client.js';
 // Os schemas Zod abaixo replicam os contratos da API (não importam @mahou-hub/contracts
 // pra deixar o MCP server publicável standalone).
 
+
+// Espelha PlanoAdsInputSchema de @mahou-hub/contracts. `params` é parcial: o que não
+// vier usa o default global do Parametro.
+const PlanoAdsInputSchema = z.object({
+  precoCentavos: z.number().int().positive(),
+  margemContribuicaoCentavos: z.number().int(),
+  params: z
+    .object({
+      cpcMedioCentavos: z.number().int().positive(),
+      taxaRetornoPct: z.number().min(0).max(100),
+      janelaTesteDias: z.number().int().min(1),
+      nivelConfianca: z.union([z.literal(95), z.literal(99)]),
+      fatorMargemEscala: z.number().min(1),
+      passoIncrementoPct: z.number().min(0),
+      cadenciaIncrementoDias: z.number().int().min(1),
+      nDegraus: z.number().int().min(1).max(20),
+    })
+    .partial()
+    .optional(),
+});
+
 const CanalSchema = z.enum(['SHOPEE', 'ML', 'SITE', 'TIKTOK']);
 const ImpressoraSchema = z.enum(['A1', 'H2C']);
 
@@ -232,5 +253,19 @@ export const tools = [
       'Não persiste nada — útil pra responder "vale a pena imprimir X por R$Y?".',
     inputSchema: CalcularInputSchema,
     handler: async (input: unknown) => apiCall('POST', '/pricing/calcular', input),
+  },
+
+  {
+    name: 'calcular_plano_ads',
+    description:
+      'Calcula o plano de Shopee Ads de um produto: ROAS de break-even, ROAS alvo do TESTE, ' +
+      'ROAS alvo da ESCALA, CPA máximo, orçamento e duração do teste, e a escada de ' +
+      'escalonamento (quanto subir o budget diário e de quantos em quantos dias). ' +
+      'Entrada é `precoCentavos` + `margemContribuicaoCentavos` (use o `liquidoCentavos` do ' +
+      'canal devolvido por `calcular_preco` ou `obter_produto`). `params` sobrescreve os ' +
+      'defaults globais (CPC médio, taxa de retorno, janela, confiança, fator de escala). ' +
+      'Devolve `inviavel: true` quando a margem não paga anúncio nenhum. Stateless.',
+    inputSchema: PlanoAdsInputSchema,
+    handler: async (input: unknown) => apiCall('POST', '/pricing/plano-ads', input),
   },
 ] as const;
