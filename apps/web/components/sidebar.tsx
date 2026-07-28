@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Calculator,
   Boxes,
@@ -14,12 +15,14 @@ import {
   Crosshair,
   DollarSign,
   Lightbulb,
+  LogOut,
   Menu,
   Settings,
   Shapes,
   Sparkles,
   X,
 } from 'lucide-react';
+import { apiFetch } from '@/lib/api-client';
 import { cn } from '@/lib/utils';
 
 const NAV_PRINCIPAL = [
@@ -127,8 +130,49 @@ function ListaNav({ pathname, onNavegar }: { pathname: string; onNavegar?: () =>
         {NAV_RODAPE.map((item) => (
           <ItemNav key={item.href} item={item} pathname={pathname} onNavegar={onNavegar} />
         ))}
+        <li>
+          <BotaoSair onNavegar={onNavegar} />
+        </li>
       </ul>
     </>
+  );
+}
+
+/**
+ * Encerra a sessão e volta pro login.
+ *
+ * Limpa o cache do React Query antes de sair: sem isso, quem logar em seguida vê por
+ * um instante os dados do usuário anterior enquanto as queries revalidam.
+ */
+function BotaoSair({ onNavegar }: { onNavegar?: () => void }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [saindo, setSaindo] = useState(false);
+
+  async function sair() {
+    setSaindo(true);
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' });
+    } catch {
+      // Cookie expirado ou API fora do ar: seguir pro login do mesmo jeito — ficar
+      // preso na sessão é pior que um logout que não confirmou no servidor.
+    }
+    queryClient.clear();
+    router.push('/login');
+    router.refresh();
+    onNavegar?.();
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={sair}
+      disabled={saindo}
+      className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+    >
+      <LogOut className="h-4 w-4 shrink-0" />
+      {saindo ? 'Saindo…' : 'Sair'}
+    </button>
   );
 }
 
