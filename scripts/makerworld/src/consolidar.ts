@@ -51,6 +51,8 @@ export interface ResumoConsolidacao {
   talvez: number;
   reprovados: number;
   semVeredito: number;
+  /** IDs avaliados que não existem no catálogo — avaliador alucinou o item. */
+  idsFantasma: number[];
 }
 
 /**
@@ -70,7 +72,16 @@ export async function consolidar(): Promise<ResumoConsolidacao> {
     talvez: 0,
     reprovados: 0,
     semVeredito: 0,
+    idsFantasma: [],
   };
+
+  // Avaliador que inventa item devolve id que não existe no catálogo (placeholders como
+  // 1111111 já apareceram). O join abaixo descartaria isso em silêncio — e silêncio aqui
+  // esconde que um modelo REAL ficou sem avaliação no lugar do inventado.
+  const idsReais = new Set(candidatos.map((c) => c.id));
+  for (const id of [...triagem.keys(), ...curadoria.keys()]) {
+    if (!idsReais.has(id)) resumo.idsFantasma.push(id);
+  }
 
   const avaliados: ModeloAvaliado[] = [];
 

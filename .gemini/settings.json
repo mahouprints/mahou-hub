@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "mahou-hub": {
+      "command": "node",
+      "args": [
+        "--env-file=./mcp-servers/mahou-hub/.env.local",
+        "./mcp-servers/mahou-hub/dist/index.js"
+      ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp",
+        "--config",
+        "/Users/gabrielberger/Documents/Mahou Prints/imagegen/playwright-mcp.config.json"
+      ]
+    }
+  }
+}

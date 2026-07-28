@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'node:crypto';
 import type { ItemImportado, PedidoImportado } from './atendimento.service';
+import { SHOPEE_STATUS_A_SINCRONIZAR } from './status-marketplace';
 
 // Cliente da Shopee OPEN PLATFORM (API de vendedor) — não confundir com o cliente da
 // Affiliate API em `modules/concorrentes/shopee`, que serve pra espiar concorrente e usa
@@ -12,9 +13,6 @@ import type { ItemImportado, PedidoImportado } from './atendimento.service';
 // que difere da Affiliate API e é a causa clássica de "sign mismatch".
 
 const HOST_PRODUCAO = 'https://partner.shopeemobile.com';
-
-/** Único status que interessa importar: pedido pago e aguardando despacho. */
-const STATUS_A_IMPORTAR = 'READY_TO_SHIP';
 
 interface ShopeeOrderItem {
   model_sku?: string;
@@ -89,19 +87,30 @@ export class ShopeeOrdersClient {
     return json.response as T;
   }
 
-  /** `order_sn` dos pedidos prontos pra despachar na janela informada. */
-  async listarPedidosParaDespachar(desde: Date, ate: Date): Promise<string[]> {
-    const resposta = await this.chamar<{ order_list?: Array<{ order_sn: string }> }>(
-      '/api/v2/order/get_order_list',
-      {
-        time_range_field: 'create_time',
-        time_from: String(Math.floor(desde.getTime() / 1000)),
-        time_to: String(Math.floor(ate.getTime() / 1000)),
-        page_size: '50',
-        order_status: STATUS_A_IMPORTAR,
-      },
-    );
-    return (resposta.order_list ?? []).map((o) => o.order_sn);
+  /**
+   * `order_sn` dos pedidos da janela, varrendo todos os status que interessam.
+   *
+   * Uma chamada por status porque `get_order_list` aceita só um `order_status` por vez.
+   * Trazer os despachados junto com os pendentes é o que permite o Hub perceber que um
+   * pedido saiu — sem isso ele nunca seria reimportado e ficaria congelado como atendido.
+   */
+  async listarPedidos(desde: Date, ate: Date): Promise<string[]> {
+    const sns = new Set<string>();
+
+    for (const status of SHOPEE_STATUS_A_SINCRONIZAR) {
+      const resposta = await this.chamar<{ order_list?: Array<{ order_sn: string }> }>(
+        '/api/v2/order/get_order_list',
+        {
+          time_range_field: 'create_time',
+          time_from: String(Math.floor(desde.getTime() / 1000)),
+          time_to: String(Math.floor(ate.getTime() / 1000)),
+          page_size: '50',
+          order_status: status,
+        },
+      );
+      for (const o of resposta.order_list ?? []) sns.add(o.order_sn);
+    }
+    return [...sns];
   }
 
   /** Detalhe de até 50 pedidos por chamada (limite da API). */

@@ -37,7 +37,7 @@ export class PedidosSyncService {
       return { configurado: false, importados: 0, erros: [] as string[] };
     }
     try {
-      const sns = await this.shopee.listarPedidosParaDespachar(desde, new Date());
+      const sns = await this.shopee.listarPedidos(desde, new Date());
       const pedidos = await this.shopee.detalharPedidos(sns);
       return await this.importarLista(pedidos, 'SHOPEE');
     } catch (erro) {

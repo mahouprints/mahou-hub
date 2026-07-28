@@ -94,8 +94,17 @@ export default function MakerWorldPage() {
   const [status, setStatus] = useState<string>('NOVO');
   const [notaMinima, setNotaMinima] = useState<string>('60');
   const [esconderIp, setEsconderIp] = useState(true);
+  const [pagina, setPagina] = useState(0);
 
-  const params = new URLSearchParams({ limit: '120', ordenarPor: 'notaIa' });
+  // 24 por página não é escolha estética: as imagens vêm do CDN do MakerWorld em
+  // resolução cheia, e pedir 120 de uma vez faz o CDN dropar a maioria — a tela
+  // aparecia com blocos cinza no lugar das fotos.
+  const POR_PAGINA = 24;
+  const params = new URLSearchParams({
+    limit: String(POR_PAGINA),
+    offset: String(pagina * POR_PAGINA),
+    ordenarPor: 'notaIa',
+  });
   if (busca) params.set('q', busca);
   if (nicho !== 'todos') params.set('nicho', nicho);
   if (status !== 'todos') params.set('status', status);
@@ -104,6 +113,7 @@ export default function MakerWorldPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['makerworld', params.toString()],
+    placeholderData: (anterior) => anterior,
     queryFn: () =>
       apiFetch<{ itens: ModeloItem[]; total: number }>(`/makerworld?${params}`),
   });
@@ -138,12 +148,12 @@ export default function MakerWorldPage() {
           <Input
             placeholder="Buscar por título, tag ou autor"
             value={busca}
-            onChange={(e) => setBusca(e.target.value)}
+            onChange={(e) => { setBusca(e.target.value); setPagina(0); }}
             className="pl-9"
           />
         </div>
 
-        <Select value={nicho} onValueChange={setNicho}>
+        <Select value={nicho} onValueChange={(v) => { setNicho(v); setPagina(0); }}>
           <SelectTrigger className="w-[190px]">
             <SelectValue placeholder="Nicho" />
           </SelectTrigger>
@@ -157,7 +167,7 @@ export default function MakerWorldPage() {
           </SelectContent>
         </Select>
 
-        <Select value={status} onValueChange={setStatus}>
+        <Select value={status} onValueChange={(v) => { setStatus(v); setPagina(0); }}>
           <SelectTrigger className="w-[160px]">
             <SelectValue />
           </SelectTrigger>
@@ -169,7 +179,7 @@ export default function MakerWorldPage() {
           </SelectContent>
         </Select>
 
-        <Select value={notaMinima} onValueChange={setNotaMinima}>
+        <Select value={notaMinima} onValueChange={(v) => { setNotaMinima(v); setPagina(0); }}>
           <SelectTrigger className="w-[150px]">
             <SelectValue />
           </SelectTrigger>
@@ -184,14 +194,16 @@ export default function MakerWorldPage() {
         <Button
           variant={esconderIp ? 'default' : 'outline'}
           size="sm"
-          onClick={() => setEsconderIp((v) => !v)}
+          onClick={() => { setEsconderIp((v) => !v); setPagina(0); }}
         >
           <AlertTriangle className="mr-1.5 size-4" />
           Esconder risco de marca
         </Button>
 
         <span className="ml-auto text-sm text-muted-foreground">
-          {data?.total ?? 0} modelos
+          {data?.total
+            ? `${pagina * POR_PAGINA + 1}–${Math.min((pagina + 1) * POR_PAGINA, data.total)} de ${data.total}`
+            : '0 modelos'}
         </span>
       </Card>
 
@@ -226,11 +238,6 @@ export default function MakerWorldPage() {
               >
                 {modelo.notaIa}
               </span>
-              {!modelo.temFotoReal && (
-                <span className="absolute left-2 top-2 rounded bg-background/90 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-                  render
-                </span>
-              )}
             </a>
 
             <div className="flex flex-1 flex-col gap-2 p-3">
@@ -328,6 +335,30 @@ export default function MakerWorldPage() {
           </Card>
         ))}
       </div>
+
+      {(data?.total ?? 0) > POR_PAGINA && (
+        <div className="flex items-center justify-center gap-3 pb-4">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagina === 0}
+            onClick={() => setPagina((p) => Math.max(0, p - 1))}
+          >
+            Anterior
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Página {pagina + 1} de {Math.ceil((data?.total ?? 0) / POR_PAGINA)}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={(pagina + 1) * POR_PAGINA >= (data?.total ?? 0)}
+            onClick={() => setPagina((p) => p + 1)}
+          >
+            Próxima
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

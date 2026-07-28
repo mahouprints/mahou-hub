@@ -19,6 +19,7 @@ import {
   Menu,
   Settings,
   Shapes,
+  ShoppingBag,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ const NAV_PRINCIPAL = [
   { href: '/estoque', label: 'Estoque', icon: Warehouse },
   { href: '/recibos', label: 'Recibos', icon: Receipt },
   { href: '/simulador', label: 'Simulador', icon: PlayCircle },
+  { href: '/pedidos', label: 'Pedidos', icon: ShoppingBag },
   { href: '/producao', label: 'Produção', icon: Factory },
   { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { href: '/concorrentes', label: 'Concorrentes', icon: Crosshair },

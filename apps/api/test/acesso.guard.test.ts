@@ -26,6 +26,44 @@ describe('LeituraSomenteGuard — bloqueia mutação de VISUALIZADOR', () => {
     ).toThrow(ForbiddenException);
   });
 
+  // Regressão (28/jul/2026): o guard barrava POST /auth/login pra quem tinha cookie de
+  // VISUALIZADOR. Efeito: quem entrasse com a conta somente-leitura não conseguia logar
+  // com outra nem sair — ficava preso até o cookie expirar, e a tela dizia
+  // "Credenciais inválidas", mandando caçar erro numa senha que estava certa.
+  it('libera login de VISUALIZADOR — senão fica preso na sessão', () => {
+    verify.mockReturnValue({ papel: 'VISUALIZADOR' });
+    const req = {
+      method: 'POST',
+      path: '/api/v1/auth/login',
+      headers: {},
+      cookies: { mahou_token: 't' },
+    };
+    expect(guard.canActivate(ctx(req))).toBe(true);
+  });
+
+  it('libera logout de VISUALIZADOR', () => {
+    verify.mockReturnValue({ papel: 'VISUALIZADOR' });
+    const req = {
+      method: 'POST',
+      path: '/api/v1/auth/logout',
+      headers: {},
+      cookies: { mahou_token: 't' },
+    };
+    expect(guard.canActivate(ctx(req))).toBe(true);
+  });
+
+  // A isenção vale só pras duas rotas de sessão — não pode virar buraco geral em /auth.
+  it('não libera outras rotas de auth pra VISUALIZADOR', () => {
+    verify.mockReturnValue({ papel: 'VISUALIZADOR' });
+    const req = {
+      method: 'POST',
+      path: '/api/v1/auth/api-token',
+      headers: {},
+      cookies: { mahou_token: 't' },
+    };
+    expect(() => guard.canActivate(ctx(req))).toThrow(ForbiddenException);
+  });
+
   it('libera POST de ADMIN', () => {
     verify.mockReturnValue({ papel: 'ADMIN' });
     expect(

@@ -2,7 +2,7 @@
 
 import { Suspense, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Sparkles } from 'lucide-react';
+import { Eye, EyeOff, Sparkles } from 'lucide-react';
 import { apiUrl } from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,23 @@ export default function LoginPage() {
   );
 }
 
+/** Traduz a falha em algo que aponta pra causa, em vez de culpar sempre a senha. */
+async function mensagemDoErro(res: Response): Promise<string> {
+  if (res.status === 401) return 'E-mail ou senha incorretos.';
+  if (res.status === 403) {
+    return 'Sessão anterior bloqueando o acesso. Saia da conta atual ou apague os cookies do site e tente de novo.';
+  }
+  if (res.status === 429) return 'Muitas tentativas seguidas. Espere um minuto e tente de novo.';
+  if (res.status >= 500) return 'O servidor está fora do ar. Tente novamente em instantes.';
+  try {
+    const corpo = (await res.json()) as { message?: string };
+    if (corpo.message) return corpo.message;
+  } catch {
+    // corpo não-JSON: cai no genérico abaixo
+  }
+  return `Não foi possível entrar (erro ${res.status}).`;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -25,6 +42,7 @@ function LoginForm() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,7 +55,7 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, senha }),
       });
-      if (!res.ok) throw new Error('Credenciais inválidas');
+      if (!res.ok) throw new Error(await mensagemDoErro(res));
       router.push(redirect);
     } catch (err) {
       setErro(err instanceof Error ? err.message : 'Erro inesperado');
@@ -71,15 +89,26 @@ function LoginForm() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="senha">Senha</Label>
-              <Input
-                id="senha"
-                type="password"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                minLength={8}
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <Input
+                  id="senha"
+                  type={mostrarSenha ? 'text' : 'password'}
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                  minLength={8}
+                  autoComplete="current-password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenha((v) => !v)}
+                  aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                  className="absolute right-0 top-0 flex h-full w-10 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {mostrarSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
             </div>
             {erro && <p className="text-sm text-destructive">{erro}</p>}
             <Button type="submit" disabled={carregando} className="w-full">

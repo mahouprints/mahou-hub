@@ -45,24 +45,41 @@ ${imagens}
 `;
 }
 
-export async function gerarLotes(opcoes?: { limite?: number; porLote?: number }): Promise<{
-  lotes: number;
-  modelos: number;
-  caminhos: string[];
-}> {
+/**
+ * Gera os lotes de triagem.
+ *
+ * `somenteSemAvaliacao` refaz só o que ficou órfão. Isso não é hipotético: avaliadores
+ * inventam ids de vez em quando (placeholders como 1111111 já apareceram), e o modelo
+ * real que deveria estar naquela linha fica sem veredicto. Sem uma via de reprocessar
+ * só os buracos, a alternativa seria refazer os 128 lotes inteiros.
+ */
+export async function gerarLotes(opcoes?: {
+  limite?: number;
+  porLote?: number;
+  somenteSemAvaliacao?: boolean;
+}): Promise<{ lotes: number; modelos: number; caminhos: string[] }> {
   await garantirPastas();
 
-  const candidatos = (await ler<ModeloCandidato>(ARQUIVOS.candidatos)).filter(
+  let candidatos = (await ler<ModeloCandidato>(ARQUIVOS.candidatos)).filter(
     (m) => (m.imagensLocais?.length ?? 0) > 0,
   );
+
+  if (opcoes?.somenteSemAvaliacao) {
+    const jaAvaliados = new Set(
+      (await ler<{ id: number }>(ARQUIVOS.triagem)).map((m) => m.id),
+    );
+    candidatos = candidatos.filter((c) => !jaAvaliados.has(c.id));
+  }
+
   const alvo = candidatos.slice(0, opcoes?.limite ?? candidatos.length);
   const porLote = opcoes?.porLote ?? MODELOS_POR_LOTE;
+  const prefixo = opcoes?.somenteSemAvaliacao ? 'orfao' : 'lote';
 
   const caminhos: string[] = [];
   for (let i = 0; i < alvo.length; i += porLote) {
     const fatia = alvo.slice(i, i + porLote);
     const numero = String(Math.floor(i / porLote) + 1).padStart(3, '0');
-    const arquivo = resolve(PASTA_LOTES, `lote-${numero}.md`);
+    const arquivo = resolve(PASTA_LOTES, `${prefixo}-${numero}.md`);
 
     const conteudo = [
       `# Lote ${numero} — ${fatia.length} modelos para avaliar`,

@@ -1,9 +1,21 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt.guard';
-import { AtendimentoService, type PedidoImportado } from './atendimento.service';
-import { PedidosSyncService } from './pedidos-sync.service';
+import { Throttle } from '@nestjs/throttler';
+import {
+  PedidoImportSchema,
+  PedidoListarSchema,
+  PedidoSyncSchema,
+  PedidoVincularItemSchema,
+  type PedidoImport,
+  type PedidoListar,
+  type PedidoSync,
+  type PedidoVincularItem,
+} from '@mahou-hub/contracts';
+import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { PrismaService } from '../../prisma/prisma.service';
+import { JwtAuthGuard } from '../auth/jwt.guard';
+import { AtendimentoService } from './atendimento.service';
+import { PedidosSyncService } from './pedidos-sync.service';
 
 @ApiTags('pedidos')
 @ApiBearerAuth('bearer')
@@ -18,20 +30,24 @@ export class PedidosController {
 
   @Get()
   @ApiOperation({ summary: 'Lista pedidos importados dos marketplaces' })
-  async listar(@Query('status') status?: string, @Query('canal') canal?: string) {
-    return this.prisma.pedidoMarketplace.findMany({
+  async listar(@Query(new ZodValidationPipe(PedidoListarSchema)) query: PedidoListar) {
+    const itens = await this.prisma.pedidoMarketplace.findMany({
       where: {
-        ...(status ? { status: status as never } : {}),
-        ...(canal ? { canal: canal as never } : {}),
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.canal ? { canal: query.canal } : {}),
+        ...(query.somenteBloqueados ? { status: 'BLOQUEADO' } : {}),
       },
       include: {
         itens: {
           include: { variacao: { select: { sku: true, nome: true, estoqueAtual: true } } },
         },
       },
-      orderBy: [{ prazoEnvio: 'asc' }, { dataPedido: 'desc' }],
-      take: 200,
+      // Prazo mais apertado primeiro: é a ordem em que precisam sair da impressora.
+      // `nulls: 'last'` porque pedido sem prazo (ML) não pode encabeçar a lista.
+      orderBy: [{ prazoEnvio: { sort: 'asc', nulls: 'last' } }, { dataPedido: 'desc' }],
+      take: query.limit,
     });
+    return { itens, total: itens.length };
   }
 
   @Get('pendencias')
@@ -47,29 +63,31 @@ export class PedidosController {
     return { total: itens.length, itens };
   }
 
+  // Throttle apertado: cada chamada pagina os dois marketplaces e conta contra o
+  // rate limit deles, não só contra o nosso.
   @Post('sync')
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
   @ApiOperation({ summary: 'Puxa pedidos novos dos marketplaces configurados' })
-  sincronizar(@Query('horas') horas?: string) {
-    return this.sync.sincronizarTudo(Number(horas) || 24);
+  sincronizar(@Query(new ZodValidationPipe(PedidoSyncSchema)) query: PedidoSync) {
+    return this.sync.sincronizarTudo(query.horas);
   }
 
   @Post('itens/:id/vincular')
   @ApiOperation({ summary: 'Liga um item órfão a uma variação e atende na hora' })
-  vincular(@Param('id') id: string, @Body() body: { variacaoId: string }) {
+  vincular(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(PedidoVincularItemSchema)) body: PedidoVincularItem,
+  ) {
     return this.atendimento.vincularItem(id, body.variacaoId);
   }
 
   /**
-   * Importação manual — usada em teste e pra reprocessar um pedido específico
-   * sem esperar o cron. O payload é o mesmo formato que os adaptadores produzem.
+   * Importação manual — reprocessa um pedido sem esperar o cron, e é como os testes
+   * de integração injetam pedido. Mesmo formato que os adaptadores produzem.
    */
   @Post('importar')
   @ApiOperation({ summary: '(Admin) Importa um pedido manualmente' })
-  importar(@Body() body: PedidoImportado) {
-    return this.atendimento.importar({
-      ...body,
-      dataPedido: new Date(body.dataPedido),
-      prazoEnvio: body.prazoEnvio ? new Date(body.prazoEnvio) : null,
-    });
+  importar(@Body(new ZodValidationPipe(PedidoImportSchema)) body: PedidoImport) {
+    return this.atendimento.importar(body);
   }
 }

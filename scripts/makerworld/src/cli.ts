@@ -88,7 +88,11 @@ async function principal(): Promise<void> {
       break;
     }
     case 'lotes': {
-      const r = await gerarLotes({ limite, porLote: numeroDoArgumento('--por-lote') });
+      const r = await gerarLotes({
+        limite,
+        porLote: numeroDoArgumento('--por-lote'),
+        somenteSemAvaliacao: process.argv.includes('--orfaos'),
+      });
       console.log(`\n${r.lotes} lotes com ${r.modelos} modelos em dados/lotes/.`);
       break;
     }
@@ -104,8 +108,15 @@ async function principal(): Promise<void> {
       const r = await consolidar();
       console.log(
         `\n${r.consolidados} vereditos aplicados · ${r.aprovados} aprovados · ` +
-          `${r.talvez} talvez · ${r.reprovados} reprovados.`,
+          `${r.talvez} talvez · ${r.reprovados} reprovados · ${r.semVeredito} sem avaliação.`,
       );
+      if (r.idsFantasma.length > 0) {
+        console.log(
+          `\n  ATENÇÃO: ${r.idsFantasma.length} id(s) avaliados não existem no catálogo ` +
+            `— o avaliador inventou o item. Descartados.\n  ${r.idsFantasma.slice(0, 10).join(', ')}` +
+            (r.idsFantasma.length > 10 ? ` …` : ''),
+        );
+      }
       break;
     }
     case 'subir': {

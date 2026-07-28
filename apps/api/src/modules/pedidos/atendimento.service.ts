@@ -1,26 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PedidoImport, PedidoItemImport, PedidoStatus } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { statusInterno, statusJobPara } from './status-marketplace';
 
-/** Item cru vindo do adaptador de um marketplace, já normalizado. */
-export interface ItemImportado {
-  skuExterno: string;
-  nomeExterno: string;
-  qtd: number;
-  precoUnitarioCentavos: number;
-}
-
-/** Pedido cru vindo do adaptador, sem nada resolvido ainda. */
-export interface PedidoImportado {
-  canal: 'SHOPEE' | 'ML';
-  externalId: string;
-  statusExterno: string;
-  compradorNome?: string | null;
-  totalCentavos: number;
-  prazoEnvio?: Date | null;
-  dataPedido: Date;
-  itens: ItemImportado[];
-}
+// Os tipos vêm do schema Zod em `packages/contracts` — os aliases existem só pra
+// manter a leitura em pt-BR dentro do módulo. Definir interfaces próprias aqui
+// duplicaria o contrato e deixaria os dois divergirem em silêncio.
+export type ItemImportado = PedidoItemImport;
+export type PedidoImportado = PedidoImport;
 
 @Injectable()
 export class AtendimentoService {
@@ -44,11 +32,7 @@ export class AtendimentoService {
     });
 
     if (jaExiste) {
-      await this.prisma.pedidoMarketplace.update({
-        where: { id: jaExiste.id },
-        data: { statusExterno: pedido.statusExterno },
-      });
-      return { pedidoId: jaExiste.id, novo: false, itensAtendidos: 0, itensSemVinculo: 0 };
+      return this.atualizarStatus(jaExiste.id, jaExiste.status, pedido);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -89,7 +73,73 @@ export class AtendimentoService {
         `Pedido ${pedido.canal}/${pedido.externalId}: ${itensAtendidos} atendidos, ` +
           `${itensSemVinculo} sem vínculo`,
       );
-      return { pedidoId: criado.id, novo: true, itensAtendidos, itensSemVinculo };
+      return {
+        pedidoId: criado.id,
+        novo: true,
+        itensAtendidos,
+        itensSemVinculo,
+        statusAtualizado: null as PedidoStatus | null,
+      };
+    });
+  }
+
+  /**
+   * Reimportação de pedido conhecido: reflete a mudança de status do marketplace.
+   *
+   * É assim que o Hub sabe que a peça saiu — quando a Shopee move o pedido pra
+   * PROCESSED/SHIPPED, o pedido vira ENVIADO aqui e os cards de produção dele fecham.
+   * Sem isso o pedido ficaria "atendido" pra sempre e o kanban acumularia card morto.
+   */
+  private async atualizarStatus(
+    pedidoId: string,
+    statusAtual: PedidoStatus,
+    pedido: PedidoImportado,
+  ) {
+    const novo = statusInterno(pedido.canal, pedido.statusExterno);
+    const mudou = novo !== null && novo !== statusAtual;
+
+    await this.prisma.pedidoMarketplace.update({
+      where: { id: pedidoId },
+      data: { statusExterno: pedido.statusExterno, ...(mudou ? { status: novo } : {}) },
+    });
+
+    if (mudou) {
+      await this.fecharJobsDoPedido(pedidoId, novo);
+      this.logger.log(
+        `Pedido ${pedido.canal}/${pedido.externalId}: ${statusAtual} → ${novo} ` +
+          `(${pedido.statusExterno})`,
+      );
+    }
+
+    return {
+      pedidoId,
+      novo: false,
+      itensAtendidos: 0,
+      itensSemVinculo: 0,
+      statusAtualizado: mudou ? novo : null,
+    };
+  }
+
+  /**
+   * Fecha os cards de produção de um pedido que saiu ou foi cancelado.
+   *
+   * Só mexe em card que ainda está aberto: um job já marcado EMBALADO/ENVIADO pelo
+   * fluxo manual do kanban não é reescrito, senão o histórico de quem fez o quê some.
+   */
+  private async fecharJobsDoPedido(pedidoId: string, status: PedidoStatus) {
+    const statusJob = statusJobPara(status);
+    if (!statusJob) return;
+
+    const itens = await this.prisma.pedidoItem.findMany({
+      where: { pedidoId, jobProducaoId: { not: null } },
+      select: { jobProducaoId: true },
+    });
+    const jobIds = itens.map((i) => i.jobProducaoId).filter((id): id is string => id !== null);
+    if (jobIds.length === 0) return;
+
+    await this.prisma.jobProducao.updateMany({
+      where: { id: { in: jobIds }, status: { in: ['FILA', 'IMPRIMINDO', 'CONCLUIDO'] } },
+      data: { status: statusJob },
     });
   }
 
@@ -205,7 +255,8 @@ export class AtendimentoService {
       where: { id: itemId },
       include: { pedido: { select: { canal: true, externalId: true, prazoEnvio: true } } },
     });
-    if (!item) throw new Error(`Item ${itemId} não existe`);
+    // NotFoundException e não Error: item inexistente é 404 pro cliente, não 500.
+    if (!item) throw new NotFoundException(`Item de pedido ${itemId} não existe`);
 
     return this.prisma.$transaction(async (tx) => {
       await tx.pedidoItem.update({ where: { id: itemId }, data: { variacaoId } });
