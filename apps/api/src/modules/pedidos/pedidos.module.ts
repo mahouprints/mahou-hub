@@ -4,9 +4,10 @@ import { MercadoLivreClient } from './mercadolivre.client';
 import { PedidosController } from './pedidos.controller';
 import { PedidosSyncService } from './pedidos-sync.service';
 import { ShopeeOrdersClient } from './shopee-orders.client';
+import { WebhookController } from './webhook.controller';
 
 @Module({
-  controllers: [PedidosController],
+  controllers: [PedidosController, WebhookController],
   providers: [AtendimentoService, PedidosSyncService, ShopeeOrdersClient, MercadoLivreClient],
   exports: [AtendimentoService],
 })
