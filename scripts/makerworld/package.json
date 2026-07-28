@@ -1,0 +1,20 @@
+{
+  "name": "makerworld-prospector",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bot de prospecção de modelos 3D no MakerWorld para o catálogo da Mahou Prints. Coleta → filtra licença/tração/viabilidade → gera lotes pra avaliação visual por IA → sobe candidatos pro Mahou Hub.",
+  "scripts": {
+    "coletar": "npx -y tsx src/cli.ts coletar",
+    "enriquecer": "npx -y tsx src/cli.ts enriquecer",
+    "filtrar": "npx -y tsx src/cli.ts filtrar",
+    "imagens": "npx -y tsx src/cli.ts imagens",
+    "lotes": "npx -y tsx src/cli.ts lotes",
+    "consolidar": "npx -y tsx src/cli.ts consolidar",
+    "subir": "npx -y tsx src/cli.ts subir",
+    "status": "npx -y tsx src/cli.ts status"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

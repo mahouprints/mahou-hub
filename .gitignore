@@ -51,3 +51,9 @@ content/marketplace/listings/
 # Exports agregados de concorrentes (gerados sob demanda pra colar em LLM externa).
 # Muda a cada snapshot do cron de domingo — não faz sentido versionar.
 concorrentes-catalogo*.md
+
+# Dados brutos da prospecção MakerWorld — regeráveis pelo bot, pesados, e as imagens
+# baixadas são de terceiros. Só o código vai pro repo.
+scripts/makerworld/dados/
+scripts/makerworld/node_modules/
+scripts/makerworld/.env.local

@@ -183,6 +183,7 @@ model Produto {
   insumos           ProdutoInsumo[]
   imagens           ProdutoImagem[]
   oportunidades     ProdutoOportunidade[]
+  modeloMakerWorld  ModeloMakerWorld?
   variacoes         ProdutoVariacao[]
   criadoEm          DateTime              @default(now())
   atualizadoEm      DateTime              @updatedAt
@@ -584,4 +585,86 @@ model ReciboArquivo {
   criadoEm     DateTime @default(now())
 
   @@index([reciboId])
+}
+
+/// Modelo 3D prospectado no MakerWorld pelo bot `scripts/makerworld`.
+///
+/// Separado de `ProdutoOportunidade` de propósito: oportunidade é um anúncio de
+/// marketplace (tem preço praticado e vendas observadas); aqui é um ARQUIVO — não tem
+/// preço nem vendas, tem licença, peso e tempo de impressão. Juntar os dois obrigaria
+/// metade dos campos a ficar null nos dois sentidos.
+///
+/// Vira Produto pelo mesmo fluxo da oportunidade: `produtoId` preenchido = já entrou no
+/// catálogo.
+model ModeloMakerWorld {
+  id String @id @default(cuid())
+
+  /// ID numérico do modelo no MakerWorld. String pra não depender do tipo deles.
+  externalId String @unique
+  titulo     String
+  url        String
+  autor      String
+  imagemUrl  String
+
+  downloads Int @default(0)
+  curtidas  Int @default(0)
+  colecoes  Int @default(0)
+
+  /// String crua da licença ("CC0", "BY-NC-SA", "Standard Digital File License"...).
+  licenca String
+  /// Veredicto comercial derivado: LIVRE / ATRIBUICAO / SEM_DERIVADAS / PROIBIDA.
+  /// Só entram no banco os vendáveis — PROIBIDA aqui indicaria reclassificação posterior.
+  licencaVeredicto String
+  /// O que precisa ser feito pra ficar em conformidade (creditar autor, não modificar).
+  licencaObrigacao String
+
+  /// Chave do nicho comercial (FLEXI_ARTICULADO, ORGANIZACAO_SETUP, ...) definida pela IA.
+  nicho String
+
+  /// Peso e tempo DO ANÚNCIO (peça × unidadesPorKit), não da peça isolada.
+  pesoGramas Decimal @db.Decimal(10, 2)
+  tempoHoras Decimal @db.Decimal(10, 2)
+  /// Quantas peças o anúncio vende junto. 1 = avulsa. Peça abaixo de 18g não se
+  /// sustenta como anúncio próprio na Shopee (taxa fixa + frete), então vira kit.
+  unidadesPorKit Int @default(1)
+
+  /// Estimativas de triagem, recalculadas pelo `packages/pricing` quando virar Produto.
+  custoEstimadoCentavos Int
+  precoSugeridoCentavos Int
+  margemEstimadaPct     Decimal @db.Decimal(5, 2)
+  /// Reais por hora de impressora — métrica de priorização da fila de produção.
+  lucroPorHoraCentavos  Int
+
+  /// 0..100 por regra (tração + rendimento + peso do nicho). Não é a nota da IA.
+  scoreObjetivo Int
+  /// 0..100 dado pela avaliação visual. Curadoria do Opus sobrescreve a triagem do Haiku.
+  notaIa        Int
+  /// APROVADO / TALVEZ / REPROVADO
+  veredictoIa   String
+  justificativaIa String
+  /// IP_TERCEIRO, PRECISA_SUPORTE, FRAGIL, MUITO_GENERICO, MULTICOR, SO_RENDER...
+  alertas       String[]
+  tags          String[]
+  temFotoReal   Boolean @default(false)
+
+  /// Revisão do Gabriel — é a palavra final, sobrepõe o veredicto da IA.
+  status    ModeloMakerWorldStatus @default(NOVO)
+  observacao String?
+
+  produtoId String?  @unique
+  produto   Produto? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([status, notaIa(sort: Desc)])
+  @@index([nicho, notaIa(sort: Desc)])
+  @@index([lucroPorHoraCentavos(sort: Desc)])
+}
+
+enum ModeloMakerWorldStatus {
+  NOVO
+  FAVORITO
+  DESCARTADO
+  VIROU_PRODUTO
 }

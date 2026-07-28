@@ -16,6 +16,7 @@ import {
   Lightbulb,
   Menu,
   Settings,
+  Shapes,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ const NAV_PRINCIPAL = [
   { href: '/financeiro', label: 'Financeiro', icon: DollarSign },
   { href: '/concorrentes', label: 'Concorrentes', icon: Crosshair },
   { href: '/oportunidades', label: 'Oportunidades', icon: Lightbulb },
+  { href: '/makerworld', label: 'MakerWorld', icon: Shapes },
 ];
 
 const NAV_RODAPE = [{ href: '/configuracoes', label: 'Configurações', icon: Settings }];

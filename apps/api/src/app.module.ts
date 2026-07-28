@@ -18,6 +18,7 @@ import { VendasModule } from './modules/vendas/vendas.module';
 import { CustosModule } from './modules/custos/custos.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { ConcorrentesModule } from './modules/concorrentes/concorrentes.module';
+import { MakerworldModule } from './modules/makerworld/makerworld.module';
 import { OportunidadesModule } from './modules/oportunidades/oportunidades.module';
 import { VariacoesModule } from './modules/variacoes/variacoes.module';
 import { EstoqueModule } from './modules/estoque/estoque.module';
@@ -63,6 +64,7 @@ import { HealthController } from './modules/health/health.controller';
     FinanceiroModule,
     ConcorrentesModule,
     OportunidadesModule,
+    MakerworldModule,
     VariacoesModule,
     EstoqueModule,
     RecibosModule,
