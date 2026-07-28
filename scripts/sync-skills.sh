@@ -15,10 +15,13 @@
 #   ./scripts/sync-skills.sh --clean         # também remove skills locais que sumiram do repo
 #   ./scripts/sync-skills.sh --target DIR    # alvo customizado (default ~/.claude/commands)
 #
-# Skills com múltiplos arquivos (ex: oportunidades-mahou com criterios-3d.md +
-# exemplos/...) são puladas — ~/.claude/commands/ aceita só arquivo único por
-# skill. Pra essas, abra o Claude Code dentro do repo (.claude/skills/ é lido
-# automaticamente em modo project-level).
+# Skill com .md irmãos (ex: gerar-descricao com contexto-mahou.md) é sincronizada
+# como arquivo único: SKILL.md + auxiliares concatenados, separados por `---`. No
+# repo eles continuam separados — dá pra editar o contexto sem tocar na skill.
+#
+# Skill com subpasta (ex: oportunidades-mahou com exemplos/) segue de fora, porque
+# aí não existe arquivo único possível. Pra essas, abra o Claude Code dentro do repo
+# (.claude/skills/ é lido automaticamente em modo project-level).
 
 set -euo pipefail
 
@@ -109,7 +112,7 @@ apply_path_rewrites() {
 COUNT_CREATED=0
 COUNT_UPDATED=0
 COUNT_UNCHANGED=0
-COUNT_SKIPPED_MULTIFILE=0
+COUNT_SKIPPED_SUBPASTA=0
 SYNCED_NAMES=()
 
 shopt -s nullglob
@@ -122,17 +125,35 @@ for skill_dir in "$SKILLS_DIR"/*/; do
     continue
   fi
 
-  # Detecta multi-arquivo (skill tem .md irmãos além de SKILL.md ou subpastas)
-  aux_count=$(find "$skill_dir" -mindepth 1 -not -name SKILL.md -not -name README.md | wc -l | tr -d ' ')
-  if (( aux_count > 0 )); then
-    warn "${C_BOLD}${skill_name}${C_RESET} tem $aux_count arquivo(s) auxiliar(es) — pulando (use Claude Code dentro do repo pra essa skill)"
-    COUNT_SKIPPED_MULTIFILE=$((COUNT_SKIPPED_MULTIFILE + 1))
+  # Subpasta ou anexo que não é .md não cabe num arquivo só. Dotfile é ignorado
+  # na contagem: .DS_Store aparece sozinho no macOS e tirava a skill do sync.
+  nao_concatenavel=$(find "$skill_dir" -mindepth 1 ! -name '.*' \( -type d -o ! -name '*.md' \) | wc -l | tr -d ' ')
+  if (( nao_concatenavel > 0 )); then
+    warn "${C_BOLD}${skill_name}${C_RESET} tem subpasta ou anexo não-.md — pulando (use Claude Code dentro do repo pra essa skill)"
+    COUNT_SKIPPED_SUBPASTA=$((COUNT_SKIPPED_SUBPASTA + 1))
     continue
   fi
+
+  # .md irmãos (contexto, referência) vão concatenados depois do SKILL.md: o
+  # ~/.claude/commands/ aceita um arquivo por skill, mas nada impede que esse
+  # arquivo seja a soma dos dois.
+  aux_files=()
+  while IFS= read -r aux; do
+    aux_files+=("$aux")
+  done < <(find "$skill_dir" -mindepth 1 -maxdepth 1 -name '*.md' \
+                ! -name SKILL.md ! -name README.md | sort)
 
   target_file="$TARGET/${skill_name}.md"
   tmp_file="$(mktemp)"
   apply_path_rewrites "$skill_main" > "$tmp_file"
+  for aux in "${aux_files[@]+"${aux_files[@]}"}"; do
+    # O SKILL.md manda ler "o arquivo ao lado". Na versão sincronizada não existe
+    # "ao lado", então o cabeçalho diz de onde o bloco veio — senão a instrução
+    # aponta pro vácuo e o agente sai procurando arquivo que não existe.
+    printf '\n\n---\n\n> Bloco abaixo: conteúdo de `%s`, concatenado por `scripts/sync-skills.sh`.\n> No repo é um arquivo separado, ao lado do SKILL.md.\n\n' \
+      "$(basename "$aux")" >> "$tmp_file"
+    apply_path_rewrites "$aux" >> "$tmp_file"
+  done
 
   if [[ -f "$target_file" ]]; then
     if cmp -s "$tmp_file" "$target_file"; then
@@ -195,7 +216,7 @@ log "${C_BOLD}resumo${C_RESET}"
 echo "  criadas:        $COUNT_CREATED"
 echo "  atualizadas:    $COUNT_UPDATED"
 echo "  já em sync:     $COUNT_UNCHANGED"
-echo "  multi-arquivo:  $COUNT_SKIPPED_MULTIFILE   ${C_DIM}(usar dentro do repo)${C_RESET}"
+echo "  com subpasta:   $COUNT_SKIPPED_SUBPASTA   ${C_DIM}(usar dentro do repo)${C_RESET}"
 if (( CLEAN )); then
   echo "  removidas:      $COUNT_REMOVED"
 fi
