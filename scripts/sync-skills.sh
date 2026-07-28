@@ -92,16 +92,25 @@ if [[ ! -d "$TARGET" ]]; then
 fi
 
 # ─────────────────────── substituições de path ───────────────────────
-# Aplica nos arquivos sincronizados: converte paths do repo (`content/...`) pra
-# os paths locais absolutos onde Claude Code espera encontrar os assets.
+# Aplica nos arquivos sincronizados: converte paths relativos ao repo (`content/...`)
+# pros absolutos, já que a skill sincronizada roda de qualquer pasta.
+#
+# marketplace, instagram e memory apontam pro próprio repo, via $REPO_ROOT: esse
+# conteúdo só existe lá, e cópia fora criaria drift — o mesmo drift que este script
+# evita ao sincronizar só numa direção. Os destinos antigos (~/Marketplace, ~/Instagram,
+# ~/.claude/projects/C--Users-PC/memory) eram da máquina Windows e não existem no Mac;
+# a skill sincronizada apontava pro vazio.
+#
+# imagegen é a exceção real: `~/Documents/Mahou Prints/imagegen/` é pasta de trabalho
+# de verdade (output, pool.txt, config do Playwright), não cópia do repo.
 apply_path_rewrites() {
   local input="$1"
   sed \
-    -e 's|content/marketplace/|~/Marketplace/|g' \
-    -e 's|content/instagram/|~/Instagram/|g' \
+    -e "s|content/marketplace/|$REPO_ROOT/content/marketplace/|g" \
+    -e "s|content/instagram/|$REPO_ROOT/content/instagram/|g" \
     -e 's|content/imagegen/templates/|~/Documents/Mahou Prints/imagegen/templates/|g' \
     -e 's|content/imagegen/|~/Documents/Mahou Prints/imagegen/|g' \
-    -e 's|content/memory/|~/.claude/projects/C--Users-PC/memory/|g' \
+    -e "s|content/memory/|$REPO_ROOT/content/memory/|g" \
     -e 's|\.claude/skills/gerar-imagem/SKILL\.md|~/.claude/commands/gerar-imagem.md|g' \
     -e 's|\.claude/skills/gerar-descricao/SKILL\.md|~/.claude/commands/gerar-descricao.md|g' \
     -e 's|\.claude/skills/gerar-post/SKILL\.md|~/.claude/commands/gerar-post.md|g' \
