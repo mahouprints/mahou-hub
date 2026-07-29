@@ -1,10 +1,10 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, ExternalLink, Scale, Store } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, Copy, ExternalLink, Scale, Store } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, pct, tempoRelativo } from '@/lib/format';
@@ -19,6 +19,10 @@ const ROTULO_MARKETPLACE: Record<Marketplace, string> = {
   ML: 'Mercado Livre',
   TIKTOK: 'TikTok Shop',
 };
+
+// Shopee primeiro por ser o canal principal da loja — a API devolve em ordem
+// alfabética, que colocaria o ML na frente sem motivo.
+const ORDEM_MARKETPLACE: Marketplace[] = ['SHOPEE', 'ML', 'TIKTOK'];
 
 // Limite de caracteres do título em cada marketplace. Serve pra mostrar quanto do
 // espaço a copy usou — título curto demais desperdiça busca, longo demais é cortado.
@@ -353,23 +357,71 @@ function CardPlanoAds({ plano }: { plano: PlanoAds }) {
 }
 
 function CardAnuncios({ anuncios }: { anuncios: Anuncio[] }) {
+  const ordenados = [...anuncios].sort(
+    (a, b) =>
+      ORDEM_MARKETPLACE.indexOf(a.marketplace) - ORDEM_MARKETPLACE.indexOf(b.marketplace),
+  );
+  const [selecionado, setSelecionado] = useState<Marketplace | null>(
+    ordenados[0]?.marketplace ?? null,
+  );
+  const atual = ordenados.find((a) => a.marketplace === selecionado);
+
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Anúncio</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">Anúncio</CardTitle>
+          {/* Uma copy por vez: as três empilhadas jogavam a página pra baixo e
+              obrigavam a rolar pra comparar o que muda entre marketplaces. */}
+          <div className="flex flex-wrap gap-1">
+            {ordenados.map((a) => (
+              <Button
+                key={a.id}
+                size="sm"
+                variant={a.marketplace === selecionado ? 'default' : 'outline'}
+                onClick={() => setSelecionado(a.marketplace)}
+              >
+                {ROTULO_MARKETPLACE[a.marketplace]}
+              </Button>
+            ))}
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-6">
-        {anuncios.length === 0 ? (
+      <CardContent>
+        {!atual ? (
           <p className="text-sm text-muted-foreground">
             Nenhuma copy gerada ainda. Ela é escrita pela skill{' '}
             <code className="rounded bg-muted px-1 py-0.5 text-xs">gerar-descricao</code>, fora
             do Hub, e gravada aqui depois.
           </p>
         ) : (
-          anuncios.map((anuncio) => <BlocoAnuncio key={anuncio.id} anuncio={anuncio} />)
+          <BlocoAnuncio anuncio={atual} />
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function BotaoCopiar({ texto, rotulo }: { texto: string; rotulo: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiar() {
+    await navigator.clipboard.writeText(texto);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1500);
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={copiar}
+      aria-label={`Copiar ${rotulo}`}
+      className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground"
+    >
+      {copiado ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      {copiado ? 'Copiado' : 'Copiar'}
+    </Button>
   );
 }
 
@@ -377,34 +429,42 @@ function BlocoAnuncio({ anuncio }: { anuncio: Anuncio }) {
   const limite = LIMITE_TITULO[anuncio.marketplace];
 
   return (
-    <section className="flex flex-col gap-2 border-t pt-4 first:border-t-0 first:pt-0">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-medium">{ROTULO_MARKETPLACE[anuncio.marketplace]}</p>
-        <p className="text-xs text-muted-foreground">
-          v{anuncio.versao} · {tempoRelativo(anuncio.geradoEm)} · preço base{' '}
-          {centavosParaReais(anuncio.precoBaseCentavos)}
-        </p>
-      </div>
+    <section className="flex flex-col gap-3">
+      <p className="text-xs text-muted-foreground">
+        v{anuncio.versao} · {tempoRelativo(anuncio.geradoEm)} · preço base{' '}
+        {centavosParaReais(anuncio.precoBaseCentavos)}
+      </p>
 
       <div className="flex flex-col gap-1">
-        <p className="text-sm">{anuncio.titulo}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm">{anuncio.titulo}</p>
+          <BotaoCopiar texto={anuncio.titulo} rotulo="título" />
+        </div>
         <p className="text-xs text-muted-foreground">
           {anuncio.titulo.length}/{limite} caracteres
         </p>
       </div>
 
       {anuncio.categoria && (
-        <p className="text-xs text-muted-foreground">
-          Categoria: <span className="text-foreground">{anuncio.categoria}</span>
-          {anuncio.categoriaId && (
-            <span className="ml-1 font-mono text-[10px]">({anuncio.categoriaId})</span>
-          )}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Categoria: <span className="text-foreground">{anuncio.categoria}</span>
+            {anuncio.categoriaId && (
+              <span className="ml-1 font-mono text-[10px]">({anuncio.categoriaId})</span>
+            )}
+          </p>
+          <BotaoCopiar texto={anuncio.categoria} rotulo="categoria" />
+        </div>
       )}
 
-      <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs leading-relaxed">
-        {anuncio.descricao}
-      </pre>
+      <div className="flex flex-col gap-1">
+        <div className="flex justify-end">
+          <BotaoCopiar texto={anuncio.descricao} rotulo="descrição" />
+        </div>
+        <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs leading-relaxed">
+          {anuncio.descricao}
+        </pre>
+      </div>
 
       {anuncio.fichaTecnica.length > 0 && (
         <div className="overflow-x-auto">
