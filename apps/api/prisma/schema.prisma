@@ -656,6 +656,8 @@ model ModeloMakerWorld {
   produtoId String?  @unique
   produto   Produto? @relation(fields: [produtoId], references: [id], onDelete: SetNull)
 
+  anuncios AnuncioModelo[]
+
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
@@ -669,6 +671,42 @@ enum ModeloMakerWorldStatus {
   FAVORITO
   DESCARTADO
   VIROU_PRODUTO
+}
+
+/// Copy de anúncio gerada pela skill `gerar-descricao` pra um modelo da prospecção.
+///
+/// Fica pendurada no ModeloMakerWorld, e não no Produto, porque o modelo ainda não é
+/// produto: o anúncio pronto é justamente o que ajuda a decidir SE vale cadastrar.
+/// Uma linha por marketplace — cada algoritmo quer título e estrutura diferentes, então
+/// não dá pra guardar um texto só e reaproveitar.
+///
+/// A copy é gerada fora do Hub (o backend não fala com LLM nenhum): uma sessão do Claude
+/// roda a skill e grava aqui via POST. Por isso `geradoEm` importa — é o que denuncia
+/// anúncio velho depois que o custo ou o preço do modelo mudou.
+model AnuncioModelo {
+  id String @id @default(cuid())
+
+  modeloId String
+  modelo   ModeloMakerWorld @relation(fields: [modeloId], references: [id], onDelete: Cascade)
+
+  marketplace Canal
+
+  titulo    String
+  descricao String
+  tags      String[]
+
+  /// Preço que a copy assumiu quando foi escrita. Guardado separado do preço sugerido
+  /// do modelo porque a descrição pode citar valor, e o sugerido muda quando o custo
+  /// é recalculado — comparar os dois é o que mostra que a copy envelheceu.
+  precoBaseCentavos Int
+
+  /// Sobe a cada regeração do mesmo marketplace.
+  versao Int @default(1)
+
+  geradoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([modeloId, marketplace])
 }
 
 /// Pedido importado de um marketplace (Shopee Open Platform ou Mercado Livre).

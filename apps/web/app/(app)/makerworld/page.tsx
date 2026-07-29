@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ExternalLink, Search, Star, Timer, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -242,9 +243,14 @@ export default function MakerWorldPage() {
 
             <div className="flex flex-1 flex-col gap-2 p-3">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="line-clamp-2 text-sm font-medium leading-snug">
+                {/* Título abre o detalhe no Hub; a imagem e o ícone continuam indo
+                    pro MakerWorld, que é pra onde eles sempre foram. */}
+                <Link
+                  href={`/makerworld/${modelo.id}`}
+                  className="line-clamp-2 text-sm font-medium leading-snug hover:underline"
+                >
                   {modelo.titulo}
-                </h3>
+                </Link>
                 <a href={modelo.url} target="_blank" rel="noreferrer">
                   <ExternalLink className="size-3.5 shrink-0 text-muted-foreground" />
                 </a>

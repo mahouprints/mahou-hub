@@ -1,9 +1,20 @@
 import 'reflect-metadata';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { MakerworldListarSchema, type MakerworldModeloImport } from '@mahou-hub/contracts';
 import { MakerworldService } from '../src/modules/makerworld/makerworld.service';
+import type { PricingService } from '../src/modules/pricing/pricing.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
+
+// Só `buscarDetalhe` usa o pricing; nos testes de importação e listagem o stub
+// existe apenas pra satisfazer o construtor.
+function pricingFake(over: Partial<Record<keyof PricingService, unknown>> = {}) {
+  return {
+    economiaDeCustoPronto: vi.fn(),
+    planoAds: vi.fn(),
+    ...over,
+  } as unknown as PricingService;
+}
 
 function modeloFake(over: Partial<MakerworldModeloImport> = {}): MakerworldModeloImport {
   return {
@@ -44,7 +55,7 @@ describe('MakerworldService', () => {
       .mockResolvedValueOnce(null) // primeiro é novo
       .mockResolvedValueOnce({ id: 'm1' }); // segundo já existia
     mock.modeloMakerWorld.upsert.mockResolvedValue({});
-    const svc = new MakerworldService(asPrisma(mock));
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     const r = await svc.importarEmLote({
       modelos: [modeloFake(), modeloFake({ externalId: '999' })],
@@ -57,7 +68,7 @@ describe('MakerworldService', () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue(null);
     mock.modeloMakerWorld.upsert.mockResolvedValue({});
-    const svc = new MakerworldService(asPrisma(mock));
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.importarEmLote({ modelos: [modeloFake()] });
 
@@ -73,7 +84,7 @@ describe('MakerworldService', () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1' });
     mock.modeloMakerWorld.upsert.mockResolvedValue({});
-    const svc = new MakerworldService(asPrisma(mock));
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.importarEmLote({ modelos: [modeloFake()] });
 
@@ -86,7 +97,7 @@ describe('MakerworldService', () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findMany.mockResolvedValue([]);
     mock.modeloMakerWorld.count.mockResolvedValue(0);
-    const svc = new MakerworldService(asPrisma(mock));
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.listar({
       semAlertas: ['IP_TERCEIRO'],
@@ -103,7 +114,7 @@ describe('MakerworldService', () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findMany.mockResolvedValue([]);
     mock.modeloMakerWorld.count.mockResolvedValue(0);
-    const svc = new MakerworldService(asPrisma(mock));
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.listar({ ordenarPor: 'lucroPorHora', limit: 10, offset: 0 });
 
@@ -128,7 +139,7 @@ describe('MakerworldService', () => {
   it('buscarPorId lança NotFound quando o modelo não existe', async () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue(null);
-    const svc = new MakerworldService(asPrisma(mock));
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await expect(svc.buscarPorId('sumiu')).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -141,7 +152,7 @@ describe('MakerworldService', () => {
       ])
       .mockResolvedValueOnce([{ status: 'NOVO', _count: { _all: 12 } }]);
     mock.modeloMakerWorld.count.mockResolvedValue(12);
-    const svc = new MakerworldService(asPrisma(mock));
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     const r = await svc.resumo();
 
@@ -151,5 +162,71 @@ describe('MakerworldService', () => {
       notaMedia: 79,
     });
     expect(r.total).toBe(12);
+  });
+
+  it('buscarDetalhe alimenta o plano de ROAS com o líquido calculado, não com o preço', async () => {
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({
+      id: 'm1',
+      precoSugeridoCentavos: 2490,
+      custoEstimadoCentavos: 377,
+      tempoHoras: '2.28',
+      anuncios: [],
+    });
+    const economia = { canal: 'SHOPEE', precoCentavos: 2490, liquidoCentavos: 1120 };
+    const pricing = pricingFake({
+      economiaDeCustoPronto: vi.fn().mockResolvedValue(economia),
+      planoAds: vi.fn().mockResolvedValue({ inviavel: false, roasBreakeven: 2.22 }),
+    });
+    const svc = new MakerworldService(asPrisma(mock), pricing);
+
+    const r = await svc.buscarDetalhe('m1');
+
+    expect(pricing.economiaDeCustoPronto).toHaveBeenCalledWith({
+      precoCentavos: 2490,
+      custoCentavos: 377,
+      canal: 'SHOPEE',
+      tempoHoras: 2.28,
+    });
+    // O erro clássico é mandar o preço como margem de contribuição — o ROAS sairia
+    // otimista e o teste de anúncio aprovaria produto que não paga o clique.
+    expect(pricing.planoAds).toHaveBeenCalledWith({
+      precoCentavos: 2490,
+      margemContribuicaoCentavos: 1120,
+    });
+    expect(r.economia).toBe(economia);
+  });
+
+  it('buscarDetalhe lança NotFound sem chamar o pricing', async () => {
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue(null);
+    const pricing = pricingFake();
+    const svc = new MakerworldService(asPrisma(mock), pricing);
+
+    await expect(svc.buscarDetalhe('sumiu')).rejects.toBeInstanceOf(NotFoundException);
+    expect(pricing.economiaDeCustoPronto).not.toHaveBeenCalled();
+  });
+
+  it('salvarAnuncio começa na versão 1 e incrementa ao regerar o mesmo marketplace', async () => {
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1' });
+    mock.anuncioModelo.findUnique.mockResolvedValue({ versao: 2 });
+    mock.anuncioModelo.upsert.mockResolvedValue({});
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
+
+    await svc.salvarAnuncio('m1', {
+      marketplace: 'SHOPEE',
+      titulo: 'Polvo Articulado',
+      descricao: 'Impresso em 3D.',
+      tags: ['polvo'],
+      precoBaseCentavos: 2490,
+    });
+
+    const args = mock.anuncioModelo.upsert.mock.calls[0]![0];
+    expect(args.create.versao).toBeUndefined(); // default do banco = 1
+    expect(args.update.versao).toBe(3);
+    expect(args.where).toEqual({
+      modeloId_marketplace: { modeloId: 'm1', marketplace: 'SHOPEE' },
+    });
   });
 });

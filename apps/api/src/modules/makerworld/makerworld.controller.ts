@@ -2,10 +2,12 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+  AnuncioModeloUpsertSchema,
   MakerworldBulkImportSchema,
   MakerworldBulkStatusSchema,
   MakerworldListarSchema,
   MakerworldUpdateSchema,
+  type AnuncioModeloUpsert,
   type MakerworldBulkImport,
   type MakerworldBulkStatus,
   type MakerworldListar,
@@ -44,8 +46,18 @@ export class MakerworldController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Modelo com economia, plano de ROAS e anúncios já gerados' })
   buscar(@Param('id') id: string) {
-    return this.service.buscarPorId(id);
+    return this.service.buscarDetalhe(id);
+  }
+
+  @Post(':id/anuncios')
+  @ApiOperation({ summary: 'Grava a copy gerada pela skill para um marketplace (upsert)' })
+  salvarAnuncio(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(AnuncioModeloUpsertSchema)) body: AnuncioModeloUpsert,
+  ) {
+    return this.service.salvarAnuncio(id, body);
   }
 
   @Patch(':id')

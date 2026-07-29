@@ -127,3 +127,46 @@ export const ModeloMakerWorldSchema = MakerworldModeloImportSchema.extend({
   atualizadoEm: z.string(),
 });
 export type ModeloMakerWorld = z.infer<typeof ModeloMakerWorldSchema>;
+
+// Marketplaces que a skill `gerar-descricao` sabe escrever. SITE fica de fora de
+// propósito: anúncio existe pra ranquear em algoritmo de marketplace, e a loja
+// própria não tem um.
+export const AnuncioMarketplaceSchema = z.enum(['SHOPEE', 'ML', 'TIKTOK']);
+export type AnuncioMarketplace = z.infer<typeof AnuncioMarketplaceSchema>;
+
+// Copy gerada FORA do Hub (o backend não fala com LLM) e gravada aqui por quem rodou
+// a skill. O teto de 200 no título é o do TikTok, o mais largo dos três: validar pelo
+// limite do ML (60) faria o Hub rejeitar título de TikTok perfeitamente válido. Quem
+// respeita o limite de cada marketplace é a skill.
+export const AnuncioModeloUpsertSchema = z.object({
+  marketplace: AnuncioMarketplaceSchema,
+  titulo: z.string().min(1).max(200),
+  descricao: z.string().min(1).max(20000),
+  tags: z.array(z.string().min(1)).max(50).default([]),
+  precoBaseCentavos: z.number().int().positive(),
+});
+export type AnuncioModeloUpsert = z.infer<typeof AnuncioModeloUpsertSchema>;
+
+export const AnuncioModeloSchema = AnuncioModeloUpsertSchema.extend({
+  id: z.string(),
+  modeloId: z.string(),
+  versao: z.number().int(),
+  geradoEm: z.string(),
+  atualizadoEm: z.string(),
+});
+export type AnuncioModelo = z.infer<typeof AnuncioModeloSchema>;
+
+// Economia recalculada na hora a partir do preço e do custo guardados no modelo.
+// Não é persistida: taxa de marketplace e imposto mudam no Parametro, e número
+// congelado no banco viraria mentira silenciosa na tela.
+export const EconomiaModeloSchema = z.object({
+  canal: AnuncioMarketplaceSchema,
+  precoCentavos: z.number().int(),
+  custoCentavos: z.number().int(),
+  taxaMarketplaceCentavos: z.number().int(),
+  impostoCentavos: z.number().int(),
+  liquidoCentavos: z.number().int(),
+  margemPct: z.number(),
+  lucroPorHoraCentavos: z.number().int(),
+});
+export type EconomiaModelo = z.infer<typeof EconomiaModeloSchema>;

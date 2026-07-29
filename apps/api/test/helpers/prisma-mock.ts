@@ -55,6 +55,7 @@ export function makePrismaMock() {
       count: vi.fn(),
       groupBy: vi.fn(),
     },
+    anuncioModelo: { findUnique: vi.fn(), upsert: vi.fn() },
     oportunidadeLog: { create: vi.fn(), findMany: vi.fn() },
     parametro: { findUnique: vi.fn() },
     taxaShopee: { findMany: vi.fn() },

@@ -1,12 +1,14 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
+  AnuncioModeloUpsert,
   MakerworldBulkImport,
   MakerworldListar,
   MakerworldUpdate,
   ModeloMakerWorldStatus,
 } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PricingService } from '../pricing/pricing.service';
 
 const ORDENACOES: Record<
   MakerworldListar['ordenarPor'],
@@ -22,7 +24,10 @@ const ORDENACOES: Record<
 export class MakerworldService {
   private readonly logger = new Logger(MakerworldService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pricing: PricingService,
+  ) {}
 
   /**
    * Upsert em lote vindo do bot. Chave é `externalId` — reimportar o mesmo modelo
@@ -121,6 +126,50 @@ export class MakerworldService {
     const modelo = await this.prisma.modeloMakerWorld.findUnique({ where: { id } });
     if (!modelo) throw new NotFoundException(`Modelo MakerWorld ${id} não encontrado`);
     return modelo;
+  }
+
+  /**
+   * Modelo + o que a tela de anúncio precisa: economia e plano de ROAS recalculados
+   * agora, e a copy já gerada. Economia e ROAS saem pelo canal SHOPEE porque é onde
+   * a Mahou anuncia e onde o degrau de taxa decide o preço — os outros canais têm a
+   * copy guardada, mas o plano de mídia mostrado é o da Shopee.
+   */
+  async buscarDetalhe(id: string) {
+    const modelo = await this.prisma.modeloMakerWorld.findUnique({
+      where: { id },
+      include: { anuncios: { orderBy: { marketplace: 'asc' } } },
+    });
+    if (!modelo) throw new NotFoundException(`Modelo MakerWorld ${id} não encontrado`);
+
+    const economia = await this.pricing.economiaDeCustoPronto({
+      precoCentavos: modelo.precoSugeridoCentavos,
+      custoCentavos: modelo.custoEstimadoCentavos,
+      canal: 'SHOPEE',
+      tempoHoras: Number(modelo.tempoHoras),
+    });
+    const planoAds = await this.pricing.planoAds({
+      precoCentavos: economia.precoCentavos,
+      margemContribuicaoCentavos: economia.liquidoCentavos,
+    });
+
+    return { ...modelo, economia, planoAds };
+  }
+
+  /**
+   * Grava a copy que a skill `gerar-descricao` produziu. Regerar o mesmo marketplace
+   * sobrescreve e sobe a versão — histórico de copy descartada não serve pra nada,
+   * mas saber que já foi refeita 3 vezes serve.
+   */
+  async salvarAnuncio(modeloId: string, dados: AnuncioModeloUpsert) {
+    await this.buscarPorId(modeloId);
+    const chave = { modeloId_marketplace: { modeloId, marketplace: dados.marketplace } };
+    const atual = await this.prisma.anuncioModelo.findUnique({ where: chave });
+
+    return this.prisma.anuncioModelo.upsert({
+      where: chave,
+      create: { modeloId, ...dados },
+      update: { ...dados, versao: (atual?.versao ?? 0) + 1, geradoEm: new Date() },
+    });
   }
 
   async atualizar(id: string, dados: MakerworldUpdate) {
