@@ -212,3 +212,66 @@ describe('ProdutosService.desativarMuitos', () => {
     expect(call?.data).toEqual({ ativo: false });
   });
 });
+
+describe('ProdutosService.vitrine', () => {
+  const linhaBase = {
+    id: 'p1',
+    nome: 'Polvo Articulado',
+    precoCentavos: 2490,
+    canalPrincipal: 'SHOPEE',
+    variacoes: [{ estoqueAtual: 3, estoqueMinimo: 5 }],
+  };
+
+  it('cai no render do MakerWorld quando o produto ainda não tem foto', async () => {
+    const { mock } = makePrismaMock();
+    mock.produto.findMany.mockResolvedValue([
+      { ...linhaBase, imagens: [], modeloMakerWorld: { imagemUrl: 'https://mw/render.png' } },
+    ] as never);
+    mock.venda.findMany.mockResolvedValue([] as never);
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+
+    const [linha] = await svc.vitrine();
+
+    expect(linha?.imagemUrl).toBe('https://mw/render.png');
+    expect(linha?.imagemEhRender).toBe(true);
+    // 3 prontos contra mínimo 5 — a vitrine tem que gritar.
+    expect(linha?.abaixoDoMinimo).toBe(true);
+  });
+
+  it('foto própria ganha do render, e não marca como render', async () => {
+    const { mock } = makePrismaMock();
+    mock.produto.findMany.mockResolvedValue([
+      {
+        ...linhaBase,
+        imagens: [{ arquivo: 'produtos/p1/foto.jpg' }],
+        modeloMakerWorld: { imagemUrl: 'https://mw/render.png' },
+      },
+    ] as never);
+    mock.venda.findMany.mockResolvedValue([] as never);
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+
+    const [linha] = await svc.vitrine();
+
+    expect(linha?.imagemUrl).toBe('https://media.test/produtos/p1/foto.jpg');
+    expect(linha?.imagemEhRender).toBe(false);
+  });
+
+  it('soma unidades e receita usando o preço praticado em cada venda', async () => {
+    const { mock } = makePrismaMock();
+    mock.produto.findMany.mockResolvedValue([
+      { ...linhaBase, imagens: [], modeloMakerWorld: null },
+    ] as never);
+    mock.venda.findMany.mockResolvedValue([
+      { produtoId: 'p1', qtd: 2, precoUnitarioCentavos: 2490, dataVenda: new Date('2026-07-01') },
+      // Preço promocional: se a receita usasse Produto.precoCentavos, sairia inflada.
+      { produtoId: 'p1', qtd: 1, precoUnitarioCentavos: 1990, dataVenda: new Date('2026-07-20') },
+    ] as never);
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+
+    const [linha] = await svc.vitrine();
+
+    expect(linha?.unidadesVendidas).toBe(3);
+    expect(linha?.receitaCentavos).toBe(2 * 2490 + 1990);
+    expect(linha?.ultimaVenda).toBe(new Date('2026-07-20').toISOString());
+  });
+});

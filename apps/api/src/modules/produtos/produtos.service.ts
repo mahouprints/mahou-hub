@@ -16,6 +16,7 @@ type ProdutoComVitrine = Prisma.ProdutoGetPayload<{
   include: {
     variacoes: { select: { estoqueAtual: true; estoqueMinimo: true } };
     imagens: { select: { arquivo: true } };
+    modeloMakerWorld: { select: { imagemUrl: true } };
   };
 }>;
 
@@ -64,6 +65,7 @@ export class ProdutosService {
       include: {
         variacoes: { where: { ativo: true }, select: { estoqueAtual: true, estoqueMinimo: true } },
         imagens: { take: 1, orderBy: { ordem: 'asc' }, select: { arquivo: true } },
+        modeloMakerWorld: { select: { imagemUrl: true } },
       },
       orderBy: { criadoEm: 'desc' },
     });
@@ -89,7 +91,13 @@ export class ProdutosService {
       nome: produto.nome,
       precoCentavos: produto.precoCentavos,
       canalPrincipal: produto.canalPrincipal,
-      imagemUrl: primeira ? this.mediaUrl.publicUrl(primeira.arquivo) : null,
+      // Foto nossa ganha do render do MakerWorld: é a peça que sai da nossa impressora.
+      // O render é o fallback pra produto recém-vindo da prospecção, que ainda não tem
+      // foto — sem ele a vitrine nasce cheia de quadrado cinza.
+      imagemUrl: primeira
+        ? this.mediaUrl.publicUrl(primeira.arquivo)
+        : (produto.modeloMakerWorld?.imagemUrl ?? null),
+      imagemEhRender: !primeira && produto.modeloMakerWorld != null,
       estoqueProntos: produto.variacoes.reduce((s, v) => s + v.estoqueAtual, 0),
       // Sem variação cadastrada não existe estoque pra ficar abaixo do mínimo.
       abaixoDoMinimo: produto.variacoes.some((v) => v.estoqueAtual < v.estoqueMinimo),

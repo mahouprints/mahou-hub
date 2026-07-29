@@ -14,6 +14,7 @@ type ItemVitrine = {
   precoCentavos: number;
   canalPrincipal: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
   imagemUrl: string | null;
+  imagemEhRender: boolean;
   estoqueProntos: number;
   abaixoDoMinimo: boolean;
   unidadesVendidas: number;
@@ -94,12 +95,20 @@ function LinhaProduto({ item }: { item: ItemVitrine }) {
   return (
     <Card className="flex flex-wrap items-center gap-4 p-3">
       {item.imagemUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={item.imagemUrl}
-          alt={item.nome}
-          className="size-16 shrink-0 rounded-md border object-cover"
-        />
+        <div className="relative size-16 shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.imagemUrl}
+            alt={item.nome}
+            className="size-16 rounded-md border object-cover"
+          />
+          {/* Render do autor não é foto da nossa peça — quem vê precisa saber. */}
+          {item.imagemEhRender && (
+            <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-background/85 text-center text-[9px] leading-4 text-muted-foreground">
+              render
+            </span>
+          )}
+        </div>
       ) : (
         <div className="flex size-16 shrink-0 items-center justify-center rounded-md border bg-muted">
           <PackageOpen className="size-5 text-muted-foreground" />
