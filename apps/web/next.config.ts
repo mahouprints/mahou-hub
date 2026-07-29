@@ -10,6 +10,14 @@ const config: NextConfig = {
     // alheio à versão — quando subir v2, basta trocar o destination aqui.
     return [{ source: '/api/:path*', destination: `${apiUrl}/api/v1/:path*` }];
   },
+  async redirects() {
+    // A lista de produtos virou a Vitrine. Sem isso, favorito e aba aberta em
+    // /produtos caem num 404 do Next — que renderiza fora do layout, sem sidebar
+    // e sem caminho de volta. Permanente porque a página não vai voltar.
+    // Só a listagem: /produtos/novo e /produtos/:id seguem vivos como destino da
+    // Calculadora e das Oportunidades.
+    return [{ source: '/produtos', destination: '/vitrine', permanent: true }];
+  },
 };
 
 export default config;
