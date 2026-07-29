@@ -702,6 +702,17 @@ model AnuncioModelo {
   descricao String
   tags      String[]
 
+  /// Categoria escolhida no marketplace. Cada um tem taxonomia própria — o mesmo
+  /// cortador é "Casa e Decoração > Cozinha > Utensílios" na Shopee e
+  /// "Cozinha > Confeitaria > Cortadores" no ML, que ainda penaliza categoria genérica.
+  categoria String?
+
+  /// Ficha técnica (atributos), como lista de {chave, valor}. Na prática é do ML:
+  /// lá preencher todos os atributos é SEO crítico, e Shopee/TikTok não têm equivalente.
+  /// Json porque o conjunto de campos muda por categoria do marketplace; a forma é
+  /// validada na borda com Zod, não aqui.
+  fichaTecnica Json?
+
   /// Preço que a copy assumiu quando foi escrita. Guardado separado do preço sugerido
   /// do modelo porque a descrição pode citar valor, e o sugerido muda quando o custo
   /// é recalculado — comparar os dois é o que mostra que a copy envelheceu.

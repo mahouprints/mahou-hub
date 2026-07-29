@@ -262,6 +262,8 @@ describe('MakerworldService', () => {
       titulo: 'Polvo Articulado',
       descricao: 'Impresso em 3D.',
       tags: ['polvo'],
+      categoria: 'Casa e Decoração > Decoração',
+      fichaTecnica: [],
       precoBaseCentavos: 2490,
     });
 

@@ -34,6 +34,8 @@ type Anuncio = {
   titulo: string;
   descricao: string;
   tags: string[];
+  categoria: string | null;
+  fichaTecnica: { chave: string; valor: string }[];
   precoBaseCentavos: number;
   versao: number;
   geradoEm: string;
@@ -390,9 +392,30 @@ function BlocoAnuncio({ anuncio }: { anuncio: Anuncio }) {
         </p>
       </div>
 
+      {anuncio.categoria && (
+        <p className="text-xs text-muted-foreground">
+          Categoria: <span className="text-foreground">{anuncio.categoria}</span>
+        </p>
+      )}
+
       <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs leading-relaxed">
         {anuncio.descricao}
       </pre>
+
+      {anuncio.fichaTecnica.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <tbody>
+              {anuncio.fichaTecnica.map((campo) => (
+                <tr key={campo.chave} className="border-b last:border-0">
+                  <td className="py-1 pr-4 text-muted-foreground">{campo.chave}</td>
+                  <td className="py-1">{campo.valor}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {anuncio.tags.length > 0 && (
         <div className="flex flex-wrap gap-1">

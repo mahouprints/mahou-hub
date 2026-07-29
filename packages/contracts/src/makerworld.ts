@@ -143,6 +143,15 @@ export const AnuncioModeloUpsertSchema = z.object({
   titulo: z.string().min(1).max(200),
   descricao: z.string().min(1).max(20000),
   tags: z.array(z.string().min(1)).max(50).default([]),
+  // Caminho completo na taxonomia do marketplace, ex.: "Casa e Decoração > Cozinha
+  // > Utensílios". Cada um tem a sua, e o ML penaliza categoria genérica.
+  categoria: z.string().max(300).nullable().default(null),
+  // Atributos da ficha técnica. Na prática só o ML usa — lá é SEO crítico preencher
+  // tudo; Shopee e TikTok não têm campo equivalente.
+  fichaTecnica: z
+    .array(z.object({ chave: z.string().min(1).max(80), valor: z.string().min(1).max(300) }))
+    .max(40)
+    .default([]),
   precoBaseCentavos: z.number().int().positive(),
 });
 export type AnuncioModeloUpsert = z.infer<typeof AnuncioModeloUpsertSchema>;
