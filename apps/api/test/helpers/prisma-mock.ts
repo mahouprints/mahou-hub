@@ -19,6 +19,8 @@ export function makePrismaMock() {
     insumo: { findUnique: vi.fn(), update: vi.fn() },
     movimentoEstoque: { create: vi.fn() },
     jobProducao: { createMany: vi.fn() },
+    recibo: { update: vi.fn(), findUniqueOrThrow: vi.fn() },
+    reciboItem: { deleteMany: vi.fn() },
   };
 
   const mock = {
@@ -44,8 +46,22 @@ export function makePrismaMock() {
     insumo: { findUnique: vi.fn(), findMany: vi.fn() },
     produtoVariacao: { findUnique: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     movimentoEstoque: { findMany: vi.fn(), create: vi.fn() },
-    recibo: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    recibo: {
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
     reciboArquivo: { create: vi.fn(), findFirst: vi.fn(), delete: vi.fn() },
+    reciboItem: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+    },
+    custo: { create: vi.fn() },
     concorrente: { findMany: vi.fn() },
     modeloMakerWorld: {
       findUnique: vi.fn(),

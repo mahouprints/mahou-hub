@@ -147,6 +147,7 @@ model Filamento {
   produtos         Produto[]
   variacoes        ProdutoVariacao[]
   movimentos       MovimentoEstoque[]
+  itensRecibo      ReciboItem[]
   criadoEm         DateTime           @default(now())
   atualizadoEm     DateTime           @updatedAt
 }
@@ -210,6 +211,7 @@ model Insumo {
   estoqueMinimo         Decimal            @default(0) @db.Decimal(10, 3)
   produtos              ProdutoInsumo[]
   movimentos            MovimentoEstoque[]
+  itensRecibo           ReciboItem[]
   criadoEm              DateTime           @default(now())
   atualizadoEm          DateTime           @updatedAt
 }
@@ -568,6 +570,27 @@ model MovimentoEstoque {
   @@index([insumoId])
 }
 
+/// PENDENTE = nota anexada, ninguém leu ainda. EXTRAIDO = a IA leu, esperando o Gabriel
+/// revisar. CONFIRMADO = revisado e aplicado (estoque + custos), não mexe mais.
+///
+/// Não existe estado "incompleto": o que faltou está em `camposIlegiveis`, e derivar dele
+/// evita dois lugares dizendo a mesma coisa e discordando.
+enum ReciboStatus {
+  PENDENTE
+  EXTRAIDO
+  CONFIRMADO
+}
+
+/// FILAMENTO e INSUMO entram no estoque e NÃO viram `Custo` — o filamento já é descontado
+/// como custo variável quando a peça é vendida, e lançar a compra também deixaria o lucro
+/// líquido descontando duas vezes (financeiro.service soma `Custo` do mês por cima).
+/// NAO_ESTOCAVEL (frete, ferramenta, manutenção) é o contrário: só vira `Custo`.
+enum ReciboItemTipo {
+  FILAMENTO
+  INSUMO
+  NAO_ESTOCAVEL
+}
+
 /// Recibo / nota de compra. Metadados + arquivos anexados (foto ou PDF).
 model Recibo {
   id            String          @id @default(cuid())
@@ -575,11 +598,61 @@ model Recibo {
   fornecedor    String?
   valorCentavos Int?
   observacao    String?
+  status        ReciboStatus    @default(PENDENTE)
+  extraidoEm    DateTime?
+  confirmadoEm  DateTime?
+  /// Campos da NOTA (não dos itens) que a IA não conseguiu ler com certeza: "data",
+  /// "fornecedor", "valorTotal". Lista não-vazia = a UI pede outra foto.
+  camposIlegiveis String[]
   arquivos      ReciboArquivo[]
+  itens         ReciboItem[]
   criadoEm      DateTime        @default(now())
   atualizadoEm  DateTime        @updatedAt
 
   @@index([data(sort: Desc)])
+  @@index([status])
+}
+
+/// Linha da nota, como a IA leu. Fica separada do movimento de estoque de propósito: aqui
+/// é o que estava ESCRITO no papel (auditável contra a foto), lá é o que entrou no saldo.
+///
+/// `filamentoId`/`insumoId` nulos com tipo preenchido = item que não existe no cadastro
+/// ainda; a UI oferece cadastrar.
+model ReciboItem {
+  id            String          @id @default(cuid())
+  reciboId      String
+  recibo        Recibo          @relation(fields: [reciboId], references: [id], onDelete: Cascade)
+  /// Texto do item exatamente como aparece na nota, sem normalizar — é o que permite
+  /// conferir a leitura contra a foto depois.
+  descricaoNota String
+  /// Nulos porque a IA devolve null quando não leu — gravar 0 ou "un" seria inventar o
+  /// dado que a regra manda não inventar. Confirmar o recibo exige preencher.
+  quantidade    Decimal?        @db.Decimal(12, 3)
+  unidade       String?
+  valorUnitCentavos  Int?
+  valorTotalCentavos Int?
+  tipo          ReciboItemTipo?
+  /// Só pra NAO_ESTOCAVEL: em qual categoria o `Custo` é lançado. A IA sugere, o Gabriel
+  /// confirma na revisão.
+  categoriaCusto CategoriaCusto?
+  filamentoId   String?
+  filamento     Filamento?      @relation(fields: [filamentoId], references: [id])
+  insumoId      String?
+  insumo        Insumo?         @relation(fields: [insumoId], references: [id])
+  /// Só pra FILAMENTO: total em gramas que entra no estoque (2 rolos de 1kg = 2000).
+  /// Nulo quando a nota não diz o peso do rolo — aí o Gabriel completa antes de confirmar.
+  gramasTotal   Int?
+  /// O que a IA não leu NESTE item ("valorUnitario", "quantidade"). Mesmo papel do
+  /// `camposIlegiveis` do recibo, no nível da linha.
+  camposIlegiveis String[]
+  /// Espelha o `consumoRegistrado` do JobProducao: marca que o movimento de estoque desta
+  /// linha já foi lançado, pra reconfirmar o recibo não duplicar saldo.
+  movimentoRegistrado Boolean   @default(false)
+  criadoEm      DateTime        @default(now())
+
+  @@index([reciboId])
+  @@index([filamentoId])
+  @@index([insumoId])
 }
 
 /// Arquivo anexado a um Recibo (imagem ou PDF). `arquivo` é path relativo a STORAGE_DIR.

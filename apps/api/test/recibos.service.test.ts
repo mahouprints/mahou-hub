@@ -20,7 +20,9 @@ describe('RecibosService', () => {
       fornecedor: 'VOOLT',
       valorCentavos: 382307,
       observacao: null,
+      camposIlegiveis: [],
       arquivos: [],
+      itens: [],
     });
     const svc = new RecibosService(asPrisma(mock), mediaUrl, config);
 
@@ -51,6 +53,8 @@ describe('RecibosService', () => {
           criadoEm: new Date(),
         },
       ],
+      camposIlegiveis: [],
+      itens: [],
     });
     const svc = new RecibosService(asPrisma(mock), mediaUrl, config);
 

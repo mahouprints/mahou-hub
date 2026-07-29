@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { FileText, Pencil, Plus, Trash2 } from 'lucide-react';
+import { FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react';
 import type { Recibo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
@@ -11,12 +11,20 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ReciboDialog } from '@/components/recibo-dialog';
+import { RevisaoNotaDialog } from '@/components/revisao-nota-dialog';
+
+/** O que o status do recibo mostra na lista. PENDENTE não vira badge — é o estado normal. */
+const BADGE_STATUS: Record<string, { texto: string; variante: 'default' | 'outline' }> = {
+  EXTRAIDO: { texto: 'lido, aguardando revisão', variante: 'outline' },
+  CONFIRMADO: { texto: 'lançado no estoque', variante: 'default' },
+};
 
 export default function RecibosPage() {
   const qc = useQueryClient();
   const [dialogAberto, setDialogAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Recibo | undefined>();
   const [confirmarId, setConfirmarId] = useState<string | null>(null);
+  const [revisandoId, setRevisandoId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['recibos'],
@@ -72,13 +80,27 @@ export default function RecibosPage() {
                   {r.valorCentavos != null && (
                     <Badge variant="default">{centavosParaReais(r.valorCentavos)}</Badge>
                   )}
+                  {BADGE_STATUS[r.status] && (
+                    <Badge variant={BADGE_STATUS[r.status]!.variante}>
+                      {BADGE_STATUS[r.status]!.texto}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {new Date(r.data).toLocaleDateString('pt-BR')}
                   {r.observacao ? ` · ${r.observacao}` : ''}
+                  {r.itens.length > 0 ? ` · ${r.itens.length} item(ns)` : ''}
                 </p>
               </div>
               <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setRevisandoId(r.id)}
+                  title={r.status === 'PENDENTE' ? 'Ler nota com IA' : 'Revisar nota'}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <ScanLine className="h-3.5 w-3.5" />
+                </button>
                 <button
                   type="button"
                   onClick={() => editar(r)}
@@ -149,6 +171,14 @@ export default function RecibosPage() {
       </div>
 
       <ReciboDialog recibo={emEdicao} open={dialogAberto} onOpenChange={setDialogAberto} />
+
+      {revisandoId && (
+        <RevisaoNotaDialog
+          reciboId={revisandoId}
+          open={!!revisandoId}
+          onOpenChange={(v) => !v && setRevisandoId(null)}
+        />
+      )}
     </div>
   );
 }

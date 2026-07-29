@@ -8,7 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import type { ReciboCreate, ReciboUpdate } from '@mahou-hub/contracts';
+import type { Prisma } from '@prisma/client';
+import type { ReciboCreate, ReciboItemUpdate, ReciboUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MediaUrlService } from '../imagens/media-url.service';
 
@@ -40,20 +41,29 @@ interface ArquivoEnviado {
   originalname: string;
 }
 
-type ReciboComArquivos = {
-  id: string;
-  data: Date;
-  fornecedor: string | null;
-  valorCentavos: number | null;
-  observacao: string | null;
-  arquivos: Array<{
-    id: string;
-    arquivo: string;
-    nomeOriginal: string;
-    mimeType: string;
-    bytes: number;
-    criadoEm: Date;
-  }>;
+type ReciboComArquivos = Prisma.ReciboGetPayload<{
+  include: { arquivos: true; itens: true };
+}>;
+
+/** Sempre carregamos anexo e item juntos: a tela de revisão precisa dos dois lado a lado. */
+const COM_ANEXOS_E_ITENS = {
+  arquivos: { orderBy: { criadoEm: 'asc' } },
+  itens: { orderBy: { criadoEm: 'asc' } },
+} satisfies Prisma.ReciboInclude;
+
+/**
+ * Ligação entre o campo que o Gabriel corrigiu e o nome que a IA usou em
+ * `camposIlegiveis`. Corrigir na tela tem que apagar o alerta — senão a nota fica pedindo
+ * outra foto pra sempre por um campo que já foi resolvido na mão.
+ */
+const ALERTA_POR_CAMPO: Record<string, string> = {
+  descricaoNota: 'descricaoNota',
+  quantidade: 'quantidade',
+  unidade: 'unidade',
+  valorUnitCentavos: 'valorUnitario',
+  valorTotalCentavos: 'valorTotal',
+  tipo: 'tipo',
+  gramasTotal: 'gramasTotal',
 };
 
 @Injectable()
@@ -75,16 +85,13 @@ export class RecibosService implements OnModuleInit {
   async list() {
     const recibos = await this.prisma.recibo.findMany({
       orderBy: { data: 'desc' },
-      include: { arquivos: { orderBy: { criadoEm: 'asc' } } },
+      include: COM_ANEXOS_E_ITENS,
     });
     return recibos.map((r) => this.toDto(r));
   }
 
   async get(id: string) {
-    const r = await this.prisma.recibo.findUnique({
-      where: { id },
-      include: { arquivos: { orderBy: { criadoEm: 'asc' } } },
-    });
+    const r = await this.prisma.recibo.findUnique({ where: { id }, include: COM_ANEXOS_E_ITENS });
     if (!r) throw new NotFoundException(`Recibo ${id} não existe`);
     return this.toDto(r);
   }
@@ -97,9 +104,37 @@ export class RecibosService implements OnModuleInit {
         valorCentavos: data.valorCentavos ?? null,
         observacao: data.observacao ?? null,
       },
-      include: { arquivos: true },
+      include: COM_ANEXOS_E_ITENS,
     });
     return this.toDto(r);
+  }
+
+  /**
+   * Correção manual de uma linha na revisão. Além de gravar, tira dos alertas o campo que
+   * acabou de ser preenchido.
+   */
+  async atualizarItem(reciboId: string, itemId: string, data: ReciboItemUpdate) {
+    const item = await this.prisma.reciboItem.findFirst({ where: { id: itemId, reciboId } });
+    if (!item) throw new NotFoundException(`Item ${itemId} não existe no recibo ${reciboId}`);
+    if (item.movimentoRegistrado) {
+      throw new BadRequestException(
+        'Este item já virou movimento de estoque — corrija pelo histórico do estoque',
+      );
+    }
+
+    const corrigidos = Object.keys(data)
+      .filter((campo) => data[campo as keyof ReciboItemUpdate] !== undefined)
+      .map((campo) => ALERTA_POR_CAMPO[campo])
+      .filter((alerta): alerta is string => alerta !== undefined);
+
+    await this.prisma.reciboItem.update({
+      where: { id: itemId },
+      data: {
+        ...data,
+        camposIlegiveis: item.camposIlegiveis.filter((c) => !corrigidos.includes(c)),
+      },
+    });
+    return this.get(reciboId);
   }
 
   async update(id: string, data: ReciboUpdate) {
@@ -112,7 +147,7 @@ export class RecibosService implements OnModuleInit {
         ...(data.valorCentavos !== undefined ? { valorCentavos: data.valorCentavos } : {}),
         ...(data.observacao !== undefined ? { observacao: data.observacao } : {}),
       },
-      include: { arquivos: { orderBy: { criadoEm: 'asc' } } },
+      include: COM_ANEXOS_E_ITENS,
     });
     return this.toDto(r);
   }
@@ -188,6 +223,15 @@ export class RecibosService implements OnModuleInit {
       fornecedor: r.fornecedor,
       valorCentavos: r.valorCentavos,
       observacao: r.observacao,
+      status: r.status,
+      extraidoEm: r.extraidoEm,
+      confirmadoEm: r.confirmadoEm,
+      camposIlegiveis: r.camposIlegiveis,
+      itens: r.itens.map((i) => ({
+        ...i,
+        // Decimal do Prisma não serializa como número no JSON — a UI espera número.
+        quantidade: i.quantidade === null ? null : Number(i.quantidade),
+      })),
       arquivos: r.arquivos.map((a) => ({
         id: a.id,
         url: this.mediaUrl.publicUrl(a.arquivo),
