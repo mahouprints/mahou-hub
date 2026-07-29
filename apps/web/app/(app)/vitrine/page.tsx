@@ -95,20 +95,13 @@ function LinhaProduto({ item }: { item: ItemVitrine }) {
   return (
     <Card className="flex flex-wrap items-center gap-4 p-3">
       {item.imagemUrl ? (
-        <div className="relative size-16 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={item.imagemUrl}
-            alt={item.nome}
-            className="size-16 rounded-md border object-cover"
-          />
-          {/* Render do autor não é foto da nossa peça — quem vê precisa saber. */}
-          {item.imagemEhRender && (
-            <span className="absolute inset-x-0 bottom-0 rounded-b-md bg-background/85 text-center text-[9px] leading-4 text-muted-foreground">
-              render
-            </span>
-          )}
-        </div>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={item.imagemUrl}
+          alt={item.nome}
+          title={item.imagemEhRender ? 'Render do autor — ainda sem foto da nossa peça' : undefined}
+          className="size-16 shrink-0 rounded-md border object-cover"
+        />
       ) : (
         <div className="flex size-16 shrink-0 items-center justify-center rounded-md border bg-muted">
           <PackageOpen className="size-5 text-muted-foreground" />
@@ -126,6 +119,11 @@ function LinhaProduto({ item }: { item: ItemVitrine }) {
           <span className="text-xs text-muted-foreground">
             {centavosParaReais(item.precoCentavos)}
           </span>
+          {/* Render do autor não é foto da nossa peça. Fica ao lado do preço, e não
+              sobre a miniatura — tarja em cima da imagem come um terço dela. */}
+          {item.imagemEhRender && (
+            <span className="text-xs text-muted-foreground/70">· render do autor</span>
+          )}
         </div>
       </div>
 
