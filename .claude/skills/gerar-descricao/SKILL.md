@@ -118,6 +118,17 @@ Exemplos reais:
 
 **Limites duros:** ML ≤60 · Shopee ≤100 · TikTok 34–200.
 
+#### Produto parecido com outro que já está no catálogo
+
+Ao gerar em lote, tipos se repetem: dois polvos, três dragões, dois topos de bolo. **A
+diferenciação vai no título, não na categoria** — dois topos de bolo caem na mesma
+categoria do ML e isso está certo; o que não pode é os dois disputarem a mesma busca.
+
+Antes de escrever, confira o que já existe no catálogo e nomeie pela diferença real:
+`Polvo Articulado Flexivel` × `Polvo Fofo Articulado Redondinho`, `Topo de Bolo` vazado
+reto × `Topo de Bolo Cursivo`. Se você não consegue nomear a diferença, o cliente também
+não vai ver — e aí são dois anúncios competindo entre si em vez de dois produtos.
+
 #### Geração por fan-out (padrão para produto importante)
 
 Dispare 8 subagentes **Sonnet** em paralelo via `Agent`, cada um com um ângulo:
@@ -161,6 +172,12 @@ Siga as regras de `content/marketplace/regras/{marketplace}.md`. Princípios que
 - Sempre citar "3D" / "Impressão 3D" e "PLA"
 - Declarar o que **não** vem junto, se for o caso
 - Consultar as marcas proibidas em `contexto-mahou.md` antes de escrever
+
+**Os alertas da triagem viram aviso ao cliente.** `FRAGIL`, `MULTICOR`, `MONTAGEM` e
+qualquer dependência de item que não vai na caixa (ímã, LED, vela, parafuso, elástico)
+não podem ficar só no Hub — o cliente que recebe menos do que esperava abre reclamação,
+e no ML isso derruba reputação. Traço fino vira "manuseie pela base"; LED integrado vira
+"NÃO acompanha fita de LED"; peça que esquenta vira aviso de que PLA amolece.
 
 Estruturas: **Shopee** blocos separados por emoji, tags no fim, sem link externo ·
 **ML** separadores `▬▬▬` e ficha técnica obrigatória · **TikTok** hashtags são críticas,
@@ -251,7 +268,11 @@ Em lote, use o modo rápido de título e só aprofunde nos que o Gabriel marcar.
 - **Nunca invente número.** Custo, margem e ROAS vêm do Hub. Se faltar dado, pergunte.
 - **Nunca escreva copy antes de conferir a economia.** Produto que dá prejuízo não precisa
   de descrição bonita, precisa de preço novo.
-- **Marca registrada nunca no título.** Ver a tabela em `contexto-mahou.md`.
+- **Marca registrada nunca no título.** Ver a tabela em `contexto-mahou.md`. Quando a
+  marca está no nome do modelo original ("Xbox Invisible Stand", "Indominus Rexi"), não
+  basta apagar a palavra: renomeie o produto inteiro em pt-BR pelo que ele é
+  ("Suporte Invisivel para Controle de Videogame", "Dinossauro Articulado Flexivel") e
+  deixe a compatibilidade só na descrição, como "compatível com".
 - **Categoria de ML nunca inventada.** Vem da API do Mercado Livre, com o `category_id`
   gravado junto. Caminho plausível não é caminho existente — e o erro é silencioso.
 

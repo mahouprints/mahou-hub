@@ -177,6 +177,17 @@ Hobbies > Antiestresse e Fidget Toys" parece certo e **não existe**. A árvore 
 
 5. **Gravar o `category_id`**, não só o nome. É o ID que o ML usa; nome bate mal.
 
+### O título É a escolha da categoria
+
+O preditor lê o **título**, então trocar uma palavra troca o ramo da árvore. Observado na
+prática, no mesmo nicho de flexi articulado: "polvo" e "cobra" caem em `MLB433037`
+Fidget Cubes, "macaquinho" e "peixe-boi" caem em `MLB433528` Squishies, e "boneco" cai em
+`MLB1839` Figuras de Ação. Nenhuma está errada — mas a escolha do substantivo decidiu a
+categoria sem ninguém perceber.
+
+Consequência prática: escreva o título primeiro, rode o preditor, e **olhe a categoria que
+saiu**. Se ela não descreve o produto, o problema costuma ser o título, não a árvore.
+
 ### Quando o preditor devolve mais de um
 
 Comparar os candidatos pelo `path_from_root`, não pelo nome isolado — dois nomes
