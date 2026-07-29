@@ -92,6 +92,14 @@ export class RecibosController {
     return this.service.atualizarItem(id, itemId, data);
   }
 
+  @Post(':id/marcar-lancada')
+  @ApiOperation({
+    summary: 'Marca a nota como já lançada sem mexer no estoque (para notas antigas)',
+  })
+  marcarLancada(@Param('id') id: string) {
+    return this.service.marcarComoLancada(id);
+  }
+
   @Post(':id/confirmar')
   @ApiOperation({
     summary: 'Aplica o recibo revisado: estocáveis viram saldo, não-estocáveis viram custo',

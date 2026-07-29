@@ -21,6 +21,9 @@ function montar(respostaDaIa: unknown, filamentos: Array<{ id: string; nome: str
   });
   mock.filamento.findMany.mockResolvedValue(filamentos);
   mock.insumo.findMany.mockResolvedValue([]);
+  // Sem outros recibos no banco não há duplicata possível — quem testa isso é
+  // detectar-nota-duplicada.test.ts, com a função pura.
+  mock.recibo.findMany.mockResolvedValue([]);
   tx.recibo.findUniqueOrThrow.mockResolvedValue({ id: 'r1', itens: [], arquivos: [] });
 
   const gemini = { lerJson: vi.fn().mockResolvedValue(respostaDaIa) };

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
+import { detectarNotaDuplicada } from './detectar-nota-duplicada';
 
 type ItemDoRecibo = Prisma.ReciboItemGetPayload<Record<string, never>>;
 
@@ -35,9 +36,11 @@ export class ConfirmacaoReciboService {
       throw new BadRequestException(`Faltam dados pra confirmar: ${pendencias.join('; ')}`);
     }
 
+    await this.recusarSeJaLancada(recibo);
+
     for (const item of recibo.itens) {
       if (item.movimentoRegistrado) continue;
-      await this.aplicarItem(item, recibo.fornecedor, recibo.data);
+      await this.aplicarItem(item, recibo.fornecedor, recibo.data, recibo.id);
     }
 
     await this.prisma.recibo.update({
@@ -48,17 +51,61 @@ export class ConfirmacaoReciboService {
   }
 
   /**
+   * Recusa confirmar quando a MESMA nota já lançou estoque num outro recibo.
+   *
+   * A checagem é refeita aqui, e não só na leitura, porque entre ler e confirmar o Gabriel
+   * pode ter lançado a nota gêmea em outra aba. Só identidade forte (chave da NF-e, ou
+   * número + CNPJ) bloqueia; semelhança de fornecedor/data/valor vira aviso na tela, já que
+   * duas compras iguais no mesmo dia são possíveis.
+   */
+  private async recusarSeJaLancada(recibo: {
+    id: string;
+    chaveNfe: string | null;
+    numeroNota: string | null;
+    cnpjEmitente: string | null;
+    fornecedor: string | null;
+    valorCentavos: number | null;
+    data: Date;
+  }) {
+    const outros = await this.prisma.recibo.findMany({
+      where: { id: { not: recibo.id } },
+      select: {
+        id: true,
+        status: true,
+        chaveNfe: true,
+        numeroNota: true,
+        cnpjEmitente: true,
+        fornecedor: true,
+        valorCentavos: true,
+        data: true,
+      },
+    });
+    const duplicata = detectarNotaDuplicada(recibo, outros);
+    if (duplicata?.nivel !== 'FORTE' || !duplicata.jaLancado) return;
+
+    throw new BadRequestException(
+      'Esta nota já foi lançada no estoque em outro recibo — confirmar de novo duplicaria o saldo. ' +
+        'Se forem compras diferentes, corrija o número da nota antes de confirmar.',
+    );
+  }
+
+  /**
    * Um item por vez, cada um marcando `movimentoRegistrado` logo depois de aplicar.
    *
    * Sem transação cobrindo o recibo inteiro de propósito: `EstoqueService.registrarMovimento`
    * já abre a sua, e Prisma não aninha. Se der erro no meio, o que entrou fica marcado e
    * reconfirmar retoma dos que faltaram, em vez de duplicar os que já entraram.
    */
-  private async aplicarItem(item: ItemDoRecibo, fornecedor: string | null, data: Date) {
-    const observacao = `Recibo${fornecedor ? ` ${fornecedor}` : ''} — ${item.descricaoNota}`.slice(
-      0,
-      500,
-    );
+  private async aplicarItem(
+    item: ItemDoRecibo,
+    fornecedor: string | null,
+    data: Date,
+    reciboId: string,
+  ) {
+    // Começa com "Nota de compra" porque essa coluna é lida no histórico do estoque, onde
+    // o que importa é saber de onde o saldo veio sem precisar abrir nada.
+    const observacao =
+      `Nota de compra${fornecedor ? ` — ${fornecedor}` : ''} — ${item.descricaoNota}`.slice(0, 500);
 
     if (item.tipo === 'NAO_ESTOCAVEL') {
       await this.prisma.custo.create({
@@ -82,6 +129,7 @@ export class ConfirmacaoReciboService {
         // cálculo nenhum hoje — é histórico —, e a observação diz a que se refere.
         custoUnitCentavos: item.valorUnitCentavos,
         observacao,
+        reciboId,
       });
     }
 

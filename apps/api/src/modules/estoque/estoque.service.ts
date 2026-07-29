@@ -122,6 +122,7 @@ export class EstoqueService {
         motivo: input.motivo,
         custoUnitCentavos: input.custoUnitCentavos ?? null,
         observacao: input.observacao ?? null,
+        reciboId: input.reciboId ?? null,
       },
     });
     return this.toDto(movimento);

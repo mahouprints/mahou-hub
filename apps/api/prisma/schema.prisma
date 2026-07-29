@@ -562,9 +562,15 @@ model MovimentoEstoque {
   motivo            MotivoMovimento
   custoUnitCentavos Int?
   observacao        String?
+  /// Recibo que originou a entrada, quando veio de nota escaneada. Dá ao histórico do
+  /// estoque um vínculo de verdade em vez de só o texto da observação — dá pra abrir a
+  /// nota e conferir de onde o saldo veio.
+  reciboId          String?
+  recibo            Recibo?          @relation(fields: [reciboId], references: [id], onDelete: SetNull)
   criadoEm          DateTime         @default(now())
 
   @@index([tipoItem, criadoEm(sort: Desc)])
+  @@index([reciboId])
   @@index([variacaoId])
   @@index([filamentoId])
   @@index([insumoId])
@@ -601,16 +607,28 @@ model Recibo {
   status        ReciboStatus    @default(PENDENTE)
   extraidoEm    DateTime?
   confirmadoEm  DateTime?
+  /// Chave de acesso da NF-e: 44 dígitos, única no país inteiro. É o que impede a mesma
+  /// nota de entrar duas vezes. Nulo em recibo que não é nota eletrônica (cupom, recibo
+  /// de papel) — aí a identidade cai pro par numeroNota + cnpjEmitente.
+  chaveNfe      String?
+  numeroNota    String?
+  cnpjEmitente  String?
+  /// Preenchido quando a leitura reconhece a nota como já lançada. Guarda o id do recibo
+  /// original pra tela poder mostrar "essa nota já entrou aqui".
+  duplicataDeReciboId String?
   /// Campos da NOTA (não dos itens) que a IA não conseguiu ler com certeza: "data",
   /// "fornecedor", "valorTotal". Lista não-vazia = a UI pede outra foto.
   camposIlegiveis String[]
   arquivos      ReciboArquivo[]
   itens         ReciboItem[]
+  movimentos    MovimentoEstoque[]
   criadoEm      DateTime        @default(now())
   atualizadoEm  DateTime        @updatedAt
 
   @@index([data(sort: Desc)])
   @@index([status])
+  @@index([chaveNfe])
+  @@index([numeroNota, cnpjEmitente])
 }
 
 /// Linha da nota, como a IA leu. Fica separada do movimento de estoque de propósito: aqui

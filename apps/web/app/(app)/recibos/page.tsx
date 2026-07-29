@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react';
+import { Check, FileText, Pencil, Plus, ScanLine, Trash2 } from 'lucide-react';
 import type { Recibo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
@@ -15,8 +15,8 @@ import { RevisaoNotaDialog } from '@/components/revisao-nota-dialog';
 
 /** O que o status do recibo mostra na lista. PENDENTE não vira badge — é o estado normal. */
 const BADGE_STATUS: Record<string, { texto: string; variante: 'default' | 'outline' }> = {
-  EXTRAIDO: { texto: 'lido, aguardando revisão', variante: 'outline' },
-  CONFIRMADO: { texto: 'lançado no estoque', variante: 'default' },
+  EXTRAIDO: { texto: 'lida, aguardando revisão', variante: 'outline' },
+  CONFIRMADO: { texto: 'lançada no estoque', variante: 'default' },
 };
 
 export default function RecibosPage() {
@@ -82,6 +82,7 @@ export default function RecibosPage() {
                   )}
                   {BADGE_STATUS[r.status] && (
                     <Badge variant={BADGE_STATUS[r.status]!.variante}>
+                      {r.status === 'CONFIRMADO' && <Check className="mr-1 h-3 w-3" />}
                       {BADGE_STATUS[r.status]!.texto}
                     </Badge>
                   )}

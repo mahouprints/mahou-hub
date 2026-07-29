@@ -5,6 +5,7 @@ import { join } from 'path';
 import { z } from 'zod';
 import { PrismaService } from '../../prisma/prisma.service';
 import { casarComCadastro } from './casar-item-cadastro';
+import { detectarNotaDuplicada } from './detectar-nota-duplicada';
 import { GeminiClient, type ArquivoParaLeitura } from './gemini.client';
 import { PROMPT_EXTRACAO_RECIBO, SCHEMA_EXTRACAO_RECIBO } from './extracao-recibo.prompt';
 
@@ -29,6 +30,27 @@ const NotaLidaSchema = z.object({
   fornecedor: z.string().min(1).nullish(),
   data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'data deve ser AAAA-MM-DD').nullish(),
   valorTotal: z.number().nonnegative().nullish(),
+  // Chave de acesso só vale inteira. Uma chave com 41 dígitos porque o modelo pulou
+  // três parece identificação e não é — daria falso negativo na busca por duplicata
+  // (nota já lançada passando batido) e, pior, falso positivo contra outra nota truncada.
+  chaveNfe: z
+    .string()
+    .nullish()
+    .transform((v) => {
+      const digitos = (v ?? '').replace(/\D/g, '');
+      return digitos.length === 44 ? digitos : null;
+    }),
+  numeroNota: z
+    .string()
+    .nullish()
+    .transform((v) => (v ?? '').replace(/\D/g, '') || null),
+  cnpjEmitente: z
+    .string()
+    .nullish()
+    .transform((v) => {
+      const digitos = (v ?? '').replace(/\D/g, '');
+      return digitos.length === 14 ? digitos : null;
+    }),
   camposIlegiveis: z.array(z.string()).default([]),
   itens: z.array(ItemLidoSchema).default([]),
 });
@@ -102,10 +124,36 @@ export class ExtracaoReciboService {
   }
 
   private async gravar(reciboId: string, nota: z.infer<typeof NotaLidaSchema>) {
-    const [filamentos, insumos] = await Promise.all([
+    const [filamentos, insumos, outros] = await Promise.all([
       this.prisma.filamento.findMany({ where: { ativo: true }, select: { id: true, nome: true } }),
       this.prisma.insumo.findMany({ where: { ativo: true }, select: { id: true, nome: true } }),
+      this.prisma.recibo.findMany({
+        where: { id: { not: reciboId } },
+        select: {
+          id: true,
+          status: true,
+          chaveNfe: true,
+          numeroNota: true,
+          cnpjEmitente: true,
+          fornecedor: true,
+          valorCentavos: true,
+          data: true,
+        },
+      }),
     ]);
+
+    const dataNota = nota.data ? new Date(`${nota.data}T12:00:00.000Z`) : new Date();
+    const duplicata = detectarNotaDuplicada(
+      {
+        chaveNfe: nota.chaveNfe,
+        numeroNota: nota.numeroNota,
+        cnpjEmitente: nota.cnpjEmitente,
+        fornecedor: nota.fornecedor ?? null,
+        valorCentavos: emCentavos(nota.valorTotal),
+        data: dataNota,
+      },
+      outros,
+    );
 
     const itens = nota.itens.map((item) => this.prepararItem(item, filamentos, insumos));
 
@@ -117,8 +165,12 @@ export class ExtracaoReciboService {
         where: { id: reciboId },
         data: {
           fornecedor: nota.fornecedor ?? null,
-          data: nota.data ? new Date(`${nota.data}T12:00:00.000Z`) : undefined,
+          data: nota.data ? dataNota : undefined,
           valorCentavos: emCentavos(nota.valorTotal),
+          chaveNfe: nota.chaveNfe,
+          numeroNota: nota.numeroNota,
+          cnpjEmitente: nota.cnpjEmitente,
+          duplicataDeReciboId: duplicata?.reciboId ?? null,
           camposIlegiveis: alertasDaNota(nota),
           status: 'EXTRAIDO',
           extraidoEm: new Date(),

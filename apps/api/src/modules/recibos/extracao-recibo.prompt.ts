@@ -37,6 +37,14 @@ Em reais, como decimal: \`115.5\` para R$ 115,50. Atenção ao padrão brasileir
 
 Formato \`AAAA-MM-DD\`. Use a data de emissão da nota. Se só houver data de vencimento ou de entrega, deixe null e registre "data" em \`camposIlegiveis\`.
 
+## Identidade da nota (é o que impede lançar a mesma compra duas vezes)
+
+Três campos, todos opcionais — devolva null no que não existir ou não der pra ler:
+
+- **\`chaveNfe\`** — a chave de acesso da NF-e: 44 dígitos, normalmente impressos em bloco no alto do DANFE, às vezes separados em grupos de 4 e quase sempre abaixo ou ao lado do código de barras. Devolva só os dígitos, sem espaços. **Confira que são exatamente 44.** Se você contou menos, ou não conseguiu ler todos com certeza, devolva null — chave pela metade é pior que chave nenhuma, porque parece identificação e não é.
+- **\`numeroNota\`** — o número da nota ("Nº 140.499" vira "140499"). Só dígitos.
+- **\`cnpjEmitente\`** — o CNPJ de quem EMITIU a nota (o fornecedor, o vendedor), não o do destinatário. Numa nota de compra a Mahou Prints é a destinatária: se você vir dois CNPJs, o do emitente é o que fica no cabeçalho junto do nome da empresa que vendeu. Na dúvida sobre qual é qual, devolva null.
+
 ## Classificando cada item
 
 Para cada linha da nota, escolha um \`tipo\`:
@@ -71,6 +79,9 @@ export const SCHEMA_EXTRACAO_RECIBO: Record<string, unknown> = {
     fornecedor: { type: ['string', 'null'] },
     data: { type: ['string', 'null'], description: 'AAAA-MM-DD' },
     valorTotal: { type: ['number', 'null'], description: 'Total da nota em reais' },
+    chaveNfe: { type: ['string', 'null'], description: '44 dígitos, sem espaços' },
+    numeroNota: { type: ['string', 'null'] },
+    cnpjEmitente: { type: ['string', 'null'], description: 'CNPJ de quem emitiu (o fornecedor)' },
     camposIlegiveis: {
       type: 'array',
       items: { type: 'string', enum: ['fornecedor', 'data', 'valorTotal'] },

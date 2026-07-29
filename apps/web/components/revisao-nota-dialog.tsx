@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { AlertTriangle, Check, ScanLine } from 'lucide-react';
+import { AlertTriangle, Check, Copy, ScanLine } from 'lucide-react';
 import type { Filamento, Insumo, Recibo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
@@ -67,6 +67,15 @@ export function RevisaoNotaDialog({ reciboId, open, onOpenChange }: Props) {
     },
   });
 
+  const marcarLancada = useMutation({
+    mutationFn: () => apiFetch<Recibo>(`/recibos/${reciboId}/marcar-lancada`, { method: 'POST' }),
+    onSuccess: () => {
+      recarregar();
+      toast.success('Nota marcada como lançada — o estoque não foi tocado');
+      onOpenChange(false);
+    },
+  });
+
   const confirmar = useMutation({
     mutationFn: () => apiFetch<Recibo>(`/recibos/${reciboId}/confirmar`, { method: 'POST' }),
     onSuccess: () => {
@@ -102,13 +111,28 @@ export function RevisaoNotaDialog({ reciboId, open, onOpenChange }: Props) {
                 Este recibo não tem nota anexada. Anexe a foto ou o PDF antes de ler.
               </p>
             )}
-            <Button
-              onClick={() => extrair.mutate()}
-              disabled={extrair.isPending || recibo.arquivos.length === 0}
-            >
-              <ScanLine className="h-4 w-4" />
-              {extrair.isPending ? 'Lendo a nota…' : 'Ler nota com IA'}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                onClick={() => extrair.mutate()}
+                disabled={extrair.isPending || recibo.arquivos.length === 0}
+              >
+                <ScanLine className="h-4 w-4" />
+                {extrair.isPending ? 'Lendo a nota…' : 'Ler nota com IA'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => marcarLancada.mutate()}
+                disabled={marcarLancada.isPending}
+              >
+                <Check className="h-4 w-4" />
+                Já lancei essa no estoque
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use o segundo botão nas notas antigas, cujo estoque você já deu entrada na mão —
+              ele só marca a nota como lançada, sem mexer em saldo, pra ninguém lançar de novo
+              por engano.
+            </p>
           </div>
         )}
 
@@ -121,7 +145,26 @@ export function RevisaoNotaDialog({ reciboId, open, onOpenChange }: Props) {
                 rotulo="Valor total"
                 valor={recibo.valorCentavos != null ? centavosParaReais(recibo.valorCentavos) : '—'}
               />
+              <Campo rotulo="Nota nº" valor={recibo.numeroNota ?? '—'} />
+              <Campo
+                rotulo="Chave da NF-e"
+                valor={recibo.chaveNfe ? `…${recibo.chaveNfe.slice(-8)}` : '—'}
+              />
             </div>
+
+            {recibo.duplicataDeReciboId && (
+              <div className="flex gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+                <Copy className="h-4 w-4 shrink-0 text-destructive" />
+                <div>
+                  <p className="font-medium">Essa nota já está no sistema</p>
+                  <p className="text-muted-foreground">
+                    {recibo.chaveNfe || recibo.numeroNota
+                      ? 'A identificação da nota bate com outro recibo. Se ela já foi lançada, confirmar de novo duplicaria o estoque — o sistema vai recusar.'
+                      : 'Mesmo fornecedor, mesma data e mesmo valor de outro recibo. Pode ser duplicata, mas também pode ser uma segunda compra igual — confira antes de confirmar.'}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {recibo.camposIlegiveis.length > 0 && (
               <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">

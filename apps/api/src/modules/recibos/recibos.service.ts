@@ -110,6 +110,34 @@ export class RecibosService implements OnModuleInit {
   }
 
   /**
+   * Marca uma nota como já lançada SEM mexer no estoque.
+   *
+   * Existe por causa das notas anteriores à leitura automática — as 3 NFs da Voolt, cujo
+   * conteúdo entrou no estoque em junho por carga manual. Sem isso, escanear e confirmar
+   * uma delas lançaria de novo um saldo que já está lá. Marcada, ela ganha o selo na lista
+   * e a releitura passa a ser recusada.
+   */
+  async marcarComoLancada(id: string) {
+    const r = await this.prisma.recibo.findUnique({
+      where: { id },
+      select: { id: true, status: true, observacao: true },
+    });
+    if (!r) throw new NotFoundException(`Recibo ${id} não existe`);
+    if (r.status === 'CONFIRMADO') return this.get(id);
+
+    const nota = 'Estoque desta nota lançado manualmente, antes da leitura automática';
+    await this.prisma.recibo.update({
+      where: { id },
+      data: {
+        status: 'CONFIRMADO',
+        confirmadoEm: new Date(),
+        observacao: r.observacao ? `${r.observacao} · ${nota}` : nota,
+      },
+    });
+    return this.get(id);
+  }
+
+  /**
    * Correção manual de uma linha na revisão. Além de gravar, tira dos alertas o campo que
    * acabou de ser preenchido.
    */
@@ -226,6 +254,10 @@ export class RecibosService implements OnModuleInit {
       status: r.status,
       extraidoEm: r.extraidoEm,
       confirmadoEm: r.confirmadoEm,
+      chaveNfe: r.chaveNfe,
+      numeroNota: r.numeroNota,
+      cnpjEmitente: r.cnpjEmitente,
+      duplicataDeReciboId: r.duplicataDeReciboId,
       camposIlegiveis: r.camposIlegiveis,
       itens: r.itens.map((i) => ({
         ...i,

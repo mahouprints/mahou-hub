@@ -26,6 +26,9 @@ export const MovimentoCreateSchema = z
     motivo: MotivoMovimentoEnum,
     custoUnitCentavos: z.number().int().nonnegative().nullable().optional(),
     observacao: z.string().max(500).nullable().optional(),
+    // Preenchido quando a entrada veio de nota escaneada — o histórico usa pra linkar
+    // o saldo de volta à nota que o originou.
+    reciboId: z.string().nullable().optional(),
   })
   .superRefine((v, ctx) => {
     const idPorTipo: Record<z.infer<typeof TipoItemEstoqueEnum>, string | undefined> = {

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Search } from 'lucide-react';
+import Link from 'next/link';
+import { AlertTriangle, FileText, Search } from 'lucide-react';
 import type { Filamento, Insumo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, tempoRelativo } from '@/lib/format';
@@ -54,6 +55,8 @@ type Movimento = {
   saldoApos: number;
   motivo: string;
   observacao: string | null;
+  /** Preenchido quando a entrada veio de nota escaneada nos Recibos. */
+  reciboId: string | null;
   criadoEm: string;
   variacao: { nome: string; produto: { nome: string } } | null;
   filamento: { nome: string } | null;
@@ -431,7 +434,20 @@ export default function EstoquePage() {
                       {entrada ? '+' : ''}
                       {m.quantidade.toLocaleString('pt-BR')} {un}
                     </TableCell>
-                    <TableCell>{MOTIVO_LABEL[m.motivo] ?? m.motivo}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1.5">
+                        {MOTIVO_LABEL[m.motivo] ?? m.motivo}
+                        {m.reciboId && (
+                          <Link
+                            href="/recibos"
+                            title="Entrada lançada a partir de uma nota de compra escaneada"
+                            className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                          >
+                            <FileText className="h-3 w-3" /> nota
+                          </Link>
+                        )}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{m.observacao ?? '—'}</TableCell>
                   </TableRow>
                 );

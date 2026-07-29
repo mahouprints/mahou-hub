@@ -5,13 +5,23 @@ import { ConfirmacaoReciboService } from '../src/modules/recibos/confirmacao-rec
 import type { EstoqueService } from '../src/modules/estoque/estoque.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
 
-function montar(itens: Array<Record<string, unknown>>, status = 'EXTRAIDO') {
+function montar(
+  itens: Array<Record<string, unknown>>,
+  status = 'EXTRAIDO',
+  outrosRecibos: Array<Record<string, unknown>> = [],
+  identidadeDaNota: Record<string, unknown> = {},
+) {
   const { mock } = makePrismaMock();
   const recibo = {
     id: 'r1',
     data: new Date('2026-07-20'),
     fornecedor: 'VOOLT',
     status,
+    chaveNfe: null,
+    numeroNota: null,
+    cnpjEmitente: null,
+    valorCentavos: 38140,
+    ...identidadeDaNota,
     itens: itens.map((i, idx) => ({
       id: `i${idx}`,
       descricaoNota: 'item',
@@ -31,6 +41,7 @@ function montar(itens: Array<Record<string, unknown>>, status = 'EXTRAIDO') {
   };
   mock.recibo.findUnique.mockResolvedValue(recibo);
   mock.recibo.findUniqueOrThrow.mockResolvedValue(recibo);
+  mock.recibo.findMany.mockResolvedValue(outrosRecibos);
   const estoque = { registrarMovimento: vi.fn() };
   const svc = new ConfirmacaoReciboService(
     asPrisma(mock),
@@ -135,6 +146,94 @@ describe('ConfirmacaoReciboService', () => {
     await svc.confirmar('r1');
 
     expect(estoque.registrarMovimento).not.toHaveBeenCalled();
+  });
+
+  it('recusa lançar nota cuja chave já entrou em outro recibo confirmado', async () => {
+    const CHAVE = '3'.repeat(44);
+    const { svc, estoque } = montar(
+      [{ descricaoNota: 'PLA', tipo: 'FILAMENTO', filamentoId: 'f1', gramasTotal: 1000 }],
+      'EXTRAIDO',
+      [
+        {
+          id: 'r-anterior',
+          status: 'CONFIRMADO',
+          chaveNfe: CHAVE,
+          numeroNota: null,
+          cnpjEmitente: null,
+          fornecedor: 'VOOLT',
+          valorCentavos: 38140,
+          data: new Date('2026-07-20'),
+        },
+      ],
+      { chaveNfe: CHAVE },
+    );
+
+    await expect(svc.confirmar('r1')).rejects.toThrow(/já foi lançada/);
+    expect(estoque.registrarMovimento).not.toHaveBeenCalled();
+  });
+
+  it('deixa passar quando a semelhança é só fornecedor+data+valor', async () => {
+    // Duas compras iguais no mesmo dia acontecem. Bloquear aqui travaria compra legítima.
+    const { svc, estoque } = montar(
+      [{ descricaoNota: 'PLA', tipo: 'FILAMENTO', filamentoId: 'f1', gramasTotal: 1000 }],
+      'EXTRAIDO',
+      [
+        {
+          id: 'r-parecido',
+          status: 'CONFIRMADO',
+          chaveNfe: null,
+          numeroNota: null,
+          cnpjEmitente: null,
+          fornecedor: 'VOOLT',
+          valorCentavos: 38140,
+          data: new Date('2026-07-20'),
+        },
+      ],
+    );
+
+    await svc.confirmar('r1');
+
+    expect(estoque.registrarMovimento).toHaveBeenCalledTimes(1);
+  });
+
+  it('não bloqueia se a nota gêmea existe mas ainda não lançou estoque', async () => {
+    const CHAVE = '7'.repeat(44);
+    const { svc, estoque } = montar(
+      [{ descricaoNota: 'PLA', tipo: 'FILAMENTO', filamentoId: 'f1', gramasTotal: 1000 }],
+      'EXTRAIDO',
+      [
+        {
+          id: 'r-rascunho',
+          status: 'EXTRAIDO',
+          chaveNfe: CHAVE,
+          numeroNota: null,
+          cnpjEmitente: null,
+          fornecedor: 'VOOLT',
+          valorCentavos: 38140,
+          data: new Date('2026-07-20'),
+        },
+      ],
+      { chaveNfe: CHAVE },
+    );
+
+    await svc.confirmar('r1');
+
+    expect(estoque.registrarMovimento).toHaveBeenCalledTimes(1);
+  });
+
+  it('vincula o movimento ao recibo de origem pro histórico do estoque', async () => {
+    const { svc, estoque } = montar([
+      { descricaoNota: 'PLA', tipo: 'FILAMENTO', filamentoId: 'f1', gramasTotal: 1000 },
+    ]);
+
+    await svc.confirmar('r1');
+
+    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reciboId: 'r1',
+        observacao: expect.stringContaining('Nota de compra'),
+      }),
+    );
   });
 
   it('recibo já confirmado não lança nada de novo', async () => {
