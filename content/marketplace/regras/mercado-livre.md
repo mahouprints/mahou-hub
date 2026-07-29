@@ -138,12 +138,57 @@ Use o botão "Perguntar ao vendedor" — respondemos em horário comercial!
 - Não citar concorrentes ("igual ao da loja X")
 - Não usar a palavra "FRETE GRÁTIS" no título — usar campo de envio
 
-## Categoria — sempre escolher a MAIS específica
-- ML penaliza categoria genérica. Se cabe em "Cortadores e Modeladores de Massa", não use "Utensílios de Cozinha"
-- Cortadores → Cozinha > Confeitaria > Cortadores
-- Suportes Kindle → Eletrônicos > E-readers > Acessórios para E-readers
-- Abajur → Casa, Móveis e Decoração > Iluminação > Abajures
-- Suporte controle → Games > Acessórios > Suportes
+## Categoria — CONFERIR NA API, NUNCA ESCREVER DE CABEÇA
+
+**Regra dura: nenhum anúncio de ML sai com categoria que não veio da API do Mercado
+Livre.** Categoria errada não dá erro nem aviso — o anúncio sobe, fica publicado e
+simplesmente não aparece na busca de quem procurava por ele. É a falha mais cara
+possível: silenciosa, e capaz de matar um produto campeão sem ninguém entender por quê.
+
+Caminho escrito de cabeça é plausível, não existente. Exemplo real: "Brinquedos e
+Hobbies > Antiestresse e Fidget Toys" parece certo e **não existe**. A árvore real é
+`MLB433037` → `Brinquedos e Hobbies > Anti-stress e Engenho > Fidget Cubes`.
+
+### Procedimento obrigatório, por produto
+
+1. **Prever pelo título** — o ML tem preditor público, sem autenticação:
+   ```
+   GET https://api.mercadolibre.com/sites/MLB/domain_discovery/search?limit=5&q=<título>
+   ```
+   Devolve `category_id` + `category_name` ordenados por probabilidade.
+
+2. **Confirmar o caminho e a permissão** de cada candidato:
+   ```
+   GET https://api.mercadolibre.com/categories/<category_id>
+   ```
+   Usar `path_from_root` como caminho, e conferir `settings.listing_allowed = true`.
+   Categoria que não aceita anúncio é descarte imediato.
+
+3. **Escolher a mais específica que ainda descreve o produto.** ML rebaixa categoria
+   genérica. Entre uma folha e o pai dela, a folha ganha — desde que não force o
+   produto pra dentro de algo que ele não é.
+
+4. **Puxar os atributos exigidos** da categoria escolhida:
+   ```
+   GET https://api.mercadolibre.com/categories/<category_id>/attributes
+   ```
+   Todo atributo com `tags.required` precisa estar na ficha técnica antes de publicar.
+   O conjunto muda por categoria — não existe ficha padrão que sirva pra todas.
+
+5. **Gravar o `category_id`**, não só o nome. É o ID que o ML usa; nome bate mal.
+
+### Quando o preditor devolve mais de um
+
+Comparar os candidatos pelo `path_from_root`, não pelo nome isolado — dois nomes
+parecidos podem estar em ramos completamente diferentes da árvore. Na dúvida entre
+dois igualmente específicos, escolher o que casa com a intenção de busca do comprador,
+e registrar a dúvida pro Gabriel decidir.
+
+### Nunca
+
+- Copiar categoria de um produto pra outro "porque é parecido"
+- Reaproveitar a categoria da Shopee ou do TikTok — são árvores diferentes
+- Publicar com categoria que não passou pelos passos acima
 
 ## Reputação MercadoLíder
 - Tempo de resposta: <1h dá peso máximo

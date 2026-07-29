@@ -702,10 +702,15 @@ model AnuncioModelo {
   descricao String
   tags      String[]
 
-  /// Categoria escolhida no marketplace. Cada um tem taxonomia própria — o mesmo
-  /// cortador é "Casa e Decoração > Cozinha > Utensílios" na Shopee e
-  /// "Cozinha > Confeitaria > Cortadores" no ML, que ainda penaliza categoria genérica.
+  /// Caminho completo da categoria no marketplace. Cada um tem taxonomia própria — o
+  /// mesmo polvo é "Brinquedos > Brinquedos Educativos e Sensoriais" na Shopee e
+  /// "Brinquedos e Hobbies > Anti-stress e Engenho > Fidget Cubes" no ML.
   categoria String?
+
+  /// ID da categoria no marketplace (ex.: MLB433037). É o que o ML usa de verdade —
+  /// nome bate mal e caminho escrito de cabeça costuma não existir na árvore real.
+  /// Preenchido a partir da API do próprio marketplace, nunca inventado.
+  categoriaId String?
 
   /// Ficha técnica (atributos), como lista de {chave, valor}. Na prática é do ML:
   /// lá preencher todos os atributos é SEO crítico, e Shopee/TikTok não têm equivalente.

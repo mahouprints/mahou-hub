@@ -146,6 +146,9 @@ export const AnuncioModeloUpsertSchema = z.object({
   // Caminho completo na taxonomia do marketplace, ex.: "Casa e Decoração > Cozinha
   // > Utensílios". Cada um tem a sua, e o ML penaliza categoria genérica.
   categoria: z.string().max(300).nullable().default(null),
+  // ID da categoria no marketplace (ex.: MLB433037). Vem da API do marketplace —
+  // nunca escrito à mão, porque caminho plausível não é caminho existente.
+  categoriaId: z.string().max(40).nullable().default(null),
   // Atributos da ficha técnica. Na prática só o ML usa — lá é SEO crítico preencher
   // tudo; Shopee e TikTok não têm campo equivalente.
   fichaTecnica: z

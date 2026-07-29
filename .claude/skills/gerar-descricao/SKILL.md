@@ -166,6 +166,22 @@ Estruturas: **Shopee** blocos separados por emoji, tags no fim, sem link externo
 **ML** separadores `▬▬▬` e ficha técnica obrigatória · **TikTok** hashtags são críticas,
 tom mais jovem.
 
+#### Categoria do ML — conferir na API, sempre
+
+**Nenhum anúncio de Mercado Livre sai com categoria escrita de cabeça.** Categoria
+errada não dá erro: o anúncio publica, fica no ar e não aparece na busca. É a falha
+que mata produto campeão sem deixar rastro.
+
+O procedimento completo está em `content/marketplace/regras/mercado-livre.md`. Em resumo:
+prever com `domain_discovery/search`, confirmar `path_from_root` e `listing_allowed` em
+`/categories/{id}`, escolher a folha mais específica que ainda descreve o produto, puxar
+os atributos `required` da categoria e cobrir todos na ficha técnica, e **gravar o
+`category_id`** — não só o nome.
+
+Vale pro ML porque é onde a punição é mais dura. Na Shopee e no TikTok, escolher a
+categoria mais específica que descreva o produto continua valendo, mas sem a mesma
+penalização de ranking.
+
 ### Fase 6 — Salvar e apresentar
 
 Salve em `~/Documents/Mahou Prints/products/{slug}/listings/{marketplace}.md`:
@@ -236,6 +252,8 @@ Em lote, use o modo rápido de título e só aprofunde nos que o Gabriel marcar.
 - **Nunca escreva copy antes de conferir a economia.** Produto que dá prejuízo não precisa
   de descrição bonita, precisa de preço novo.
 - **Marca registrada nunca no título.** Ver a tabela em `contexto-mahou.md`.
+- **Categoria de ML nunca inventada.** Vem da API do Mercado Livre, com o `category_id`
+  gravado junto. Caminho plausível não é caminho existente — e o erro é silencioso.
 
 ## Pronto quando
 
@@ -243,6 +261,7 @@ Em lote, use o modo rápido de título e só aprofunde nos que o Gabriel marcar.
 - [ ] Plano de ROAS calculado e explicado (teste ≠ escala)
 - [ ] Imagens abertas e conferidas contra o cadastro
 - [ ] 3 títulos dentro do limite, sem marca proibida
+- [ ] Categoria do ML confirmada na API, com `category_id` e atributos `required` cobertos
 - [ ] Descrição com keyword 3–5×, marca mencionada, itens que não vêm junto declarados
 - [ ] Arquivo salvo em `listings/{marketplace}.md`
 - [ ] Gabriel escolheu o título → marcado com ✅

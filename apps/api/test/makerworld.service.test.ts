@@ -263,6 +263,7 @@ describe('MakerworldService', () => {
       descricao: 'Impresso em 3D.',
       tags: ['polvo'],
       categoria: 'Casa e Decoração > Decoração',
+      categoriaId: null,
       fichaTecnica: [],
       precoBaseCentavos: 2490,
     });

@@ -35,6 +35,7 @@ type Anuncio = {
   descricao: string;
   tags: string[];
   categoria: string | null;
+  categoriaId: string | null;
   fichaTecnica: { chave: string; valor: string }[];
   precoBaseCentavos: number;
   versao: number;
@@ -395,6 +396,9 @@ function BlocoAnuncio({ anuncio }: { anuncio: Anuncio }) {
       {anuncio.categoria && (
         <p className="text-xs text-muted-foreground">
           Categoria: <span className="text-foreground">{anuncio.categoria}</span>
+          {anuncio.categoriaId && (
+            <span className="ml-1 font-mono text-[10px]">({anuncio.categoriaId})</span>
+          )}
         </p>
       )}
 
