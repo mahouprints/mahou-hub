@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
   AnuncioModeloUpsert,
@@ -169,6 +169,72 @@ export class MakerworldService {
       where: chave,
       create: { modeloId, ...dados },
       update: { ...dados, versao: (atual?.versao ?? 0) + 1, geradoEm: new Date() },
+    });
+  }
+
+  /**
+   * "Anunciei este" — o modelo vira Produto de verdade e entra na Vitrine.
+   *
+   * Só a partir daqui existem venda e estoque: modelo de prospecção não tem nem um
+   * nem outro, quem tem é Produto (via Venda e ProdutoVariacao). O nome sai do título
+   * do anúncio Shopee quando já foi gerado, porque é o nome sob o qual o produto está
+   * de fato à venda — o título do MakerWorld está em inglês.
+   *
+   * Chamar de novo num modelo já convertido não duplica: só regarante as flags.
+   */
+  async marcarAnunciado(id: string) {
+    const modelo = await this.prisma.modeloMakerWorld.findUnique({
+      where: { id },
+      include: { anuncios: { where: { marketplace: 'SHOPEE' } } },
+    });
+    if (!modelo) throw new NotFoundException(`Modelo MakerWorld ${id} não encontrado`);
+
+    if (modelo.produtoId) {
+      return this.prisma.produto.update({
+        where: { id: modelo.produtoId },
+        data: { anunciado: true, naVitrine: true },
+      });
+    }
+
+    // O filamento não vem do MakerWorld — o modelo é um arquivo, não uma peça nossa.
+    // Pega o primeiro ativo pro custo sair de algum lugar; o Gabriel corrige depois.
+    const filamento = await this.prisma.filamento.findFirst({
+      where: { ativo: true },
+      select: { id: true },
+      orderBy: { criadoEm: 'asc' },
+    });
+    if (!filamento) {
+      throw new BadRequestException(
+        'Nenhum filamento ativo cadastrado — cadastre um antes de mandar produto pra vitrine',
+      );
+    }
+
+    const anuncio = modelo.anuncios[0];
+
+    return this.prisma.$transaction(async (tx) => {
+      const produto = await tx.produto.create({
+        data: {
+          nome: (anuncio?.titulo ?? modelo.titulo).slice(0, 200),
+          inspiracao: modelo.url,
+          filamentoId: filamento.id,
+          pesoG: modelo.pesoGramas,
+          tempoH: modelo.tempoHoras,
+          impressora: 'A1',
+          embalagemCentavos: 0,
+          precoCentavos: anuncio?.precoBaseCentavos ?? modelo.precoSugeridoCentavos,
+          canalPrincipal: 'SHOPEE',
+          rascunho: false,
+          ativo: true,
+          anunciado: true,
+          naVitrine: true,
+        },
+      });
+      await tx.modeloMakerWorld.update({
+        where: { id },
+        data: { status: 'VIROU_PRODUTO', produtoId: produto.id },
+      });
+      this.logger.log(`Modelo ${id} virou Produto ${produto.id} e entrou na vitrine`);
+      return produto;
     });
   }
 

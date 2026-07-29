@@ -10,6 +10,14 @@ import {
 import type { ProdutoCreate, ProdutoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImagensService } from '../imagens/imagens.service';
+import { MediaUrlService } from '../imagens/media-url.service';
+
+type ProdutoComVitrine = Prisma.ProdutoGetPayload<{
+  include: {
+    variacoes: { select: { estoqueAtual: true; estoqueMinimo: true } };
+    imagens: { select: { arquivo: true } };
+  };
+}>;
 
 export type ProdutoListSortBy = 'criadoEm' | 'atualizadoEm' | 'nome' | 'precoCentavos';
 export type ProdutoListSortDir = 'asc' | 'desc';
@@ -41,7 +49,55 @@ export class ProdutosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly imagens: ImagensService,
+    private readonly mediaUrl: MediaUrlService,
   ) {}
+
+  /**
+   * Catálogo atual: o que está anunciado hoje, com venda e estoque na mesma linha.
+   *
+   * Filtra por `naVitrine`, não por `anunciado` — ver o comentário do campo no schema.
+   * Os 53 produtos herdados da loja antiga ficam de fora até alguém marcá-los.
+   */
+  async vitrine() {
+    const produtos = await this.prisma.produto.findMany({
+      where: { naVitrine: true },
+      include: {
+        variacoes: { where: { ativo: true }, select: { estoqueAtual: true, estoqueMinimo: true } },
+        imagens: { take: 1, orderBy: { ordem: 'asc' }, select: { arquivo: true } },
+      },
+      orderBy: { criadoEm: 'desc' },
+    });
+    if (produtos.length === 0) return [];
+
+    const vendas = await this.prisma.venda.findMany({
+      where: { produtoId: { in: produtos.map((p) => p.id) } },
+      select: { produtoId: true, qtd: true, precoUnitarioCentavos: true, dataVenda: true },
+    });
+
+    return produtos.map((p) => this.linhaDaVitrine(p, vendas.filter((v) => v.produtoId === p.id)));
+  }
+
+  private linhaDaVitrine(
+    produto: ProdutoComVitrine,
+    vendas: { qtd: number; precoUnitarioCentavos: number; dataVenda: Date }[],
+  ) {
+    const primeira = produto.imagens[0];
+    const datas = vendas.map((v) => v.dataVenda.getTime());
+
+    return {
+      id: produto.id,
+      nome: produto.nome,
+      precoCentavos: produto.precoCentavos,
+      canalPrincipal: produto.canalPrincipal,
+      imagemUrl: primeira ? this.mediaUrl.publicUrl(primeira.arquivo) : null,
+      estoqueProntos: produto.variacoes.reduce((s, v) => s + v.estoqueAtual, 0),
+      // Sem variação cadastrada não existe estoque pra ficar abaixo do mínimo.
+      abaixoDoMinimo: produto.variacoes.some((v) => v.estoqueAtual < v.estoqueMinimo),
+      unidadesVendidas: vendas.reduce((s, v) => s + v.qtd, 0),
+      receitaCentavos: vendas.reduce((s, v) => s + v.qtd * v.precoUnitarioCentavos, 0),
+      ultimaVenda: datas.length > 0 ? new Date(Math.max(...datas)).toISOString() : null,
+    };
+  }
 
   /**
    * Lista produtos com pricing já calculado. Filtros e paginação opcionais.

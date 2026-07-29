@@ -207,6 +207,49 @@ describe('MakerworldService', () => {
     expect(pricing.economiaDeCustoPronto).not.toHaveBeenCalled();
   });
 
+  it('marcarAnunciado não cria produto duplicado quando o modelo já virou produto', async () => {
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1', produtoId: 'p1', anuncios: [] });
+    mock.produto.update.mockResolvedValue({ id: 'p1', naVitrine: true });
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
+
+    await svc.marcarAnunciado('m1');
+
+    expect(mock.produto.create).not.toHaveBeenCalled();
+    expect(mock.produto.update).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { anunciado: true, naVitrine: true },
+    });
+  });
+
+  it('marcarAnunciado usa o título do anúncio Shopee como nome do produto', async () => {
+    const { mock, tx } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({
+      id: 'm1',
+      produtoId: null,
+      titulo: 'Articulated Octopus – Commercial use allowed',
+      url: 'https://makerworld.com/models/1',
+      pesoGramas: '24',
+      tempoHoras: '2.28',
+      precoSugeridoCentavos: 2490,
+      anuncios: [{ titulo: 'Polvo Articulado Flexivel Impressao 3D', precoBaseCentavos: 1990 }],
+    });
+    mock.filamento.findFirst.mockResolvedValue({ id: 'fil1' });
+    tx.produto.create.mockResolvedValue({ id: 'p9' });
+    tx.modeloMakerWorld.update.mockResolvedValue({});
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
+
+    await svc.marcarAnunciado('m1');
+
+    const data = tx.produto.create.mock.calls[0]![0].data;
+    // O título do MakerWorld está em inglês; quem vale é o nome sob o qual o produto
+    // está de fato à venda.
+    expect(data.nome).toBe('Polvo Articulado Flexivel Impressao 3D');
+    expect(data.precoCentavos).toBe(1990);
+    expect(data.naVitrine).toBe(true);
+    expect(data.anunciado).toBe(true);
+  });
+
   it('salvarAnuncio começa na versão 1 e incrementa ao regerar o mesmo marketplace', async () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1' });

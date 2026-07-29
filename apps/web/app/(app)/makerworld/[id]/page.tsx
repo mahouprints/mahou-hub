@@ -2,11 +2,14 @@
 
 import { use } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, ExternalLink, Scale } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AlertTriangle, ArrowLeft, ExternalLink, Scale, Store } from 'lucide-react';
+import { toast } from 'sonner';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, pct, tempoRelativo } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Marketplace = 'SHOPEE' | 'ML' | 'TIKTOK';
@@ -64,6 +67,7 @@ type PlanoAds = {
 
 type Detalhe = {
   id: string;
+  produtoId: string | null;
   titulo: string;
   url: string;
   autor: string;
@@ -107,7 +111,7 @@ export default function DetalheModelo({ params }: { params: Promise<{ id: string
         <ArrowLeft className="size-4" /> Prospecção
       </Link>
 
-      <Cabecalho modelo={data} />
+      <Cabecalho modelo={data} id={id} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4">
@@ -131,7 +135,20 @@ export default function DetalheModelo({ params }: { params: Promise<{ id: string
   );
 }
 
-function Cabecalho({ modelo }: { modelo: Detalhe }) {
+function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const anunciei = useMutation({
+    mutationFn: () => apiFetch(`/makerworld/${id}/anunciei`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['makerworld'] });
+      queryClient.invalidateQueries({ queryKey: ['vitrine'] });
+      toast.success('Produto criado e na vitrine');
+      router.push('/vitrine');
+    },
+  });
+
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -149,6 +166,18 @@ function Cabecalho({ modelo }: { modelo: Detalhe }) {
         >
           MakerWorld <ExternalLink className="size-3.5" />
         </a>
+        {modelo.produtoId ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/vitrine">
+              <Store className="size-4" /> Já está na vitrine
+            </Link>
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => anunciei.mutate()} disabled={anunciei.isPending}>
+            <Store className="size-4" />
+            {anunciei.isPending ? 'Criando…' : 'Anunciei este produto'}
+          </Button>
+        )}
       </div>
     </div>
   );

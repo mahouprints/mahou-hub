@@ -13,6 +13,7 @@ export function makePrismaMock() {
       findMany: vi.fn(),
     },
     produto: { create: vi.fn() },
+    modeloMakerWorld: { update: vi.fn() },
     produtoVariacao: { findUnique: vi.fn(), update: vi.fn() },
     filamento: { findUnique: vi.fn(), update: vi.fn() },
     insumo: { findUnique: vi.fn(), update: vi.fn() },

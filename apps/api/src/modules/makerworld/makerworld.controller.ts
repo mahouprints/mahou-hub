@@ -51,6 +51,12 @@ export class MakerworldController {
     return this.service.buscarDetalhe(id);
   }
 
+  @Post(':id/anunciei')
+  @ApiOperation({ summary: 'Marca como anunciado: vira Produto e entra na vitrine' })
+  marcarAnunciado(@Param('id') id: string) {
+    return this.service.marcarAnunciado(id);
+  }
+
   @Post(':id/anuncios')
   @ApiOperation({ summary: 'Grava a copy gerada pela skill para um marketplace (upsert)' })
   salvarAnuncio(

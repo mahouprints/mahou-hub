@@ -118,6 +118,13 @@ export class ProdutosController {
     return items;
   }
 
+  // Antes de `:id` de propósito: registrada depois, "vitrine" cairia como um id.
+  @Get('vitrine')
+  @ApiOperation({ summary: 'Catálogo atual com vendas e estoque de prontos' })
+  vitrine() {
+    return this.service.vitrine();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Detalha um produto' })
   get(@Param('id') id: string) {

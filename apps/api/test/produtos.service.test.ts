@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
 import { ProdutosService } from '../src/modules/produtos/produtos.service';
 import type { ImagensService } from '../src/modules/imagens/imagens.service';
+import type { MediaUrlService } from '../src/modules/imagens/media-url.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
+
+// Só a vitrine usa o MediaUrlService; nos demais testes o stub existe pro construtor.
+function makeMediaUrlMock(): MediaUrlService {
+  return { publicUrl: vi.fn((a: string) => `https://media.test/${a}`) } as unknown as MediaUrlService;
+}
 
 function makeImagensMock(): ImagensService {
   return { paraDto: vi.fn((row) => row) } as unknown as ImagensService;
@@ -88,7 +94,7 @@ describe('ProdutosService.list — filtros', () => {
     stubPricingDependencies(mock);
     mock.produto.findMany.mockResolvedValue([] as never);
     mock.produto.count.mockResolvedValue(0 as never);
-    svc = new ProdutosService(asPrisma(mock), makeImagensMock());
+    svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
   });
 
   it('sempre filtra por ativo=true (soft-delete invisível)', async () => {
@@ -185,7 +191,7 @@ describe('ProdutosService.marcarAnunciados', () => {
   it('chama updateMany com anunciado=true pra ids dados', async () => {
     const { mock } = makePrismaMock();
     mock.produto.updateMany.mockResolvedValue({ count: 2 } as never);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
     const r = await svc.marcarAnunciados(['a', 'b'], true);
     expect(r).toEqual({ ok: true, count: 2 });
     expect(mock.produto.updateMany).toHaveBeenCalledWith({
@@ -199,7 +205,7 @@ describe('ProdutosService.desativarMuitos', () => {
   it('soft-delete em massa preserva referência histórica', async () => {
     const { mock } = makePrismaMock();
     mock.produto.updateMany.mockResolvedValue({ count: 3 } as never);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
     const r = await svc.desativarMuitos(['x', 'y', 'z']);
     expect(r).toEqual({ ok: true, count: 3 });
     const call = mock.produto.updateMany.mock.calls[0]?.[0];

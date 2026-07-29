@@ -171,6 +171,13 @@ model Produto {
   /// Indica se o produto já foi publicado no marketplace.
   /// Fluxo externo de geração de imagem só processa produtos com anunciado=false.
   anunciado         Boolean               @default(false)
+  /// Faz parte do catálogo ATUAL — é o que a Vitrine lista.
+  ///
+  /// Separado de `anunciado` de propósito. Os 53 produtos herdados são da loja antiga
+  /// e vários estão com `anunciado=true`; virá-los pra false pra limpar a Vitrine
+  /// jogaria todos eles de volta na fila do fluxo externo de imagem, que filtra
+  /// justamente por `anunciado=false`. Marcador próprio evita esse efeito colateral.
+  naVitrine         Boolean               @default(false)
   /// Produto incompleto (criado a partir de Oportunidade sem preencher tudo).
   /// Quando true: alguns campos podem estar zerados (peso/tempo) e ativo=false.
   /// Usuário precisa completar antes de anunciar.
