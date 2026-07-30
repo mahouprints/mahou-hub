@@ -120,10 +120,15 @@ function SelosDeAnuncio({ item }: { item: ItemVitrine }) {
   const salvar = useMutation({
     mutationFn: (canais: Canal[]) =>
       apiFetch(`/produtos/${item.id}/canais-anunciados`, { method: 'PUT', json: { canais } }),
-    onSuccess: () => {
+    onSuccess: (_r, canais) => {
       qc.invalidateQueries({ queryKey: ['vitrine'] });
+      // Sem canal nenhum o produto volta pra fila do MakerWorld — a aba de lá precisa saber.
+      qc.invalidateQueries({ queryKey: ['makerworld'] });
+      qc.invalidateQueries({ queryKey: ['makerworld-resumo'] });
       setEditando(false);
-      toast.success('Atualizado');
+      toast.success(
+        canais.length === 0 ? 'Voltou para revisão no MakerWorld' : 'Atualizado',
+      );
     },
   });
 

@@ -93,6 +93,19 @@ export default function MakerWorldPage() {
   const [busca, setBusca] = useState('');
   const [nicho, setNicho] = useState<string>('todos');
   const [status, setStatus] = useState<string>('NOVO');
+
+  // Contagem por estado no próprio filtro: sem isso, modelo que volta da vitrine cai em
+  // "Favoritos" e some da vista de quem abre a tela no padrão "Não revisados".
+  const { data: resumo } = useQuery({
+    queryKey: ['makerworld-resumo'],
+    queryFn: () => apiFetch<{ porStatus: Array<{ status: string; quantidade: number }> }>(
+      '/makerworld/resumo',
+    ),
+  });
+  const contar = (s: string) => {
+    const n = resumo?.porStatus.find((x) => x.status === s)?.quantidade ?? 0;
+    return n > 0 ? ` (${n})` : '';
+  };
   const [notaMinima, setNotaMinima] = useState<string>('60');
   const [esconderIp, setEsconderIp] = useState(true);
   const [pagina, setPagina] = useState(0);
@@ -127,6 +140,7 @@ export default function MakerWorldPage() {
       }),
     onSuccess: (_, { novo }) => {
       queryClient.invalidateQueries({ queryKey: ['makerworld'] });
+      queryClient.invalidateQueries({ queryKey: ['makerworld-resumo'] });
       toast.success(novo === 'FAVORITO' ? 'Favoritado' : 'Descartado');
     },
   });
@@ -173,9 +187,10 @@ export default function MakerWorldPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="NOVO">Não revisados</SelectItem>
-            <SelectItem value="FAVORITO">Favoritos</SelectItem>
-            <SelectItem value="DESCARTADO">Descartados</SelectItem>
+            <SelectItem value="NOVO">Não revisados{contar('NOVO')}</SelectItem>
+            <SelectItem value="FAVORITO">Favoritos{contar('FAVORITO')}</SelectItem>
+            <SelectItem value="DESCARTADO">Descartados{contar('DESCARTADO')}</SelectItem>
+            <SelectItem value="VIROU_PRODUTO">Na vitrine{contar('VIROU_PRODUTO')}</SelectItem>
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
