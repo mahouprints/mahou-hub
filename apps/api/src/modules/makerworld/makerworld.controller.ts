@@ -12,6 +12,8 @@ import {
   type MakerworldBulkStatus,
   type MakerworldListar,
   type MakerworldUpdate,
+  CanaisAnunciadosSchema,
+  type CanaisAnunciados,
 } from '@mahou-hub/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -52,9 +54,15 @@ export class MakerworldController {
   }
 
   @Post(':id/anunciei')
-  @ApiOperation({ summary: 'Marca como anunciado: vira Produto e entra na vitrine' })
-  marcarAnunciado(@Param('id') id: string) {
-    return this.service.marcarAnunciado(id);
+  @ApiOperation({
+    summary: 'Marca como anunciado: vira Produto e entra na vitrine',
+    description: 'Body opcional `{ canais: ["SHOPEE","ML"] }` diz em quais marketplaces saiu.',
+  })
+  marcarAnunciado(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CanaisAnunciadosSchema.partial())) data: Partial<CanaisAnunciados>,
+  ) {
+    return this.service.marcarAnunciado(id, data.canais ?? []);
   }
 
   @Post(':id/anuncios')

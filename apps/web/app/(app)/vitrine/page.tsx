@@ -2,14 +2,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Layers, PackageOpen } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { AlertTriangle, Check, Layers, PackageOpen, Pencil } from 'lucide-react';
+import type { Canal } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, tempoRelativo } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { VariacoesLoteDialog } from '@/components/variacoes-lote-dialog';
+import { CanaisAnunciadosDialog, MARKETPLACES } from '@/components/canais-anunciados-dialog';
 
 type ItemVitrine = {
   id: string;
@@ -18,6 +21,8 @@ type ItemVitrine = {
   canalPrincipal: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
   imagemUrl: string | null;
   imagemEhRender: boolean;
+  canaisAnunciados: Canal[];
+  anunciado: boolean;
   estoqueProntos: number;
   abaixoDoMinimo: boolean;
   unidadesVendidas: number;
@@ -102,6 +107,70 @@ function Resumo({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
+/**
+ * Onde o produto está no ar, e o atalho pra corrigir.
+ *
+ * Mostra também o que FALTA, em cinza: "publiquei na Shopee, falta ML e TikTok" é a
+ * informação que decide o próximo trabalho, e ela some se a tela só listar o que já saiu.
+ */
+function SelosDeAnuncio({ item }: { item: ItemVitrine }) {
+  const qc = useQueryClient();
+  const [editando, setEditando] = useState(false);
+
+  const salvar = useMutation({
+    mutationFn: (canais: Canal[]) =>
+      apiFetch(`/produtos/${item.id}/canais-anunciados`, { method: 'PUT', json: { canais } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['vitrine'] });
+      setEditando(false);
+      toast.success('Atualizado');
+    },
+  });
+
+  const anunciados = new Set(item.canaisAnunciados);
+  const faltando = MARKETPLACES.filter((m) => !anunciados.has(m.canal));
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      {MARKETPLACES.filter((m) => anunciados.has(m.canal)).map((m) => (
+        <Badge key={m.canal} variant="success" className="text-[10px]">
+          <Check className="mr-0.5 size-2.5" /> {m.nome}
+        </Badge>
+      ))}
+
+      {anunciados.size === 0 && item.anunciado && (
+        <Badge variant="outline" className="text-[10px] text-muted-foreground">
+          anunciado · canal não informado
+        </Badge>
+      )}
+
+      {faltando.length > 0 && (
+        <span className="text-[10px] text-muted-foreground">
+          falta {faltando.map((m) => m.nome).join(', ')}
+        </span>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setEditando(true)}
+        title="Editar onde está anunciado"
+        className="inline-flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Pencil className="size-3" />
+      </button>
+
+      <CanaisAnunciadosDialog
+        open={editando}
+        onOpenChange={setEditando}
+        canaisIniciais={item.canaisAnunciados}
+        nomeProduto={item.nome}
+        salvando={salvar.isPending}
+        onConfirmar={(canais) => salvar.mutate(canais)}
+      />
+    </div>
+  );
+}
+
 function LinhaProduto({ item }: { item: ItemVitrine }) {
   return (
     <Card className="flex flex-wrap items-center gap-4 p-3">
@@ -136,6 +205,7 @@ function LinhaProduto({ item }: { item: ItemVitrine }) {
             <span className="text-xs text-muted-foreground/70">· render do autor</span>
           )}
         </div>
+        <SelosDeAnuncio item={item} />
       </div>
 
       <Numero

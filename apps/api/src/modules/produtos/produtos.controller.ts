@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Put,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -17,9 +18,11 @@ import type { Response } from 'express';
 import { z } from 'zod';
 import {
   BulkDeleteSchema,
+  CanaisAnunciadosSchema,
   ProdutoCreateSchema,
   ProdutoUpdateSchema,
   type BulkDelete,
+  type CanaisAnunciados,
   type ProdutoCreate,
   type ProdutoUpdate,
 } from '@mahou-hub/contracts';
@@ -162,6 +165,18 @@ export class ProdutosController {
   @ApiOperation({ summary: 'Soft-delete em massa (até 500 ids)' })
   bulkDelete(@Body(new ZodValidationPipe(BulkDeleteSchema)) data: BulkDelete) {
     return this.service.desativarMuitos(data.ids);
+  }
+
+  @Put(':id/canais-anunciados')
+  @ApiOperation({
+    summary: 'Define em quais marketplaces o produto está anunciado',
+    description: 'Lista vazia = não está anunciado em lugar nenhum (zera a flag `anunciado`).',
+  })
+  definirCanais(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(CanaisAnunciadosSchema)) data: CanaisAnunciados,
+  ) {
+    return this.service.definirCanaisAnunciados(id, data.canais);
   }
 
   @Post('bulk-anunciar')

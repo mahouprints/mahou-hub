@@ -98,6 +98,8 @@ export class ProdutosService {
         ? this.mediaUrl.publicUrl(primeira.arquivo)
         : (produto.modeloMakerWorld?.imagemUrl ?? null),
       imagemEhRender: !primeira && produto.modeloMakerWorld != null,
+      canaisAnunciados: produto.canaisAnunciados,
+      anunciado: produto.anunciado,
       estoqueProntos: produto.variacoes.reduce((s, v) => s + v.estoqueAtual, 0),
       // Sem variação cadastrada não existe estoque pra ficar abaixo do mínimo.
       abaixoDoMinimo: produto.variacoes.some((v) => v.estoqueAtual < v.estoqueMinimo),
@@ -242,6 +244,25 @@ export class ProdutosService {
    * Marca/desmarca produtos como anunciados em massa. Útil pro fluxo externo
    * de geração de imagem confirmar publicações em batch.
    */
+  /**
+   * Define em quais marketplaces o produto está no ar.
+   *
+   * `anunciado` é mantido em sincronia porque o fluxo externo de geração de imagem
+   * filtra por ele (`?anunciado=false`) — se os dois divergirem, produto publicado volta
+   * pra fila de imagem, ou some dela sem estar publicado.
+   */
+  async definirCanaisAnunciados(id: string, canais: Canal[]) {
+    const produto = await this.prisma.produto.findUnique({ where: { id }, select: { id: true } });
+    if (!produto) throw new NotFoundException(`Produto ${id} não existe`);
+
+    // Set: a UI pode mandar repetido, e canal repetido na lista viraria selo duplicado.
+    const unicos = [...new Set(canais)];
+    return this.prisma.produto.update({
+      where: { id },
+      data: { canaisAnunciados: unicos, anunciado: unicos.length > 0 },
+    });
+  }
+
   async marcarAnunciados(ids: string[], anunciado: boolean) {
     const r = await this.prisma.produto.updateMany({
       where: { id: { in: ids } },

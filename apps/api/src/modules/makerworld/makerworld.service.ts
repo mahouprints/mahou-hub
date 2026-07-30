@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Canal, Prisma } from '@prisma/client';
 import type {
   AnuncioModeloUpsert,
   MakerworldBulkImport,
@@ -182,7 +182,7 @@ export class MakerworldService {
    *
    * Chamar de novo num modelo já convertido não duplica: só regarante as flags.
    */
-  async marcarAnunciado(id: string) {
+  async marcarAnunciado(id: string, canais: Canal[] = []) {
     const modelo = await this.prisma.modeloMakerWorld.findUnique({
       where: { id },
       include: { anuncios: { where: { marketplace: 'SHOPEE' } } },
@@ -192,7 +192,7 @@ export class MakerworldService {
     if (modelo.produtoId) {
       return this.prisma.produto.update({
         where: { id: modelo.produtoId },
-        data: { anunciado: true, naVitrine: true },
+        data: { ...this.flagsDeAnuncio(canais), naVitrine: true },
       });
     }
 
@@ -225,7 +225,7 @@ export class MakerworldService {
           canalPrincipal: 'SHOPEE',
           rascunho: false,
           ativo: true,
-          anunciado: true,
+          ...this.flagsDeAnuncio(canais),
           naVitrine: true,
         },
       });
@@ -236,6 +236,15 @@ export class MakerworldService {
       this.logger.log(`Modelo ${id} virou Produto ${produto.id} e entrou na vitrine`);
       return produto;
     });
+  }
+
+  /**
+   * Onde o produto foi anunciado + a flag booleana que o fluxo externo de imagem lê.
+   * Lista vazia ainda marca `anunciado`: o Gabriel disse que anunciou, só não disse onde
+   * — tratar como "não anunciado" jogaria o produto de volta na fila de geração de foto.
+   */
+  private flagsDeAnuncio(canais: Canal[]) {
+    return { anunciado: true, canaisAnunciados: [...new Set(canais)] };
   }
 
   async atualizar(id: string, dados: MakerworldUpdate) {

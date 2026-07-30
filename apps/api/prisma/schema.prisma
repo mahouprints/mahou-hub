@@ -173,9 +173,17 @@ model Produto {
   precoCentavos     Int
   canalPrincipal    Canal
   ativo             Boolean               @default(true)
-  /// Indica se o produto já foi publicado no marketplace.
-  /// Fluxo externo de geração de imagem só processa produtos com anunciado=false.
+  /// Indica se o produto já foi publicado em ALGUM marketplace.
+  /// Fluxo externo de geração de imagem só processa produtos com anunciado=false, então
+  /// o campo continua existindo — é mantido em sincronia com `canaisAnunciados`:
+  /// verdadeiro quando a lista tem pelo menos um canal.
   anunciado         Boolean               @default(false)
+  /// ONDE o produto está anunciado. Vazio = em lugar nenhum.
+  ///
+  /// Anunciar é canal a canal na vida real: sai na Shopee hoje, no ML semana que vem, e
+  /// às vezes se tira de um só. Um booleano único não conseguia responder "falta publicar
+  /// onde?", que é a pergunta que decide o próximo trabalho.
+  canaisAnunciados  Canal[]
   /// Faz parte do catálogo ATUAL — é o que a Vitrine lista.
   ///
   /// Separado de `anunciado` de propósito. Os 53 produtos herdados são da loja antiga

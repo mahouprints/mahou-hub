@@ -213,12 +213,12 @@ describe('MakerworldService', () => {
     mock.produto.update.mockResolvedValue({ id: 'p1', naVitrine: true });
     const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
-    await svc.marcarAnunciado('m1');
+    await svc.marcarAnunciado('m1', ['SHOPEE', 'ML']);
 
     expect(mock.produto.create).not.toHaveBeenCalled();
     expect(mock.produto.update).toHaveBeenCalledWith({
       where: { id: 'p1' },
-      data: { anunciado: true, naVitrine: true },
+      data: { anunciado: true, canaisAnunciados: ['SHOPEE', 'ML'], naVitrine: true },
     });
   });
 
@@ -274,5 +274,34 @@ describe('MakerworldService', () => {
     expect(args.where).toEqual({
       modeloId_marketplace: { modeloId: 'm1', marketplace: 'SHOPEE' },
     });
+  });
+});
+
+describe('MakerworldService.marcarAnunciado — canais', () => {
+  it('sem canais informados ainda marca anunciado', async () => {
+    // O Gabriel disse que anunciou, só não disse onde. Tratar como "não anunciado"
+    // jogaria o produto de volta na fila de geração de foto do fluxo externo.
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1', produtoId: 'p1', anuncios: [] });
+    mock.produto.update.mockResolvedValue({ id: 'p1' });
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
+
+    await svc.marcarAnunciado('m1');
+
+    expect(mock.produto.update.mock.calls[0]?.[0].data).toMatchObject({
+      anunciado: true,
+      canaisAnunciados: [],
+    });
+  });
+
+  it('canal repetido não duplica', async () => {
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1', produtoId: 'p1', anuncios: [] });
+    mock.produto.update.mockResolvedValue({ id: 'p1' });
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
+
+    await svc.marcarAnunciado('m1', ['SHOPEE', 'SHOPEE']);
+
+    expect(mock.produto.update.mock.calls[0]?.[0].data.canaisAnunciados).toEqual(['SHOPEE']);
   });
 });

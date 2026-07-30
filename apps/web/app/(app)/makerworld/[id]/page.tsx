@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowLeft, Check, Copy, ExternalLink, Scale, Store } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Canal } from '@mahou-hub/contracts';
+import { CanaisAnunciadosDialog } from '@/components/canais-anunciados-dialog';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, pct, tempoRelativo } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
@@ -146,11 +148,15 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [perguntandoCanais, setPerguntandoCanais] = useState(false);
+
   const anunciei = useMutation({
-    mutationFn: () => apiFetch(`/makerworld/${id}/anunciei`, { method: 'POST' }),
+    mutationFn: (canais: Canal[]) =>
+      apiFetch(`/makerworld/${id}/anunciei`, { method: 'POST', json: { canais } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['makerworld'] });
       queryClient.invalidateQueries({ queryKey: ['vitrine'] });
+      setPerguntandoCanais(false);
       toast.success('Produto criado e na vitrine');
       router.push('/vitrine');
     },
@@ -180,12 +186,25 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
             </Link>
           </Button>
         ) : (
-          <Button size="sm" onClick={() => anunciei.mutate()} disabled={anunciei.isPending}>
+          <Button
+            size="sm"
+            onClick={() => setPerguntandoCanais(true)}
+            disabled={anunciei.isPending}
+          >
             <Store className="size-4" />
             {anunciei.isPending ? 'Criando…' : 'Anunciei este produto'}
           </Button>
         )}
       </div>
+
+      <CanaisAnunciadosDialog
+        open={perguntandoCanais}
+        onOpenChange={setPerguntandoCanais}
+        canaisIniciais={[]}
+        nomeProduto={modelo.titulo}
+        salvando={anunciei.isPending}
+        onConfirmar={(canais) => anunciei.mutate(canais)}
+      />
     </div>
   );
 }

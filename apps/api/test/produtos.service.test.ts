@@ -275,3 +275,50 @@ describe('ProdutosService.vitrine', () => {
     expect(linha?.ultimaVenda).toBe(new Date('2026-07-20').toISOString());
   });
 });
+
+describe('ProdutosService.definirCanaisAnunciados', () => {
+  function montar() {
+    const { mock } = makePrismaMock();
+    mock.produto.findUnique.mockResolvedValue({ id: 'p1' });
+    mock.produto.update.mockImplementation((args: { data: unknown }) => Promise.resolve(args.data));
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+    return { svc, mock };
+  }
+
+  it('grava os canais e liga a flag `anunciado`', async () => {
+    const { svc, mock } = montar();
+
+    await svc.definirCanaisAnunciados('p1', ['SHOPEE', 'ML']);
+
+    expect(mock.produto.update.mock.calls[0]?.[0].data).toEqual({
+      canaisAnunciados: ['SHOPEE', 'ML'],
+      anunciado: true,
+    });
+  });
+
+  it('lista vazia desliga a flag — "tirei de todos"', async () => {
+    const { svc, mock } = montar();
+
+    await svc.definirCanaisAnunciados('p1', []);
+
+    expect(mock.produto.update.mock.calls[0]?.[0].data).toEqual({
+      canaisAnunciados: [],
+      anunciado: false,
+    });
+  });
+
+  it('canal repetido não vira selo duplicado', async () => {
+    const { svc, mock } = montar();
+
+    await svc.definirCanaisAnunciados('p1', ['SHOPEE', 'SHOPEE', 'ML']);
+
+    expect(mock.produto.update.mock.calls[0]?.[0].data.canaisAnunciados).toEqual(['SHOPEE', 'ML']);
+  });
+
+  it('produto inexistente é 404', async () => {
+    const { svc, mock } = montar();
+    mock.produto.findUnique.mockResolvedValue(null);
+
+    await expect(svc.definirCanaisAnunciados('fantasma', ['SHOPEE'])).rejects.toThrow(/não existe/);
+  });
+});

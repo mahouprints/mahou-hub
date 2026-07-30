@@ -31,6 +31,8 @@ export const ProdutoSchema = z.object({
   canalPrincipal: CanalEnum,
   ativo: z.boolean(),
   anunciado: z.boolean(),
+  /// Em quais marketplaces o produto está no ar. Vazio = em nenhum.
+  canaisAnunciados: z.array(CanalEnum).default([]),
   // Rascunho = produto incompleto (criado via virar-produto sem todos os campos).
   // Bloqueia o fluxo de anunciar até o usuário completar.
   rascunho: z.boolean(),
@@ -43,6 +45,9 @@ export const ProdutoCreateSchema = ProdutoSchema.omit({
   anunciado: true,
   rascunho: true,
   metodoImagem: true,
+  // Onde está anunciado não se escolhe no formulário do produto: vem do fluxo
+  // "já anunciei" (PUT /produtos/:id/canais-anunciados), que é onde a informação nasce.
+  canaisAnunciados: true,
 }).extend({
   // No create normal (UI manual), peso e tempo voltam a ser obrigatórios positivos.
   pesoG: z.number().positive(),
@@ -68,3 +73,15 @@ export const EstatisticasProdutoSchema = z.object({
   emProducao: z.number().int().nonnegative(),
 });
 export type EstatisticasProduto = z.infer<typeof EstatisticasProdutoSchema>;
+
+/**
+ * Onde o produto está anunciado. Substitui o sim/não que não respondia "falta publicar
+ * onde?" — a pergunta que decide o próximo trabalho.
+ *
+ * Lista vazia é válida e significa "tirei de todos": `anunciado` volta a false junto.
+ */
+export const CanaisAnunciadosSchema = z.object({
+  canais: z.array(CanalEnum),
+});
+
+export type CanaisAnunciados = z.infer<typeof CanaisAnunciadosSchema>;
