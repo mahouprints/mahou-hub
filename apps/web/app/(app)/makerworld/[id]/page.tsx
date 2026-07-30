@@ -77,6 +77,8 @@ type PlanoAds = {
 type Detalhe = {
   id: string;
   produtoId: string | null;
+  /** Null quando nunca virou produto. `naVitrine` false = voltou pra revisão. */
+  produto: { naVitrine: boolean; canaisAnunciados: string[] } | null;
   titulo: string;
   url: string;
   autor: string;
@@ -179,7 +181,7 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
         >
           MakerWorld <ExternalLink className="size-3.5" />
         </a>
-        {modelo.produtoId ? (
+        {modelo.produto?.naVitrine ? (
           <Button variant="outline" size="sm" asChild>
             <Link href="/vitrine">
               <Store className="size-4" /> Já está na vitrine
@@ -192,7 +194,11 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
             disabled={anunciei.isPending}
           >
             <Store className="size-4" />
-            {anunciei.isPending ? 'Criando…' : 'Anunciei este produto'}
+            {anunciei.isPending
+              ? 'Salvando…'
+              : modelo.produtoId
+                ? 'Voltar para a vitrine'
+                : 'Anunciei este produto'}
           </Button>
         )}
       </div>
@@ -200,7 +206,7 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
       <CanaisAnunciadosDialog
         open={perguntandoCanais}
         onOpenChange={setPerguntandoCanais}
-        canaisIniciais={[]}
+        canaisIniciais={(modelo.produto?.canaisAnunciados ?? []) as Canal[]}
         nomeProduto={modelo.titulo}
         salvando={anunciei.isPending}
         onConfirmar={(canais) => anunciei.mutate(canais)}

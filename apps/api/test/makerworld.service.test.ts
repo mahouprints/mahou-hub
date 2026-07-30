@@ -208,17 +208,23 @@ describe('MakerworldService', () => {
   });
 
   it('marcarAnunciado não cria produto duplicado quando o modelo já virou produto', async () => {
-    const { mock } = makePrismaMock();
+    const { mock, tx } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1', produtoId: 'p1', anuncios: [] });
-    mock.produto.update.mockResolvedValue({ id: 'p1', naVitrine: true });
+    tx.produto.update.mockResolvedValue({ id: 'p1', naVitrine: true });
     const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.marcarAnunciado('m1', ['SHOPEE', 'ML']);
 
     expect(mock.produto.create).not.toHaveBeenCalled();
-    expect(mock.produto.update).toHaveBeenCalledWith({
+    expect(tx.produto.update).toHaveBeenCalledWith({
       where: { id: 'p1' },
       data: { anunciado: true, canaisAnunciados: ['SHOPEE', 'ML'], naVitrine: true },
+    });
+    // Reanúncio tira o modelo de "Favoritos": ele não pode estar na vitrine e na fila
+    // de revisão ao mesmo tempo.
+    expect(tx.modeloMakerWorld.update).toHaveBeenCalledWith({
+      where: { id: 'm1' },
+      data: { status: 'VIROU_PRODUTO' },
     });
   });
 
@@ -281,27 +287,27 @@ describe('MakerworldService.marcarAnunciado — canais', () => {
   it('sem canais informados ainda marca anunciado', async () => {
     // O Gabriel disse que anunciou, só não disse onde. Tratar como "não anunciado"
     // jogaria o produto de volta na fila de geração de foto do fluxo externo.
-    const { mock } = makePrismaMock();
+    const { mock, tx } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1', produtoId: 'p1', anuncios: [] });
-    mock.produto.update.mockResolvedValue({ id: 'p1' });
+    tx.produto.update.mockResolvedValue({ id: 'p1' });
     const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.marcarAnunciado('m1');
 
-    expect(mock.produto.update.mock.calls[0]?.[0].data).toMatchObject({
+    expect(tx.produto.update.mock.calls[0]?.[0].data).toMatchObject({
       anunciado: true,
       canaisAnunciados: [],
     });
   });
 
   it('canal repetido não duplica', async () => {
-    const { mock } = makePrismaMock();
+    const { mock, tx } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1', produtoId: 'p1', anuncios: [] });
-    mock.produto.update.mockResolvedValue({ id: 'p1' });
+    tx.produto.update.mockResolvedValue({ id: 'p1' });
     const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.marcarAnunciado('m1', ['SHOPEE', 'SHOPEE']);
 
-    expect(mock.produto.update.mock.calls[0]?.[0].data.canaisAnunciados).toEqual(['SHOPEE']);
+    expect(tx.produto.update.mock.calls[0]?.[0].data.canaisAnunciados).toEqual(['SHOPEE']);
   });
 });
