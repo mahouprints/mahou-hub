@@ -186,6 +186,29 @@ export class ProdutosService {
         filamento: true,
         insumos: { include: { insumo: true } },
         imagens: { orderBy: { ordem: 'asc' } },
+        // A ficha do modelo original vai junto pra tela poder comparar o que foi
+        // cadastrado com o que a prospecção mediu — é onde se pega peso digitado errado
+        // e licença que exige crédito ao autor na descrição do anúncio.
+        modeloMakerWorld: {
+          select: {
+            id: true,
+            titulo: true,
+            url: true,
+            autor: true,
+            imagemUrl: true,
+            licenca: true,
+            licencaObrigacao: true,
+            pesoGramas: true,
+            tempoHoras: true,
+            unidadesPorKit: true,
+            custoEstimadoCentavos: true,
+            precoSugeridoCentavos: true,
+            alertas: true,
+            nicho: true,
+            notaIa: true,
+            temFotoReal: true,
+          },
+        },
       },
     });
     if (!p) throw new NotFoundException(`Produto ${id} não existe`);
@@ -252,14 +275,37 @@ export class ProdutosService {
    * pra fila de imagem, ou some dela sem estar publicado.
    */
   async definirCanaisAnunciados(id: string, canais: Canal[]) {
-    const produto = await this.prisma.produto.findUnique({ where: { id }, select: { id: true } });
+    const produto = await this.prisma.produto.findUnique({
+      where: { id },
+      select: { id: true, modeloMakerWorld: { select: { id: true } } },
+    });
     if (!produto) throw new NotFoundException(`Produto ${id} não existe`);
 
     // Set: a UI pode mandar repetido, e canal repetido na lista viraria selo duplicado.
     const unicos = [...new Set(canais)];
-    return this.prisma.produto.update({
-      where: { id },
-      data: { canaisAnunciados: unicos, anunciado: unicos.length > 0 },
+
+    // Saiu de todos os canais e veio da prospecção: volta pra fila do MakerWorld, onde o
+    // Gabriel confere peso, licença e ficha antes de publicar de novo. Sem isso o produto
+    // ficaria na Vitrine ("o que está anunciado hoje") sem estar anunciado em lugar nenhum.
+    const voltaPraRevisao = unicos.length === 0 && produto.modeloMakerWorld !== null;
+
+    return this.prisma.$transaction(async (tx) => {
+      if (voltaPraRevisao) {
+        await tx.modeloMakerWorld.update({
+          where: { id: produto.modeloMakerWorld!.id },
+          // FAVORITO e não NOVO: ele já foi revisado e aprovado uma vez; devolver pro
+          // começo da triagem faria parecer que nunca passou por análise.
+          data: { status: 'FAVORITO' },
+        });
+      }
+      return tx.produto.update({
+        where: { id },
+        data: {
+          canaisAnunciados: unicos,
+          anunciado: unicos.length > 0,
+          ...(voltaPraRevisao ? { naVitrine: false } : {}),
+        },
+      });
     });
   }
 

@@ -31,12 +31,15 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ModeloOrigemCard, type ModeloOrigem } from '@/components/modelo-origem-card';
 import { ImagensSection } from '@/components/imagens-section';
 import { VariacoesSection } from '@/components/variacoes-section';
 import { PlanoAdsPaineis } from '@/components/plano-ads-paineis';
 
 type ProdutoComFilamento = Produto & {
   filamento: { id: string; nome: string };
+  /** Ficha do modelo que virou este produto. Null em produto cadastrado à mão. */
+  modeloMakerWorld: ModeloOrigem | null;
   insumos: Array<{
     id: string;
     insumoId: string;
@@ -175,6 +178,9 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
       <div className="grid gap-6 lg:grid-cols-2">
         <EspecificacoesCard produto={produto} />
         <EstatisticasCard stats={stats} />
+        {produto.modeloMakerWorld && (
+          <ModeloOrigemCard modelo={produto.modeloMakerWorld} produto={produto} />
+        )}
       </div>
 
       <Card>

@@ -276,48 +276,80 @@ describe('ProdutosService.vitrine', () => {
   });
 });
 
-describe('ProdutosService.definirCanaisAnunciados', () => {
-  function montar() {
+describe('ProdutosService.definirCanaisAnunciados — volta pra revisão', () => {
+  function montarComModelo(temModelo: boolean) {
     const { mock } = makePrismaMock();
-    mock.produto.findUnique.mockResolvedValue({ id: 'p1' });
-    mock.produto.update.mockImplementation((args: { data: unknown }) => Promise.resolve(args.data));
+    mock.produto.findUnique.mockResolvedValue({
+      id: 'p1',
+      modeloMakerWorld: temModelo ? { id: 'm1' } : null,
+    });
+    const tx = {
+      produto: { update: vi.fn().mockImplementation((a: { data: unknown }) => a.data) },
+      modeloMakerWorld: { update: vi.fn() },
+    };
+    mock.$transaction.mockImplementation(async (cb: unknown) =>
+      (cb as (t: unknown) => unknown)(tx),
+    );
     const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
-    return { svc, mock };
+    return { svc, tx };
   }
 
+  it('tirar de todos os canais devolve o produto pra fila do MakerWorld', async () => {
+    const { svc, tx } = montarComModelo(true);
+
+    await svc.definirCanaisAnunciados('p1', []);
+
+    expect(tx.modeloMakerWorld.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'm1' }, data: { status: 'FAVORITO' } }),
+    );
+    expect(tx.produto.update.mock.calls[0]?.[0].data).toMatchObject({
+      anunciado: false,
+      naVitrine: false,
+    });
+  });
+
+  it('ainda anunciado em algum canal não sai da vitrine', async () => {
+    const { svc, tx } = montarComModelo(true);
+
+    await svc.definirCanaisAnunciados('p1', ['SHOPEE']);
+
+    expect(tx.modeloMakerWorld.update).not.toHaveBeenCalled();
+    expect(tx.produto.update.mock.calls[0]?.[0].data).not.toHaveProperty('naVitrine');
+  });
+
+  it('produto cadastrado à mão não tem pra onde voltar — só desmarca', async () => {
+    // Sem modelo de origem, tirar da vitrine deixaria o produto sem tela nenhuma.
+    const { svc, tx } = montarComModelo(false);
+
+    await svc.definirCanaisAnunciados('p1', []);
+
+    expect(tx.modeloMakerWorld.update).not.toHaveBeenCalled();
+    expect(tx.produto.update.mock.calls[0]?.[0].data).not.toHaveProperty('naVitrine');
+  });
+
   it('grava os canais e liga a flag `anunciado`', async () => {
-    const { svc, mock } = montar();
+    const { svc, tx } = montarComModelo(true);
 
     await svc.definirCanaisAnunciados('p1', ['SHOPEE', 'ML']);
 
-    expect(mock.produto.update.mock.calls[0]?.[0].data).toEqual({
+    expect(tx.produto.update.mock.calls[0]?.[0].data).toMatchObject({
       canaisAnunciados: ['SHOPEE', 'ML'],
       anunciado: true,
     });
   });
 
-  it('lista vazia desliga a flag — "tirei de todos"', async () => {
-    const { svc, mock } = montar();
-
-    await svc.definirCanaisAnunciados('p1', []);
-
-    expect(mock.produto.update.mock.calls[0]?.[0].data).toEqual({
-      canaisAnunciados: [],
-      anunciado: false,
-    });
-  });
-
   it('canal repetido não vira selo duplicado', async () => {
-    const { svc, mock } = montar();
+    const { svc, tx } = montarComModelo(true);
 
     await svc.definirCanaisAnunciados('p1', ['SHOPEE', 'SHOPEE', 'ML']);
 
-    expect(mock.produto.update.mock.calls[0]?.[0].data.canaisAnunciados).toEqual(['SHOPEE', 'ML']);
+    expect(tx.produto.update.mock.calls[0]?.[0].data.canaisAnunciados).toEqual(['SHOPEE', 'ML']);
   });
 
   it('produto inexistente é 404', async () => {
-    const { svc, mock } = montar();
+    const { mock } = makePrismaMock();
     mock.produto.findUnique.mockResolvedValue(null);
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
 
     await expect(svc.definirCanaisAnunciados('fantasma', ['SHOPEE'])).rejects.toThrow(/não existe/);
   });
