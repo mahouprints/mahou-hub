@@ -138,6 +138,10 @@ model Filamento {
   custoKgCentavos  Int
   potenciaA1W      Int
   potenciaH2cW     Int
+  /// Sigla de 2-3 letras que representa esta cor no SKU (AZ, VM, VD, PT, BR, RS).
+  /// Fica no filamento, e não solta em cada variação, pra "azul" não virar AZ num produto
+  /// e AZUL noutro — SKU inconsistente é SKU que ninguém confia.
+  siglaCor         String?
   observacao       String?
   ativo            Boolean            @default(true)
   // Estoque do rolo em gramas; baixa automática quando um job de produção é confirmado.
@@ -248,18 +252,28 @@ model ProdutoImagem {
 }
 
 model Venda {
-  id                    String   @id @default(cuid())
+  id                    String           @id @default(cuid())
   produtoId             String
-  produto               Produto  @relation(fields: [produtoId], references: [id])
+  produto               Produto          @relation(fields: [produtoId], references: [id])
+  /// Qual cor/versão saiu. Nulo nas vendas lançadas à mão antes disso existir e nas de
+  /// produto sem variação — é o que permite responder "vendi 12 azuis e 3 rosas".
+  variacaoId            String?
+  variacao              ProdutoVariacao? @relation(fields: [variacaoId], references: [id])
+  /// Item de pedido que gerou esta venda. Unique: reimportar o mesmo pedido (o que
+  /// acontece a cada mudança de status) não pode faturar duas vezes. Nulo = venda que o
+  /// Gabriel lançou na mão.
+  pedidoItemId          String?          @unique
+  pedidoItem            PedidoItem?      @relation(fields: [pedidoItemId], references: [id], onDelete: SetNull)
   qtd                   Int
   precoUnitarioCentavos Int // pode diferir de Produto.precoCentavos
   canal                 Canal
   dataVenda             DateTime
   observacao            String?
-  criadoEm              DateTime @default(now())
+  criadoEm              DateTime         @default(now())
 
   @@index([dataVenda])
   @@index([canal])
+  @@index([variacaoId])
 }
 
 /// Custo geral da Mahou Prints (aluguel, internet, software, etc).
@@ -532,6 +546,12 @@ model ProdutoVariacao {
   filamentoId   String?
   filamento     Filamento?         @relation(fields: [filamentoId], references: [id])
   precoCentavos Int?
+  /// Peso e tempo próprios existem para a variação que muda o QUE SAI DA IMPRESSORA, não
+  /// só a aparência: kit de 3 peças, tamanho G. Sem eles, um "Kit 3" descontaria do rolo o
+  /// filamento de uma peça só — o estoque mentiria e o custo do kit sairia pela terça
+  /// parte. Cor não precisa: mesmo molde, mesmo peso, mesmo tempo.
+  pesoG         Decimal?           @db.Decimal(10, 2)
+  tempoH        Decimal?           @db.Decimal(10, 2)
   // Estoque de peças prontas (unidades inteiras).
   estoqueAtual  Int                @default(0)
   estoqueMinimo Int                @default(0)
@@ -539,6 +559,7 @@ model ProdutoVariacao {
   movimentos    MovimentoEstoque[]
   jobs          JobProducao[]
   itensPedido   PedidoItem[]
+  vendas        Venda[]
   criadoEm      DateTime           @default(now())
   atualizadoEm  DateTime           @updatedAt
 
@@ -883,6 +904,8 @@ model PedidoItem {
   /// Job criado quando não havia peça pronta. Permite acompanhar da venda até a impressora.
   jobProducaoId String?
   jobProducao   JobProducao?          @relation(fields: [jobProducaoId], references: [id], onDelete: SetNull)
+  /// Venda gerada por este item. Existe só depois que o item foi atendido.
+  venda         Venda?
 
   criadoEm DateTime @default(now())
 

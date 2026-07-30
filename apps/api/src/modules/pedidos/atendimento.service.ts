@@ -105,6 +105,7 @@ export class AtendimentoService {
 
     if (mudou) {
       await this.fecharJobsDoPedido(pedidoId, novo);
+      await this.desfazerVendasSeCancelado(pedidoId, novo);
       this.logger.log(
         `Pedido ${pedido.canal}/${pedido.externalId}: ${statusAtual} → ${novo} ` +
           `(${pedido.statusExterno})`,
@@ -144,6 +145,29 @@ export class AtendimentoService {
   }
 
   /**
+   * Pedido cancelado deixa de contar como faturamento.
+   *
+   * Só apaga venda que ESTE fluxo criou (as que têm `pedidoItemId`) — venda lançada à mão
+   * nunca é tocada, mesmo que pareça a mesma coisa.
+   *
+   * Não estorna o estoque de propósito: quem cancela depois de despachar não recupera a
+   * peça, e cancelamento antes disso o Gabriel resolve no kanban. Devolver saldo aqui
+   * criaria peça que não existe na prateleira.
+   */
+  private async desfazerVendasSeCancelado(pedidoId: string, status: PedidoStatus) {
+    if (status !== 'CANCELADO') return;
+
+    const itens = await this.prisma.pedidoItem.findMany({
+      where: { pedidoId },
+      select: { id: true },
+    });
+    const { count } = await this.prisma.venda.deleteMany({
+      where: { pedidoItemId: { in: itens.map((i) => i.id) } },
+    });
+    if (count > 0) this.logger.log(`Pedido cancelado: ${count} venda(s) removida(s)`);
+  }
+
+  /**
    * Resolve um item: baixa do estoque de prontos se houver peça, senão põe na fila.
    *
    * O match é por SKU EXATO. Não tentamos aproximar por nome: vincular errado baixa
@@ -168,6 +192,24 @@ export class AtendimentoService {
       return 'SEM_VINCULO';
     }
 
+    return this.atenderComVariacao(tx, pedidoId, item, pedido, variacao);
+  }
+
+  /**
+   * Dá baixa ou põe na fila, com a variação JÁ resolvida.
+   *
+   * Separado de `atenderItem` porque o vínculo manual chega aqui com a variação que o
+   * humano escolheu — e não tem SKU pra procurar: se tivesse, o item não estaria órfão.
+   * Enquanto isso morava junto com a busca por SKU, o botão "vincular" refazia a busca
+   * que já tinha falhado, criava outro item órfão e apagava o que acabara de ser ligado.
+   */
+  private async atenderComVariacao(
+    tx: Prisma.TransactionClient,
+    pedidoId: string,
+    item: ItemImportado,
+    pedido: PedidoImportado,
+    variacao: { id: string; produtoId: string; estoqueAtual: number; nome: string },
+  ): Promise<'BAIXADO_ESTOQUE' | 'EM_PRODUCAO'> {
     if (variacao.estoqueAtual >= item.qtd) {
       const novoSaldo = variacao.estoqueAtual - item.qtd;
       await tx.produtoVariacao.update({
@@ -184,7 +226,7 @@ export class AtendimentoService {
           observacao: `Pedido ${pedido.canal} ${pedido.externalId}`,
         },
       });
-      await tx.pedidoItem.create({
+      const linha = await tx.pedidoItem.create({
         data: {
           pedidoId,
           ...this.camposItem(item),
@@ -192,6 +234,7 @@ export class AtendimentoService {
           atendimento: 'BAIXADO_ESTOQUE',
         },
       });
+      await this.registrarVenda(tx, linha.id, variacao, item, pedido);
       return 'BAIXADO_ESTOQUE';
     }
 
@@ -212,7 +255,7 @@ export class AtendimentoService {
       },
     });
 
-    await tx.pedidoItem.create({
+    const linha = await tx.pedidoItem.create({
       data: {
         pedidoId,
         ...this.camposItem(item),
@@ -221,7 +264,39 @@ export class AtendimentoService {
         jobProducaoId: job.id,
       },
     });
+    await this.registrarVenda(tx, linha.id, variacao, item, pedido);
     return 'EM_PRODUCAO';
+  }
+
+  /**
+   * Transforma o item atendido em `Venda`, que é o que o dashboard financeiro lê.
+   *
+   * Sem isso, tudo que vem de marketplace ficava fora do faturamento — o financeiro só
+   * enxergava o que o Gabriel lançava à mão. A venda nasce no atendimento, e não no envio,
+   * porque nesse ponto o cliente já pagou; cancelamento depois apaga a linha.
+   *
+   * `pedidoItemId` é unique: reimportar o pedido (o que acontece a cada mudança de status)
+   * não fatura de novo.
+   */
+  private async registrarVenda(
+    tx: Prisma.TransactionClient,
+    pedidoItemId: string,
+    variacao: { id: string; produtoId: string; nome: string },
+    item: ItemImportado,
+    pedido: PedidoImportado,
+  ) {
+    await tx.venda.create({
+      data: {
+        produtoId: variacao.produtoId,
+        variacaoId: variacao.id,
+        pedidoItemId,
+        qtd: item.qtd,
+        precoUnitarioCentavos: item.precoUnitarioCentavos,
+        canal: pedido.canal,
+        dataVenda: pedido.dataPedido,
+        observacao: `${pedido.canal} ${pedido.externalId} — ${variacao.nome}`,
+      },
+    });
   }
 
   private camposItem(item: ItemImportado) {
@@ -259,8 +334,13 @@ export class AtendimentoService {
     if (!item) throw new NotFoundException(`Item de pedido ${itemId} não existe`);
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.pedidoItem.update({ where: { id: itemId }, data: { variacaoId } });
-      const atendimento = await this.atenderItem(
+      const variacao = await tx.produtoVariacao.findUnique({
+        where: { id: variacaoId },
+        select: { id: true, produtoId: true, estoqueAtual: true, nome: true },
+      });
+      if (!variacao) throw new NotFoundException(`Variação ${variacaoId} não existe`);
+
+      const atendimento = await this.atenderComVariacao(
         tx,
         item.pedidoId,
         {
@@ -269,8 +349,8 @@ export class AtendimentoService {
           qtd: item.qtd,
           precoUnitarioCentavos: item.precoUnitarioCentavos,
         },
-        // Só `canal`, `externalId` e `prazoEnvio` são lidos por atenderItem (observação
-        // do movimento e prioridade do job). O resto é preenchimento do tipo.
+        // Só `canal`, `externalId` e `prazoEnvio` são lidos daqui (observação do movimento
+        // e prioridade do job). O resto é preenchimento do tipo.
         {
           canal: item.pedido.canal as 'SHOPEE' | 'ML',
           externalId: item.pedido.externalId,
@@ -280,8 +360,9 @@ export class AtendimentoService {
           dataPedido: new Date(),
           itens: [],
         },
+        variacao,
       );
-      // atenderItem cria uma linha nova; a órfã sai pra não duplicar o item no pedido.
+      // A linha nova já nasce com o vínculo; a órfã sai pra não duplicar o item no pedido.
       await tx.pedidoItem.delete({ where: { id: itemId } });
 
       const restamOrfaos = await tx.pedidoItem.count({

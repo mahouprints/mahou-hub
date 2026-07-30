@@ -29,7 +29,7 @@ export class ProducaoService {
       orderBy: [{ prioridade: 'desc' }, { dataInicio: 'asc' }],
       include: {
         produto: { select: { nome: true, pesoG: true, filamento: { select: { nome: true } } } },
-        variacao: { select: { nome: true, filamento: { select: { nome: true } } } },
+        variacao: { select: { nome: true, pesoG: true, filamento: { select: { nome: true } } } },
       },
     });
     return jobs.map((j) => ({
@@ -51,7 +51,9 @@ export class ProducaoService {
       variacaoNome: j.variacao?.nome ?? null,
       filamentoNome: j.variacao?.filamento?.nome ?? j.produto.filamento.nome,
       // Card do estoque pronto não consome filamento: mostra 0.
-      consumoGramas: j.daEstoque ? 0 : Math.round(Number(j.produto.pesoG) * j.qtd),
+      consumoGramas: j.daEstoque
+        ? 0
+        : Math.round(Number(j.variacao?.pesoG ?? j.produto.pesoG) * j.qtd),
     }));
   }
 
@@ -132,7 +134,7 @@ export class ProducaoService {
       where: { id },
       include: {
         produto: { select: { nome: true, pesoG: true, filamentoId: true } },
-        variacao: { select: { nome: true, filamentoId: true } },
+        variacao: { select: { nome: true, filamentoId: true, pesoG: true } },
       },
     });
     if (!job) throw new NotFoundException(`Job ${id} não existe`);
@@ -142,7 +144,10 @@ export class ProducaoService {
     const foiImpresso = status === 'CONCLUIDO' || status === 'EMBALADO' || status === 'ENVIADO';
 
     if (foiImpresso && !job.daEstoque && !job.consumoRegistrado) {
-      const gramas = Math.round(Number(job.produto.pesoG) * job.qtd);
+      // O peso sai da variação quando ela tem um próprio: kit de 3 e tamanho G consomem
+      // mais rolo que a peça-base. Variação de cor não define peso e cai no do produto.
+      const pesoUnitario = job.variacao?.pesoG ?? job.produto.pesoG;
+      const gramas = Math.round(Number(pesoUnitario) * job.qtd);
       const filamentoId = job.variacao?.filamentoId ?? job.produto.filamentoId;
       if (gramas > 0)
         await this.movimentarFilamento(filamentoId, -gramas, `Impressão: ${rotulo} x${job.qtd}`);
@@ -180,13 +185,17 @@ export class ProducaoService {
       where: { id },
       include: {
         produto: { select: { nome: true, pesoG: true, filamentoId: true } },
-        variacao: { select: { nome: true, filamentoId: true } },
+        variacao: { select: { nome: true, filamentoId: true, pesoG: true } },
       },
     });
     if (!job) throw new NotFoundException(`Job ${id} não existe`);
     const rotulo = this.rotulo(job.produto.nome, job.variacao?.nome);
 
-    const gramas = job.consumoRegistrado ? Math.round(Number(job.produto.pesoG) * job.qtd) : 0;
+    // Mesmo peso que a baixa usou — estornar pelo peso do produto devolveria menos rolo
+    // do que saiu quando a variação é um kit.
+    const gramas = job.consumoRegistrado
+      ? Math.round(Number(job.variacao?.pesoG ?? job.produto.pesoG) * job.qtd)
+      : 0;
     if (gramas > 0) {
       const filamentoId = job.variacao?.filamentoId ?? job.produto.filamentoId;
       await this.movimentarFilamento(filamentoId, gramas, `Estorno (job excluído): ${rotulo} x${job.qtd}`);

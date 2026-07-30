@@ -147,6 +147,48 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
     );
   });
 
+  it('usa o peso da VARIAÇÃO quando ela tem um próprio (kit, tamanho)', async () => {
+    // A regra que sustenta "kit é variação": sem ela, um Kit 3 de 300g descontaria os
+    // 100g da peça-base e o rolo mentiria 200g por unidade impressa.
+    const { mock } = makePrismaMock();
+    mock.jobProducao.findUnique.mockResolvedValue({
+      id: 'j1', qtd: 2, status: 'IMPRIMINDO', daEstoque: false, consumoRegistrado: false,
+      consumoProdutoRegistrado: false, variacaoId: 'v1', dataFim: null,
+      produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(100), filamentoId: 'f1' },
+      variacao: { nome: 'Kit 3', filamentoId: null, pesoG: new Prisma.Decimal(300) },
+    });
+    mock.jobProducao.update.mockResolvedValue({});
+    const estoque = makeEstoqueMock();
+    const svc = new ProducaoService(asPrisma(mock), estoque);
+
+    await svc.mudarStatus('j1', 'CONCLUIDO');
+
+    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+      expect.objectContaining({ quantidade: -600 }),
+      { permitirNegativo: true },
+    );
+  });
+
+  it('variação de cor não define peso e cai no peso do produto', async () => {
+    const { mock } = makePrismaMock();
+    mock.jobProducao.findUnique.mockResolvedValue({
+      id: 'j1', qtd: 2, status: 'IMPRIMINDO', daEstoque: false, consumoRegistrado: false,
+      consumoProdutoRegistrado: false, variacaoId: 'v1', dataFim: null,
+      produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(100), filamentoId: 'f1' },
+      variacao: { nome: 'Rosa', filamentoId: 'fr', pesoG: null },
+    });
+    mock.jobProducao.update.mockResolvedValue({});
+    const estoque = makeEstoqueMock();
+    const svc = new ProducaoService(asPrisma(mock), estoque);
+
+    await svc.mudarStatus('j1', 'CONCLUIDO');
+
+    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+      expect.objectContaining({ quantidade: -200 }),
+      { permitirNegativo: true },
+    );
+  });
+
   it('card do estoque NUNCA baixa filamento (blindagem daEstoque)', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({

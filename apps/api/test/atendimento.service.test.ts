@@ -24,6 +24,7 @@ function makeMock(overrides: Record<string, unknown> = {}) {
     },
     produtoVariacao: { findUnique: vi.fn().mockResolvedValue(null), update: vi.fn() },
     movimentoEstoque: { create: vi.fn().mockResolvedValue({}) },
+    venda: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     jobProducao: {
       create: vi.fn().mockResolvedValue({ id: 'job1' }),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -275,5 +276,186 @@ describe('AtendimentoService — status vindo do marketplace', () => {
 
     const r = await svc.importar(pedidoFake({ canal: 'ML', statusExterno: 'shipped' }));
     expect(r.statusAtualizado).toBe('ENVIADO');
+  });
+});
+
+describe('AtendimentoService.vincularItem — o botão "vincular a uma variação"', () => {
+  const ITEM_ORFAO = {
+    id: 'it-orfao',
+    pedidoId: 'ped1',
+    skuExterno: 'SKU-QUE-NINGUEM-CONHECE',
+    nomeExterno: 'Polvo azul',
+    qtd: 2,
+    precoUnitarioCentavos: 3990,
+    pedido: { canal: 'SHOPEE', externalId: '2506AB123', prazoEnvio: null },
+  };
+
+  function mockComOrfao(variacao: Record<string, unknown> | null) {
+    const { mock, tx } = makeMock();
+    mock.pedidoItem.findUnique.mockResolvedValue(ITEM_ORFAO);
+    // Busca por id (o vínculo escolhido) devolve a variação; por sku não devolve nada —
+    // que é justamente a situação de um item órfão.
+    tx.produtoVariacao.findUnique.mockImplementation((args: { where: { id?: string } }) =>
+      Promise.resolve(args.where.id ? variacao : null),
+    );
+    return { mock, tx };
+  }
+
+  it('REGRESSÃO: vincula de verdade em vez de recriar o item órfão', async () => {
+    // O bug: atendia pelo skuExterno (que já tinha falhado), criava outra linha
+    // SEM_VINCULO e apagava a que acabara de ser vinculada. O pedido continuava travado.
+    const { mock, tx } = mockComOrfao({
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: 5,
+      nome: 'Azul',
+    });
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    const r = await svc.vincularItem('it-orfao', 'v1');
+
+    expect(r.atendimento).toBe('BAIXADO_ESTOQUE');
+    const criados = tx.pedidoItem.create.mock.calls.map((c) => c[0].data);
+    expect(criados).toHaveLength(1);
+    expect(criados[0]?.atendimento).toBe('BAIXADO_ESTOQUE');
+    expect(criados[0]?.variacaoId).toBe('v1');
+    expect(criados.some((d) => d.atendimento === 'SEM_VINCULO')).toBe(false);
+  });
+
+  it('baixa o estoque da variação escolhida', async () => {
+    const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 5, nome: 'Azul' });
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await svc.vincularItem('it-orfao', 'v1');
+
+    expect(tx.produtoVariacao.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'v1' }, data: { estoqueAtual: 3 } }),
+    );
+    expect(tx.movimentoEstoque.create.mock.calls[0]?.[0].data.motivo).toBe('VENDA');
+  });
+
+  it('sem peça pronta, manda pra fila de produção na cor certa', async () => {
+    const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 0, nome: 'Azul' });
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    const r = await svc.vincularItem('it-orfao', 'v1');
+
+    expect(r.atendimento).toBe('EM_PRODUCAO');
+    expect(tx.jobProducao.create.mock.calls[0]?.[0].data).toMatchObject({
+      produtoId: 'p1',
+      variacaoId: 'v1',
+      qtd: 2,
+    });
+  });
+
+  it('desatravanca o pedido quando não sobra nenhum item órfão', async () => {
+    const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 5, nome: 'Azul' });
+    tx.pedidoItem.count.mockResolvedValue(0);
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await svc.vincularItem('it-orfao', 'v1');
+
+    expect(tx.pedidoMarketplace.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: 'ATENDIDO', observacao: null } }),
+    );
+  });
+
+  it('mantém o pedido bloqueado enquanto sobrar item sem vínculo', async () => {
+    const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 5, nome: 'Azul' });
+    tx.pedidoItem.count.mockResolvedValue(1);
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    const r = await svc.vincularItem('it-orfao', 'v1');
+
+    expect(r.restamOrfaos).toBe(1);
+    expect(tx.pedidoMarketplace.update).not.toHaveBeenCalled();
+  });
+
+  it('recusa vincular a uma variação que não existe', async () => {
+    const { mock } = mockComOrfao(null);
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await expect(svc.vincularItem('it-orfao', 'fantasma')).rejects.toThrow(/não existe/);
+  });
+});
+
+describe('AtendimentoService — pedido de marketplace vira Venda', () => {
+  function mockComVariacao(estoque: number) {
+    const { mock, tx } = makeMock();
+    tx.produtoVariacao.findUnique.mockResolvedValue({
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: estoque,
+      nome: 'Azul',
+    });
+    tx.pedidoItem.create.mockResolvedValue({ id: 'item-novo' });
+    return { mock, tx };
+  }
+
+  it('item atendido do estoque gera venda com produto, cor e canal', async () => {
+    // Sem isso o dashboard financeiro não enxergava um centavo de marketplace.
+    const { mock, tx } = mockComVariacao(10);
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await svc.importar(pedidoFake());
+
+    const venda = tx.venda.create.mock.calls[0]?.[0].data;
+    expect(venda).toMatchObject({
+      produtoId: 'p1',
+      variacaoId: 'v1',
+      pedidoItemId: 'item-novo',
+      canal: 'SHOPEE',
+    });
+  });
+
+  it('item que foi pra produção também gera venda — o cliente já pagou', async () => {
+    const { mock, tx } = mockComVariacao(0);
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await svc.importar(pedidoFake());
+
+    expect(tx.venda.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('item sem vínculo NÃO gera venda', async () => {
+    // Não dá pra faturar o que não se sabe o que é.
+    const { mock, tx } = makeMock();
+    tx.produtoVariacao.findUnique.mockResolvedValue(null);
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await svc.importar(pedidoFake());
+
+    expect(tx.venda.create).not.toHaveBeenCalled();
+  });
+
+  /** Pedido que já existe no banco — o caminho de atualização de status. */
+  function pedidoJaImportado(statusAtual = 'ATENDIDO') {
+    const { mock, tx } = makeMock();
+    mock.pedidoMarketplace.findUnique.mockResolvedValue({ id: 'ped1', status: statusAtual });
+    mock.pedidoItem.findMany.mockResolvedValue([{ id: 'item-novo', jobProducaoId: 'job1' }]);
+    mock.jobProducao.updateMany.mockResolvedValue({ count: 1 });
+    return { mock, tx };
+  }
+
+  it('cancelar o pedido remove as vendas dele', async () => {
+    const { mock } = pedidoJaImportado('ATENDIDO');
+    mock.venda = { create: vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await svc.importar(pedidoFake({ statusExterno: 'CANCELLED' }));
+
+    expect(mock.venda.deleteMany).toHaveBeenCalledWith({
+      where: { pedidoItemId: { in: ['item-novo'] } },
+    });
+  });
+
+  it('pedido que só mudou pra enviado não mexe em venda nenhuma', async () => {
+    const { mock } = pedidoJaImportado('ATENDIDO');
+    mock.venda = { create: vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
+    const svc = new AtendimentoService(mock as unknown as PrismaService);
+
+    await svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }));
+
+    expect(mock.venda.deleteMany).not.toHaveBeenCalled();
   });
 });

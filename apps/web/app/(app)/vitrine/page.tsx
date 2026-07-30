@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, PackageOpen } from 'lucide-react';
+import { AlertTriangle, Layers, PackageOpen } from 'lucide-react';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, tempoRelativo } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { VariacoesLoteDialog } from '@/components/variacoes-lote-dialog';
 
 type ItemVitrine = {
   id: string;
@@ -30,6 +33,7 @@ const ROTULO_CANAL: Record<ItemVitrine['canalPrincipal'], string> = {
 };
 
 export default function Vitrine() {
+  const [loteAberto, setLoteAberto] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ['vitrine'],
     queryFn: () => apiFetch<ItemVitrine[]>('/produtos/vitrine'),
@@ -44,12 +48,19 @@ export default function Vitrine() {
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-      <div>
-        <h1 className="text-xl font-semibold">Vitrine</h1>
-        <p className="text-sm text-muted-foreground">
-          O que está anunciado hoje, com venda e estoque de prontos.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold">Vitrine</h1>
+          <p className="text-sm text-muted-foreground">
+            O que está anunciado hoje, com venda e estoque de prontos.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setLoteAberto(true)}>
+          <Layers className="h-4 w-4" /> Criar variações em lote
+        </Button>
       </div>
+
+      <VariacoesLoteDialog open={loteAberto} onOpenChange={setLoteAberto} />
 
       {itens.length === 0 ? (
         <Card className="flex flex-col items-center gap-2 p-10 text-center">

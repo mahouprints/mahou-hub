@@ -9,12 +9,14 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ProdutoVariacaoCreateSchema,
   ProdutoVariacaoUpdateSchema,
+  VariacoesEmLoteSchema,
   type ProdutoVariacaoCreate,
   type ProdutoVariacaoUpdate,
+  type VariacoesEmLote,
 } from '@mahou-hub/contracts';
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -40,6 +42,14 @@ export class VariacoesController {
   @Post()
   create(@Body(new ZodValidationPipe(ProdutoVariacaoCreateSchema)) data: ProdutoVariacaoCreate) {
     return this.service.create(data);
+  }
+
+  @Post('lote')
+  @ApiOperation({
+    summary: 'Cria a combinação produto × cor de uma vez, pulando o que já existe',
+  })
+  criarEmLote(@Body(new ZodValidationPipe(VariacoesEmLoteSchema)) data: VariacoesEmLote) {
+    return this.service.criarEmLote(data);
   }
 
   @Patch(':id')

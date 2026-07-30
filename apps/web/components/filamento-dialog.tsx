@@ -29,10 +29,18 @@ interface FormState {
   custoKgReais: string;
   potenciaA1W: string;
   potenciaH2cW: string;
+  siglaCor: string;
   observacao: string;
 }
 
-const VAZIO: FormState = { nome: '', custoKgReais: '', potenciaA1W: '', potenciaH2cW: '', observacao: '' };
+const VAZIO: FormState = {
+  nome: '',
+  custoKgReais: '',
+  potenciaA1W: '',
+  potenciaH2cW: '',
+  siglaCor: '',
+  observacao: '',
+};
 
 export function FilamentoDialog({ open, onOpenChange, filamento }: Props) {
   const qc = useQueryClient();
@@ -48,6 +56,7 @@ export function FilamentoDialog({ open, onOpenChange, filamento }: Props) {
         custoKgReais: (filamento.custoKgCentavos / 100).toFixed(2).replace('.', ','),
         potenciaA1W: String(filamento.potenciaA1W),
         potenciaH2cW: String(filamento.potenciaH2cW),
+        siglaCor: filamento.siglaCor ?? '',
         observacao: filamento.observacao ?? '',
       });
     } else {
@@ -66,6 +75,7 @@ export function FilamentoDialog({ open, onOpenChange, filamento }: Props) {
         custoKgCentavos: parseDecimalParaCentavos(form.custoKgReais),
         potenciaA1W: Number(form.potenciaA1W),
         potenciaH2cW: Number(form.potenciaH2cW),
+        siglaCor: form.siglaCor.trim().toUpperCase() || null,
         observacao: form.observacao.trim() || null,
       };
       if (filamento) {
@@ -131,6 +141,21 @@ export function FilamentoDialog({ open, onOpenChange, filamento }: Props) {
               />
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fil-sigla">Sigla no SKU</Label>
+            <Input
+              id="fil-sigla"
+              value={form.siglaCor}
+              onChange={(e) => setForm({ ...form, siglaCor: e.target.value.toUpperCase() })}
+              placeholder="AZ, VM, VD, PT…"
+              maxLength={3}
+            />
+            <p className="text-xs text-muted-foreground">
+              2 ou 3 letras que representam esta cor no código dos produtos. Fica aqui pra
+              &quot;azul&quot; nunca virar duas siglas diferentes.
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="fil-obs">Observação</Label>
             <Input

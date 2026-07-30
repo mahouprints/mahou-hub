@@ -34,6 +34,11 @@ export class VendasController {
     return this.service.list(mes);
   }
 
+  @Get('por-variacao')
+  porVariacao(@Query('mes') mes?: string) {
+    return this.service.porVariacao(mes);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.service.get(id);

@@ -6,6 +6,12 @@ export const FilamentoSchema = z.object({
   custoKgCentavos: z.number().int().nonnegative(),
   potenciaA1W: z.number().int().nonnegative(),
   potenciaH2cW: z.number().int().nonnegative(),
+  /// Sigla de 2-3 letras desta cor no SKU (AZ, VM, VD). Fica no filamento pra "azul"
+  /// não virar duas siglas diferentes em produtos diferentes.
+  siglaCor: z
+    .string()
+    .regex(/^[A-Z0-9]{2,3}$/, 'Sigla: 2 ou 3 letras maiúsculas (ex: AZ, VM, PT)')
+    .nullable(),
   observacao: z.string().nullable(),
   ativo: z.boolean(),
   // Saldo em gramas (somente leitura — muda via movimento de estoque).

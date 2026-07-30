@@ -19,6 +19,44 @@ export class VendasService {
     });
   }
 
+  /**
+   * "Vendi 12 azuis e 3 rosas" — agrupa as vendas do mês por variação.
+   *
+   * Serve pra decidir o que imprimir: cor que sai é cor que vale ter pronta na
+   * prateleira. Venda de produto sem variação entra numa linha "sem cor definida" em vez
+   * de sumir do relatório — some seria pior, porque o total não bateria com o financeiro.
+   */
+  async porVariacao(mes?: string) {
+    const vendas = await this.prisma.venda.findMany({
+      where: mes ? { dataVenda: rangeDoMes(mes) } : {},
+      include: {
+        produto: { select: { nome: true } },
+        variacao: { select: { nome: true, sku: true } },
+      },
+    });
+
+    const linhas = new Map<
+      string,
+      { produto: string; cor: string | null; sku: string | null; unidades: number; receitaCentavos: number }
+    >();
+
+    for (const v of vendas) {
+      const chave = v.variacaoId ?? `sem-variacao:${v.produtoId}`;
+      const linha = linhas.get(chave) ?? {
+        produto: v.produto.nome,
+        cor: v.variacao?.nome ?? null,
+        sku: v.variacao?.sku ?? null,
+        unidades: 0,
+        receitaCentavos: 0,
+      };
+      linha.unidades += v.qtd;
+      linha.receitaCentavos += v.precoUnitarioCentavos * v.qtd;
+      linhas.set(chave, linha);
+    }
+
+    return [...linhas.values()].sort((a, b) => b.unidades - a.unidades);
+  }
+
   async get(id: string) {
     const v = await this.prisma.venda.findUnique({
       where: { id },

@@ -27,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { MonthPicker } from '@/components/ui/month-picker';
+import { VendasPorCor } from '@/components/vendas-por-cor';
 import {
   Select,
   SelectContent,
@@ -179,6 +180,8 @@ export default function VendasPage() {
       />
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+
+      <VendasPorCor mes={mes} />
 
       {data && (
         <Card>
