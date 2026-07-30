@@ -62,7 +62,7 @@ export function VariacoesLoteDialog({ open, onOpenChange }: Props) {
   // Pré-marca quem tem rolo em casa — é o palpite certo na maioria das vezes.
   const coresEfetivas = useMemo(() => {
     if (tocouNasCores) return cores;
-    return new Set(comEstoque.filter((f) => f.estoqueGramas > 0 && f.siglaCor).map((f) => f.id));
+    return new Set(comEstoque.filter((f) => f.estoqueGramas > 0).map((f) => f.id));
   }, [tocouNasCores, cores, comEstoque]);
 
   const produtosFiltrados = useMemo(() => {
@@ -153,8 +153,8 @@ export function VariacoesLoteDialog({ open, onOpenChange }: Props) {
                 <span className="font-medium text-foreground">
                   {semSigla.map((f) => f.nome).join(', ')}
                 </span>{' '}
-                {semSigla.length === 1 ? 'não tem' : 'não têm'} sigla de cor. Cadastre a sigla no
-                filamento (Estoque → Custos) antes, senão o SKU sai sem a cor.
+                {semSigla.length === 1 ? 'não tem' : 'não têm'} sigla cadastrada — vou deduzir do
+                nome (PLA Rose Gold → RSG). Se quiser controlar, cadastre a sigla no filamento.
               </p>
             </div>
           )}
@@ -220,7 +220,7 @@ export function VariacoesLoteDialog({ open, onOpenChange }: Props) {
           </DialogClose>
           <Button
             onClick={() => criar.mutate()}
-            disabled={criar.isPending || total === 0 || semSigla.length > 0}
+            disabled={criar.isPending || total === 0}
           >
             {criar.isPending ? 'Criando…' : 'Criar variações'}
           </Button>

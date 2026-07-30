@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -13,7 +12,7 @@ import {
   type VariacoesEmLoteResultado,
 } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
-import { gerarSku } from './gerar-sku';
+import { gerarSku, siglaDaCor } from './gerar-sku';
 
 /** Acrescenta "-2", "-3"… ao SKU sem estourar o teto de caracteres. */
 function encurtarPara(base: string, n: number): string {
@@ -56,7 +55,8 @@ export class VariacoesService {
     });
     if (!produto) throw new NotFoundException(`Produto ${data.produtoId} não existe`);
 
-    const sku = data.sku ?? (await this.skuDisponivel(produto.nome, await this.sigla(data.filamentoId)));
+    const sku =
+      data.sku ?? (await this.skuDisponivel(produto.nome, await this.sigla(data.filamentoId, data.nome)));
     try {
       return await this.prisma.produtoVariacao.create({
         data: {
@@ -103,16 +103,6 @@ export class VariacoesService {
       }),
     ]);
 
-    // Sem sigla, duas cores do mesmo produto gerariam o mesmo código base e a segunda
-    // viraria "…-2" — um SKU que não diz cor nenhuma. Melhor barrar do que sujar.
-    const semSigla = filamentos.filter((f) => !f.siglaCor);
-    if (semSigla.length > 0) {
-      throw new BadRequestException(
-        `Estes filamentos não têm sigla de cor: ${semSigla.map((f) => f.nome).join(', ')}. ` +
-          'Cadastre a sigla (AZ, VM…) no filamento antes de gerar os SKUs.',
-      );
-    }
-
     const jaExistem = await this.prisma.produtoVariacao.findMany({
       where: { produtoId: { in: input.produtoIds } },
       select: { produtoId: true, filamentoId: true },
@@ -128,7 +118,10 @@ export class VariacoesService {
           puladas++;
           continue;
         }
-        const sku = await this.skuDisponivel(produto.nome, filamento.siglaCor);
+        const sku = await this.skuDisponivel(
+          produto.nome,
+          filamento.siglaCor ?? siglaDaCor(filamento.nome),
+        );
         await this.prisma.produtoVariacao.create({
           data: {
             produtoId: produto.id,
@@ -162,13 +155,23 @@ export class VariacoesService {
     throw new ConflictException(`Não consegui gerar um SKU livre a partir de "${base}"`);
   }
 
-  private async sigla(filamentoId?: string | null): Promise<string | null> {
-    if (!filamentoId) return null;
-    const f = await this.prisma.filamento.findUnique({
-      where: { id: filamentoId },
-      select: { siglaCor: true },
-    });
-    return f?.siglaCor ?? null;
+  /**
+   * Sigla da cor: a cadastrada no filamento manda, senão deduz do nome.
+   *
+   * O nome da variação JÁ é a cor ("Branco", "Preto") e o do filamento traz a cor no meio
+   * ("PLA Branco OFF White Velvet Voolt"). Exigir cadastro prévio da sigla fazia o SKU sair
+   * sem cor nenhuma, e três cores do mesmo produto viravam "…-2" e "…-3".
+   */
+  private async sigla(filamentoId?: string | null, nomeDaCor?: string): Promise<string | null> {
+    if (filamentoId) {
+      const f = await this.prisma.filamento.findUnique({
+        where: { id: filamentoId },
+        select: { siglaCor: true, nome: true },
+      });
+      if (f?.siglaCor) return f.siglaCor;
+      if (f?.nome) return siglaDaCor(f.nome) || null;
+    }
+    return nomeDaCor ? siglaDaCor(nomeDaCor) || null : null;
   }
 
   /** O unique do banco vira 500 sem isso — e "erro inesperado" não ajuda ninguém. */

@@ -5,12 +5,15 @@ import { Prisma } from '@prisma/client';
 import { VariacoesService } from '../src/modules/variacoes/variacoes.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
 
-function montar(opts: { siglaCor?: string | null; skusOcupados?: string[] } = {}) {
+function montar(
+  opts: { siglaCor?: string | null; skusOcupados?: string[]; nomeFilamento?: string } = {},
+) {
   const { mock } = makePrismaMock();
   mock.produto.findUnique.mockResolvedValue({ id: 'p1', nome: 'Suporte de Móbile de Berço' });
   // `in` e não `??`: o teste da sigla ausente passa null de propósito.
   mock.filamento.findUnique.mockResolvedValue({
     siglaCor: 'siglaCor' in opts ? opts.siglaCor : 'AZ',
+    nome: opts.nomeFilamento ?? 'PLA Azul Voolt',
   });
   const ocupados = new Set(opts.skusOcupados ?? []);
   mock.produtoVariacao.findUnique.mockImplementation((args: { where: { sku?: string } }) =>
@@ -55,12 +58,22 @@ describe('VariacoesService', () => {
     expect(sku.length).toBeLessThanOrEqual(24);
   });
 
-  it('gera sem sufixo de cor quando o filamento não tem sigla cadastrada', async () => {
-    const { svc, mock } = montar({ siglaCor: null });
+  it('deduz a sigla do nome do filamento quando não há uma cadastrada', async () => {
+    // Regressão (30/07/2026): sem sigla o SKU saía sem cor nenhuma, e três cores do mesmo
+    // produto viravam SUPORTE-MOBILE-BERCO, -2 e -3.
+    const { svc, mock } = montar({ siglaCor: null, nomeFilamento: 'PLA Vermelho Velvet Voolt' });
 
-    await svc.create({ produtoId: 'p1', nome: 'Azul', filamentoId: 'f1' });
+    await svc.create({ produtoId: 'p1', nome: 'Vermelho', filamentoId: 'f1' });
 
-    expect(mock.produtoVariacao.create.mock.calls[0]?.[0].data.sku).toBe('SUPORTE-MOBILE-BERCO');
+    expect(mock.produtoVariacao.create.mock.calls[0]?.[0].data.sku).toBe('SUPORTE-MOBILE-BERCO-VM');
+  });
+
+  it('deduz a cor do NOME DA VARIAÇÃO quando não há filamento vinculado', async () => {
+    const { svc, mock } = montar();
+
+    await svc.create({ produtoId: 'p1', nome: 'Preto' });
+
+    expect(mock.produtoVariacao.create.mock.calls[0]?.[0].data.sku).toBe('SUPORTE-MOBILE-BERCO-PT');
   });
 
   it('grava peso e tempo próprios — é o que faz kit não mentir', async () => {
@@ -179,19 +192,19 @@ describe('VariacoesService', () => {
       expect(r.novas[0]?.cor).toBe('Rosa');
     });
 
-    it('barra o lote quando alguma cor não tem sigla, dizendo qual', async () => {
-      // Sem sigla, as duas cores gerariam o mesmo código base e a segunda viraria "-2".
-      const { svc, mock } = montarLote({
+    it('cor sem sigla cadastrada não trava o lote — a sigla sai do nome', async () => {
+      const { svc } = montarLote({
+        produtos: [{ id: 'p1', nome: 'Abajur Nuvem' }],
         filamentos: [
-          { id: 'f1', nome: 'Azul', siglaCor: 'AZ' },
-          { id: 'f2', nome: 'Rosa Ametista', siglaCor: null },
+          { id: 'f1', nome: 'PLA Azul Voolt', siglaCor: 'AZ' },
+          { id: 'f2', nome: 'PLA Rosa Velvet Voolt', siglaCor: null },
         ],
       });
 
-      await expect(
-        svc.criarEmLote({ produtoIds: ['p1'], filamentoIds: ['f1', 'f2'] }),
-      ).rejects.toThrow(/Rosa Ametista/);
-      expect(mock.produtoVariacao.create).not.toHaveBeenCalled();
+      const r = await svc.criarEmLote({ produtoIds: ['p1'], filamentoIds: ['f1', 'f2'] });
+
+      expect(r.criadas).toBe(2);
+      expect(r.novas.map((n) => n.sku)).toEqual(['ABAJUR-NUVEM-AZ', 'ABAJUR-NUVEM-RS']);
     });
   });
 
