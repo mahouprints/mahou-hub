@@ -5,15 +5,22 @@ import {
   type ProdutoCreate,
   type ProdutoImagem,
 } from '@mahou-hub/contracts';
+import {
+  converterFilamentosForm,
+  pesoTotalFilamentos,
+  type FilamentoLinha,
+  type ProdutoComComposicao,
+} from './produto-filamentos';
 import { parseDecimalBr, parseDecimalParaCentavos } from './parsing';
 
 /** GET /produtos/:id devolve insumos e imagens populados; declaramos local pra não poluir contracts. */
 export type InsumoFormulario = Pick<Insumo, 'id' | 'nome' | 'unidade' | 'custoUnitarioCentavos'>;
 
-export type ProdutoComInsumos = Produto & {
-  insumos?: Array<{ insumoId: string; qtd: number | string; insumo?: InsumoFormulario }>;
-  imagens?: ProdutoImagem[];
-};
+export type ProdutoComInsumos = Omit<Produto, 'filamentos'> &
+  ProdutoComComposicao & {
+    insumos?: Array<{ insumoId: string; qtd: number | string; insumo?: InsumoFormulario }>;
+    imagens?: ProdutoImagem[];
+  };
 
 export interface InsumoLinha {
   insumoId: string;
@@ -27,8 +34,7 @@ export interface FormState {
   larguraCm: string;
   alturaCm: string;
   profundidadeCm: string;
-  filamentoId: string;
-  pesoG: string;
+  filamentos: FilamentoLinha[];
   tempoH: string;
   impressora: 'A1' | 'H2C';
   embalagemReais: string;
@@ -45,8 +51,7 @@ export const PRODUTO_FORM_VAZIO: FormState = {
   larguraCm: '',
   alturaCm: '',
   profundidadeCm: '',
-  filamentoId: '',
-  pesoG: '',
+  filamentos: [{ filamentoId: '', pesoGStr: '' }],
   tempoH: '',
   impressora: 'A1',
   // Embalagem default 0: custos pequenos sem rastreio individual ficam nos
@@ -76,7 +81,7 @@ export function converterProdutoForm(
   form: FormState,
   produto?: ProdutoComInsumos | null,
 ): ProdutoCreate {
-  if (!form.filamentoId) throw new Error(MENSAGENS_CAMPO.filamentoId);
+  const filamentos = converterFilamentosForm(form.filamentos);
   const insumos = form.insumos.map((linha, indice) => {
     const qtd = parseDecimalBr(linha.qtdStr);
     if (!linha.insumoId || !Number.isFinite(qtd) || qtd <= 0) {
@@ -93,8 +98,9 @@ export function converterProdutoForm(
     larguraCm: parseDimensaoCm(form.larguraCm),
     alturaCm: parseDimensaoCm(form.alturaCm),
     profundidadeCm: parseDimensaoCm(form.profundidadeCm),
-    filamentoId: form.filamentoId,
-    pesoG: parseDecimalBr(form.pesoG),
+    filamentos,
+    filamentoId: filamentos[0]!.filamentoId,
+    pesoG: pesoTotalFilamentos(filamentos),
     tempoH: parseDecimalBr(form.tempoH),
     impressora: form.impressora,
     embalagemCentavos: form.embalagemReais.trim()

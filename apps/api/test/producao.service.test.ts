@@ -4,12 +4,22 @@ import { Prisma } from '@prisma/client';
 import type { JobCreate } from '@mahou-hub/contracts';
 import { ProducaoService } from '../src/modules/producao/producao.service';
 import type { EstoqueService } from '../src/modules/estoque/estoque.service';
-import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
+import { asPrisma, makePrismaMock as makePrismaBase } from './helpers/prisma-mock';
+
+function makePrismaMock() {
+  const base = makePrismaBase();
+  Object.assign(base.tx.jobProducao, {
+    findUnique: base.mock.jobProducao.findUnique,
+    update: base.mock.jobProducao.update,
+    delete: base.mock.jobProducao.delete,
+  });
+  return base;
+}
 
 function makeEstoqueMock() {
   return {
-    registrarMovimento: vi.fn().mockResolvedValue({}),
-  } as unknown as EstoqueService & { registrarMovimento: ReturnType<typeof vi.fn> };
+    registrarEmTransacao: vi.fn().mockResolvedValue({}),
+  } as unknown as EstoqueService & { registrarEmTransacao: ReturnType<typeof vi.fn> };
 }
 
 function item(over: Partial<JobCreate> = {}): JobCreate {
@@ -100,8 +110,14 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
   it('CONCLUIDO num card normal baixa filamento (peso×qtd) permitindo negativo', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 3, status: 'IMPRIMINDO', daEstoque: false, consumoRegistrado: false,
-      consumoProdutoRegistrado: false, variacaoId: null, dataFim: null,
+      id: 'j1',
+      qtd: 3,
+      status: 'IMPRIMINDO',
+      daEstoque: false,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      variacaoId: null,
+      dataFim: null,
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: null,
     });
@@ -111,7 +127,8 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'CONCLUIDO');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         tipoItem: 'FILAMENTO',
         filamentoId: 'f1',
@@ -130,8 +147,14 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
   it('usa o filamento da VARIAÇÃO quando há override de cor', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 2, status: 'IMPRIMINDO', daEstoque: false, consumoRegistrado: false,
-      consumoProdutoRegistrado: false, variacaoId: 'v1', dataFim: null,
+      id: 'j1',
+      qtd: 2,
+      status: 'IMPRIMINDO',
+      daEstoque: false,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      variacaoId: 'v1',
+      dataFim: null,
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(100), filamentoId: 'f1' },
       variacao: { nome: 'Rosa', filamentoId: 'fr' },
     });
@@ -141,7 +164,8 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'CONCLUIDO');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ tipoItem: 'FILAMENTO', filamentoId: 'fr', quantidade: -200 }),
       { permitirNegativo: true },
     );
@@ -152,8 +176,14 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
     // 100g da peça-base e o rolo mentiria 200g por unidade impressa.
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 2, status: 'IMPRIMINDO', daEstoque: false, consumoRegistrado: false,
-      consumoProdutoRegistrado: false, variacaoId: 'v1', dataFim: null,
+      id: 'j1',
+      qtd: 2,
+      status: 'IMPRIMINDO',
+      daEstoque: false,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      variacaoId: 'v1',
+      dataFim: null,
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(100), filamentoId: 'f1' },
       variacao: { nome: 'Kit 3', filamentoId: null, pesoG: new Prisma.Decimal(300) },
     });
@@ -163,7 +193,8 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'CONCLUIDO');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ quantidade: -600 }),
       { permitirNegativo: true },
     );
@@ -172,8 +203,14 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
   it('variação de cor não define peso e cai no peso do produto', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 2, status: 'IMPRIMINDO', daEstoque: false, consumoRegistrado: false,
-      consumoProdutoRegistrado: false, variacaoId: 'v1', dataFim: null,
+      id: 'j1',
+      qtd: 2,
+      status: 'IMPRIMINDO',
+      daEstoque: false,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      variacaoId: 'v1',
+      dataFim: null,
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(100), filamentoId: 'f1' },
       variacao: { nome: 'Rosa', filamentoId: 'fr', pesoG: null },
     });
@@ -183,7 +220,8 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'CONCLUIDO');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ quantidade: -200 }),
       { permitirNegativo: true },
     );
@@ -192,8 +230,14 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
   it('card do estoque NUNCA baixa filamento (blindagem daEstoque)', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 5, status: 'CONCLUIDO', daEstoque: true, consumoRegistrado: false,
-      consumoProdutoRegistrado: false, variacaoId: 'v1', dataFim: null,
+      id: 'j1',
+      qtd: 5,
+      status: 'CONCLUIDO',
+      daEstoque: true,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      variacaoId: 'v1',
+      dataFim: null,
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: { nome: 'Branco', filamentoId: null },
     });
@@ -203,14 +247,20 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'CONCLUIDO');
 
-    expect(estoque.registrarMovimento).not.toHaveBeenCalled();
+    expect(estoque.registrarEmTransacao).not.toHaveBeenCalled();
   });
 
   it('embalar um card do estoque baixa prontos (−qtd, VENDA) e é idempotente', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 5, status: 'CONCLUIDO', daEstoque: true, consumoRegistrado: false,
-      consumoProdutoRegistrado: false, variacaoId: 'v1', dataFim: new Date(),
+      id: 'j1',
+      qtd: 5,
+      status: 'CONCLUIDO',
+      daEstoque: true,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      variacaoId: 'v1',
+      dataFim: new Date(),
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: { nome: 'Rosa', filamentoId: 'fr' },
     });
@@ -220,8 +270,9 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'EMBALADO');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledTimes(1);
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledTimes(1);
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         tipoItem: 'PRODUTO',
         variacaoId: 'v1',
@@ -231,15 +282,23 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
       { permitirNegativo: true },
     );
     expect(mock.jobProducao.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ consumoProdutoRegistrado: true }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ consumoProdutoRegistrado: true }),
+      }),
     );
   });
 
   it('já embalado (flag true) não baixa prontos de novo ao ir pra ENVIADO', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 5, status: 'EMBALADO', daEstoque: true, consumoRegistrado: false,
-      consumoProdutoRegistrado: true, variacaoId: 'v1', dataFim: new Date(),
+      id: 'j1',
+      qtd: 5,
+      status: 'EMBALADO',
+      daEstoque: true,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: true,
+      variacaoId: 'v1',
+      dataFim: new Date(),
       produto: { nome: 'X', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: { nome: 'Rosa', filamentoId: 'fr' },
     });
@@ -249,14 +308,20 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'ENVIADO');
 
-    expect(estoque.registrarMovimento).not.toHaveBeenCalled();
+    expect(estoque.registrarEmTransacao).not.toHaveBeenCalled();
   });
 
   it('voltar de EMBALADO estorna prontos (+qtd, AJUSTE) e zera a flag', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 5, status: 'EMBALADO', daEstoque: true, consumoRegistrado: false,
-      consumoProdutoRegistrado: true, variacaoId: 'v1', dataFim: new Date(),
+      id: 'j1',
+      qtd: 5,
+      status: 'EMBALADO',
+      daEstoque: true,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: true,
+      variacaoId: 'v1',
+      dataFim: new Date(),
       produto: { nome: 'X', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: { nome: 'Rosa', filamentoId: 'fr' },
     });
@@ -266,7 +331,8 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'CONCLUIDO');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         tipoItem: 'PRODUTO',
         variacaoId: 'v1',
@@ -285,8 +351,14 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
   it('mudar pra IMPRIMINDO não mexe no estoque', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 3, status: 'FILA', daEstoque: false, consumoRegistrado: false,
-      consumoProdutoRegistrado: false, variacaoId: null, dataFim: null,
+      id: 'j1',
+      qtd: 3,
+      status: 'FILA',
+      daEstoque: false,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      variacaoId: null,
+      dataFim: null,
       produto: { nome: 'X', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: null,
     });
@@ -296,7 +368,7 @@ describe('ProducaoService.mudarStatus — filamento e estoque de prontos', () =>
 
     await svc.mudarStatus('j1', 'IMPRIMINDO');
 
-    expect(estoque.registrarMovimento).not.toHaveBeenCalled();
+    expect(estoque.registrarEmTransacao).not.toHaveBeenCalled();
   });
 });
 
@@ -304,8 +376,12 @@ describe('ProducaoService.remove — estornos ao excluir', () => {
   it('estorna o filamento quando o consumo de impressão já tinha sido registrado', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 3, consumoRegistrado: true, consumoProdutoRegistrado: false,
-      daEstoque: false, variacaoId: null,
+      id: 'j1',
+      qtd: 3,
+      consumoRegistrado: true,
+      consumoProdutoRegistrado: false,
+      daEstoque: false,
+      variacaoId: null,
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: null,
     });
@@ -315,7 +391,8 @@ describe('ProducaoService.remove — estornos ao excluir', () => {
 
     const res = await svc.remove('j1');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ tipoItem: 'FILAMENTO', filamentoId: 'f1', quantidade: 360 }),
       { permitirNegativo: true },
     );
@@ -325,8 +402,12 @@ describe('ProducaoService.remove — estornos ao excluir', () => {
   it('estorna o estoque de prontos quando o card do estoque já tinha sido embalado', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j1', qtd: 5, consumoRegistrado: false, consumoProdutoRegistrado: true,
-      daEstoque: true, variacaoId: 'v1',
+      id: 'j1',
+      qtd: 5,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: true,
+      daEstoque: true,
+      variacaoId: 'v1',
       produto: { nome: 'Suporte', pesoG: new Prisma.Decimal(120), filamentoId: 'f1' },
       variacao: { nome: 'Rosa', filamentoId: 'fr' },
     });
@@ -336,7 +417,8 @@ describe('ProducaoService.remove — estornos ao excluir', () => {
 
     const res = await svc.remove('j1');
 
-    expect(estoque.registrarMovimento).toHaveBeenCalledWith(
+    expect(estoque.registrarEmTransacao).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         tipoItem: 'PRODUTO',
         variacaoId: 'v1',
@@ -351,8 +433,12 @@ describe('ProducaoService.remove — estornos ao excluir', () => {
   it('não estorna nada quando o job nunca movimentou estoque', async () => {
     const { mock } = makePrismaMock();
     mock.jobProducao.findUnique.mockResolvedValue({
-      id: 'j2', qtd: 2, consumoRegistrado: false, consumoProdutoRegistrado: false,
-      daEstoque: false, variacaoId: null,
+      id: 'j2',
+      qtd: 2,
+      consumoRegistrado: false,
+      consumoProdutoRegistrado: false,
+      daEstoque: false,
+      variacaoId: null,
       produto: { nome: 'X', pesoG: new Prisma.Decimal(50), filamentoId: 'f1' },
       variacao: null,
     });
@@ -362,7 +448,7 @@ describe('ProducaoService.remove — estornos ao excluir', () => {
 
     const res = await svc.remove('j2');
 
-    expect(estoque.registrarMovimento).not.toHaveBeenCalled();
+    expect(estoque.registrarEmTransacao).not.toHaveBeenCalled();
     expect(res).toEqual({ ok: true, estornado: false, gramas: 0, prontosEstornados: 0 });
   });
 });

@@ -5,7 +5,6 @@ import { apiCall } from './client.js';
 // Os schemas Zod abaixo replicam os contratos da API (não importam @mahou-hub/contracts
 // pra deixar o MCP server publicável standalone).
 
-
 // Espelha PlanoAdsInputSchema de @mahou-hub/contracts. `params` é parcial: o que não
 // vier usa o default global do Parametro.
 const PlanoAdsInputSchema = z.object({
@@ -28,9 +27,19 @@ const PlanoAdsInputSchema = z.object({
 
 const CanalSchema = z.enum(['SHOPEE', 'ML', 'SITE', 'TIKTOK']);
 const ImpressoraSchema = z.enum(['A1', 'H2C']);
+const FilamentosSchema = z
+  .array(
+    z.object({
+      filamentoId: z.string().min(1),
+      pesoG: z.number().positive().max(99999999.99).multipleOf(0.01),
+    }),
+  )
+  .min(1)
+  .optional();
 
 const ProdutoCreateSchema = z.object({
   nome: z.string().min(1),
+  filamentos: FilamentosSchema,
   inspiracao: z.string().nullable().optional(),
   modelo3dUrl: z.string().url().nullable().optional(),
   larguraCm: z.number().positive().nullable().optional(),
@@ -60,6 +69,7 @@ const ProdutoUpdateSchema = ProdutoCreateSchema.partial();
 // Input livre pra calculadora — calcula pricing dum produto hipotético sem persistir.
 // Usado pra "quanto custaria imprimir X?" sem precisar criar Produto.
 const CalcularInputSchema = z.object({
+  filamentos: FilamentosSchema,
   filamentoId: z.string().min(1),
   pesoG: z.number().positive(),
   tempoH: z.number().positive(),
@@ -167,7 +177,8 @@ export const tools = [
   {
     name: 'criar_produto',
     description:
-      'Cria um produto novo. Todos os campos obrigatórios (filamento/peso/tempo/impressora/preço/canal). ' +
+      'Cria um produto novo. Campos obrigatórios: filamentoId/pesoG/tempoH/impressora/preço/canal. ' +
+      'Para vários materiais, envie filamentos: [{filamentoId,pesoG}] com gramas por unidade; pesoG é a soma e filamentoId é o primeiro. ' +
       'Use `obter_produto` depois pra ver o pricing calculado. Pra criar a partir de uma ' +
       'oportunidade Shopee, use `virar_produto` no lugar.',
     inputSchema: ProdutoCreateSchema,
@@ -178,7 +189,8 @@ export const tools = [
     name: 'atualizar_produto',
     description:
       'Atualiza campos do produto (parcial). Use pra completar um rascunho (preencher ' +
-      'peso/tempo/filamento) e setar `rascunho: false`, ou pra ajustar preço, dimensões etc.',
+      'peso/tempo/filamento), ou pra ajustar preço, dimensões etc. ' +
+      'Para mudar a composição, envie a lista completa filamentos: [{filamentoId,pesoG}], sem repetir IDs.',
     inputSchema: ProdutoUpdateSchema.extend({ id: z.string().min(1) }),
     handler: async (input: unknown) => {
       const { id, ...rest } = input as { id: string } & Record<string, unknown>;

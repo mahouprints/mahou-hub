@@ -23,6 +23,8 @@ import type {
   Produto,
   ProdutoImagem,
 } from '@mahou-hub/contracts';
+import type { ProdutoComComposicao, FilamentoFormulario } from '@/lib/produto-filamentos';
+import { ProdutoFilamentosDetalhe } from '@/components/produto-filamentos-detalhe';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -35,18 +37,20 @@ import { ImagensSection } from '@/components/imagens-section';
 import { VariacoesSection } from '@/components/variacoes-section';
 import { PlanoAdsPaineis } from '@/components/plano-ads-paineis';
 
-type ProdutoComFilamento = Produto & {
-  filamento: { id: string; nome: string };
-  /** Ficha do modelo que virou este produto. Null em produto cadastrado à mão. */
-  modeloMakerWorld: ModeloOrigem | null;
-  insumos: Array<{
-    id: string;
-    insumoId: string;
-    qtd: number | string;
-    insumo: { id: string; nome: string; unidade: string; custoUnitarioCentavos: number };
-  }>;
-  imagens: ProdutoImagem[];
-};
+type ProdutoComFilamento = Omit<Produto, 'filamentos'> &
+  ProdutoComComposicao & {
+    filamento: FilamentoFormulario;
+    pricing: CalcularOutput;
+    /** Ficha do modelo que virou este produto. Null em produto cadastrado à mão. */
+    modeloMakerWorld: ModeloOrigem | null;
+    insumos: Array<{
+      id: string;
+      insumoId: string;
+      qtd: number | string;
+      insumo: { id: string; nome: string; unidade: string; custoUnitarioCentavos: number };
+    }>;
+    imagens: ProdutoImagem[];
+  };
 type Canal = 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
 const CANAL_LABEL: Record<Canal, string> = {
   SHOPEE: 'Shopee',
@@ -77,29 +81,7 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
     },
   });
 
-  const custoInsumosCentavos =
-    produto?.insumos.reduce(
-      (acc, pi) => acc + Math.round(Number(pi.qtd) * pi.insumo.custoUnitarioCentavos),
-      0,
-    ) ?? 0;
-
-  const { data: pricing } = useQuery({
-    queryKey: ['produto-pricing', id, custoInsumosCentavos],
-    enabled: !!produto,
-    queryFn: () =>
-      apiFetch<CalcularOutput>('/pricing/calcular', {
-        method: 'POST',
-        json: {
-          filamentoId: produto!.filamentoId,
-          pesoG: Number(produto!.pesoG),
-          tempoH: Number(produto!.tempoH),
-          impressora: produto!.impressora,
-          embalagemCentavos: produto!.embalagemCentavos,
-          custoInsumosCentavos,
-          precoCentavos: produto!.precoCentavos,
-        },
-      }),
-  });
+  const pricing = produto?.pricing;
 
   const { data: parametros } = useQuery({
     queryKey: ['parametros'],
@@ -146,7 +128,11 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           <h1 className="text-2xl font-semibold tracking-tight">{produto.nome}</h1>
           <div className="flex flex-wrap gap-2">
             {!produto.ativo && <Badge variant="warning">Arquivado</Badge>}
-            <Badge variant="default">{produto.filamento.nome}</Badge>
+            <Badge variant="default">
+              {produto.filamentos && produto.filamentos.length > 1
+                ? `${produto.filamentos.length} filamentos`
+                : produto.filamento.nome}
+            </Badge>
             <Badge variant="default">{produto.impressora}</Badge>
             <Badge variant="default">{CANAL_LABEL[produto.canalPrincipal]}</Badge>
             <Badge variant={produto.anunciado ? 'success' : 'default'}>
@@ -185,6 +171,11 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           <ModeloOrigemCard modelo={produto.modeloMakerWorld} produto={produto} />
         )}
       </div>
+
+      <ProdutoFilamentosDetalhe
+        produto={produto}
+        custoCentavos={produto.pricing.custoFilamentoCentavos}
+      />
 
       <Card>
         <CardHeader>
@@ -273,9 +264,9 @@ function EspecificacoesCard({ produto }: { produto: ProdutoComFilamento }) {
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-3 text-sm">
-          <Linha rotulo="Filamento" valor={produto.filamento.nome} />
+          <Linha rotulo="Referência de energia" valor={produto.filamento.nome} />
           <Linha rotulo="Impressora" valor={produto.impressora} />
-          <Linha rotulo="Peso" valor={`${Number(produto.pesoG)} g`} />
+          <Linha rotulo="Peso total por unidade" valor={`${Number(produto.pesoG)} g`} />
           <Linha rotulo="Tempo" valor={`${Number(produto.tempoH)} h`} />
           <Linha rotulo="Dimensões" valor={formatarDimensoes(produto)} />
           <Linha rotulo="Embalagem" valor={centavosParaReais(produto.embalagemCentavos)} />

@@ -16,8 +16,12 @@ function ProdutoNovoContent() {
   const searchParams = useSearchParams();
 
   const inicial = {
-    filamentoId: searchParams.get('filamentoId') ?? '',
-    pesoG: searchParams.get('pesoG') ?? '',
+    filamentos: [
+      {
+        filamentoId: searchParams.get('filamentoId') ?? '',
+        pesoGStr: searchParams.get('pesoG') ?? '',
+      },
+    ],
     tempoH: searchParams.get('tempoH') ?? '',
     impressora: (searchParams.get('impressora') as 'A1' | 'H2C') ?? 'A1',
     embalagemReais: searchParams.get('embalagemCentavos')

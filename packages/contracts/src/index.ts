@@ -7,6 +7,7 @@ export * from './variacao';
 export * from './estoque';
 export * from './recibo';
 export * from './produto';
+export * from './produto-filamento';
 export * from './parametro';
 export * from './pricing';
 export * from './producao';

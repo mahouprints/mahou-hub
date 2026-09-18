@@ -23,14 +23,30 @@ const PARAMETROS: ParametrosGlobais = {
   comissaoMlPct: 15,
   impostoAtivo: false,
   impostoPct: 0,
+  tiktokComissaoPlataformaPct: 6,
+  tiktokTaxaSfpPct: 5,
+  tiktokComissaoAfiliadoPct: 7,
+  tiktokTaxaPagamentoPct: 2,
 };
 
 const TABELA_SHOPEE: FaixaShopee[] = [
-  { limInferiorCentavos: 0, comissaoPct: 14, fixaCnpjCentavos: 300, fixaCpfBaixoCentavos: 400, fixaCpfAltoCentavos: 600 },
+  {
+    limInferiorCentavos: 0,
+    comissaoPct: 14,
+    fixaCnpjCentavos: 300,
+    fixaCpfBaixoCentavos: 400,
+    fixaCpfAltoCentavos: 600,
+  },
 ];
 
 const TABELA_ML: FaixaMercadoLivre[] = [
-  { faixa: 'B', limInferiorCentavos: 0, custoFixoCentavos: 650, pctAlternativo: 0, comissaoCategoriaPct: 15 },
+  {
+    faixa: 'B',
+    limInferiorCentavos: 0,
+    custoFixoCentavos: 650,
+    pctAlternativo: 0,
+    comissaoCategoriaPct: 15,
+  },
 ];
 
 const ENTRADA_BASE: CalculoEntrada = {
@@ -78,5 +94,50 @@ describe('calcularProduto', () => {
   it('margem zero quando preço cobre exatamente custos+taxas', () => {
     const r = calcularProduto({ ...ENTRADA_BASE, precoCentavos: 1000 });
     expect(typeof r.margemMl).toBe('number');
+  });
+});
+
+describe('calcularProduto — múltiplos filamentos', () => {
+  it('soma cinco materiais sem usar o peso total no primeiro nem repetir energia', () => {
+    const filamentos = [
+      [100, 6000],
+      [50, 7000],
+      [25, 8000],
+      [10, 10000],
+      [5, 12000],
+    ].map(([pesoG, custoKgCentavos]) => ({
+      pesoG: pesoG!,
+      filamento: { ...FILAMENTO_PLA, custoKgCentavos: custoKgCentavos!, potenciaA1W: 900 },
+    }));
+
+    const resultado = calcularProduto({ ...ENTRADA_BASE, pesoG: 190, filamentos });
+
+    expect(resultado.custoFilamentoCentavos).toBe(1310);
+    expect(resultado.custoEnergiaCentavos).toBe(16);
+    expect(resultado.custoTotalProducaoCentavos).toBe(1476);
+    expect(resultado.liquidoSiteCentavos).toBe(2024);
+  });
+
+  it('arredonda a soma das frações uma única vez', () => {
+    const filamentos = [0.1, 0.1].map((pesoG) => ({ pesoG, filamento: FILAMENTO_PLA }));
+
+    const resultado = calcularProduto({ ...ENTRADA_BASE, filamentos });
+
+    expect(resultado.custoFilamentoCentavos).toBe(1); // 0,7 + 0,7 = 1,4 centavos.
+  });
+
+  it('mantém o cálculo legado quando composição está vazia', () => {
+    expect(calcularProduto({ ...ENTRADA_BASE, filamentos: [] })).toEqual(
+      calcularProduto(ENTRADA_BASE),
+    );
+  });
+
+  it('composição de um material equivale ao legado', () => {
+    expect(
+      calcularProduto({
+        ...ENTRADA_BASE,
+        filamentos: [{ pesoG: 50, filamento: FILAMENTO_PLA }],
+      }),
+    ).toEqual(calcularProduto(ENTRADA_BASE));
   });
 });

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { custoEnergiaCentavos, custoFilamentoCentavos } from '../src/custos';
+import {
+  custoEnergiaCentavos,
+  custoFilamentoCentavos,
+  custoFilamentosCentavos,
+} from '../src/custos';
 import type { Filamento } from '../src/types';
 
 const FILAMENTO_ABS: Filamento = {
@@ -38,5 +42,39 @@ describe('custoEnergiaCentavos', () => {
 
   it('zero horas → custo zero', () => {
     expect(custoEnergiaCentavos(0, FILAMENTO_ABS, 'A1', 60)).toBe(0);
+  });
+});
+
+describe('custoFilamentosCentavos', () => {
+  it('soma frações que individualmente arredondariam para zero', () => {
+    const itens = [0.05, 0.05].map((pesoG) => ({ pesoG, filamento: FILAMENTO_ABS }));
+    expect(custoFilamentosCentavos(itens)).toBe(1);
+  });
+
+  it('arredonda exatamente meio centavo com peso em centésimos de grama', () => {
+    expect(custoFilamentosCentavos([{ pesoG: 0.3, filamento: { custoKgCentavos: 5000 } }])).toBe(2);
+  });
+
+  it('soma cinco materiais de meio centavo antes de arredondar', () => {
+    const itens = [
+      [0.3, 5000],
+      [0.15, 10000],
+      [0.12, 12500],
+      [0.06, 25000],
+      [0.5, 3000],
+    ].map(([pesoG, custoKgCentavos]) => ({
+      pesoG: pesoG!,
+      filamento: { custoKgCentavos: custoKgCentavos! },
+    }));
+    expect(custoFilamentosCentavos(itens)).toBe(8); // 5 × 1,5 = 7,5; não 5 nem 10 centavos.
+  });
+
+  it('rejeita peso negativo em qualquer material', () => {
+    expect(() =>
+      custoFilamentosCentavos([
+        { pesoG: 1, filamento: FILAMENTO_ABS },
+        { pesoG: -1, filamento: FILAMENTO_ABS },
+      ]),
+    ).toThrow(/>= 0/);
   });
 });

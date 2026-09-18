@@ -1,5 +1,5 @@
 import type { CalculoEntrada, CalculoSaida } from './types';
-import { custoEnergiaCentavos, custoFilamentoCentavos } from './custos';
+import { custoEnergiaCentavos, custoFilamentoCentavos, custoFilamentosCentavos } from './custos';
 import { taxaMercadoLivreCentavos, taxaShopeeCentavos, taxaTikTokCentavos } from './taxas';
 import { arredondarCentavos } from './money';
 
@@ -25,7 +25,9 @@ export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
     parametros,
   } = entrada;
 
-  const custoFilamento = custoFilamentoCentavos(pesoG, filamento.custoKgCentavos);
+  const custoFilamento = entrada.filamentos?.length
+    ? custoFilamentosCentavos(entrada.filamentos)
+    : custoFilamentoCentavos(pesoG, filamento.custoKgCentavos);
   const custoEnergia = custoEnergiaCentavos(
     tempoH,
     filamento,

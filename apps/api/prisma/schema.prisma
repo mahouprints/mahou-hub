@@ -149,6 +149,7 @@ model Filamento {
   // Alerta de reposição: avisa quando estoqueGramas <= estoqueMinGramas.
   estoqueMinGramas Decimal            @default(0) @db.Decimal(10, 2)
   produtos         Produto[]
+  composicoes      ProdutoFilamento[]
   variacoes        ProdutoVariacao[]
   movimentos       MovimentoEstoque[]
   itensRecibo      ReciboItem[]
@@ -194,12 +195,27 @@ model Produto {
   jobs              JobProducao[]
   vendas            Venda[]
   insumos           ProdutoInsumo[]
+  filamentos        ProdutoFilamento[]
   imagens           ProdutoImagem[]
   oportunidades     ProdutoOportunidade[]
   modeloMakerWorld  ModeloMakerWorld?
   variacoes         ProdutoVariacao[]
   criadoEm          DateTime              @default(now())
   atualizadoEm      DateTime              @updatedAt
+}
+
+/// Gramas de cada filamento por unidade. Sem linhas = cadastro legado de filamento único.
+model ProdutoFilamento {
+  id          String    @id @default(cuid())
+  produtoId   String
+  produto     Produto   @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  filamentoId String
+  filamento   Filamento @relation(fields: [filamentoId], references: [id])
+  pesoG       Decimal   @db.Decimal(10, 2)
+  ordem       Int       @default(0)
+
+  @@unique([produtoId, filamentoId])
+  @@index([filamentoId])
 }
 
 /// Insumo reutilizável usado em vários produtos (caixa, fita, etiqueta).
@@ -517,6 +533,8 @@ model JobProducao {
   status                   JobStatus        @default(FILA)
   /// true após a baixa automática de filamento ter sido registrada (evita baixa dupla).
   consumoRegistrado        Boolean          @default(false)
+  /// Pesos realmente baixados na primeira conclusão, para estornar sem reler a receita atual.
+  consumoFilamentos        Json?
   /// true = card atendido pelo ESTOQUE DE PEÇAS PRONTAS: pula impressão, NÃO baixa filamento e
   /// baixa o estoque de prontos ao Embalar. Ortogonal a `origem` (canal do pedido, que pode ser ESTOQUE).
   daEstoque                Boolean          @default(false)

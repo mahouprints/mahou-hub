@@ -82,6 +82,7 @@ function fakeProduto(
       potenciaH2cW: 160,
     },
     insumos: [],
+    filamentos: [],
     imagens: [],
   };
 }
@@ -297,7 +298,10 @@ describe('ProdutosService.create — cadastro avulso', () => {
 
     expect(mock.produto.create).toHaveBeenCalledWith({
       data: { ...produto, insumos: { create: [{ insumoId: 'i1', qtd: 0.5 }] } },
-      include: { insumos: { include: { insumo: true } } },
+      include: {
+        insumos: { include: { insumo: true } },
+        filamentos: { include: { filamento: true }, orderBy: { ordem: 'asc' } },
+      },
     });
   });
 });

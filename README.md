@@ -29,6 +29,10 @@ A aba **Produtos** reúne o catálogo independentemente de anúncio ou origem Ma
 
 Os custos das vendas são calculados com os dados atuais do produto e dos insumos. Alterar o custo ou a composição de um produto também altera o cálculo dos relatórios históricos; não há snapshot de custo na venda.
 
+O cadastro aceita vários filamentos, cada um com gramas por unidade (até duas casas decimais). O peso total é a soma da composição; o custo soma cada peso pelo preço/kg do respectivo filamento e arredonda só o total. A energia usa o primeiro filamento como referência de potência e o tempo total da peça, uma única vez. Catálogo, preview, simulador e financeiro usam essa composição; no financeiro, o custo por unidade é multiplicado pela quantidade vendida. Cadastros antigos continuam funcionando com o filamento único.
+
+Na produção, cada filamento é baixado separadamente e o consumo efetivo fica registrado no job para estorno. Variações de produtos com múltiplos filamentos devem herdar a composição, sem substituir silenciosamente toda a receita por uma cor ou um peso diferente. Na API, `filamentos: [{filamentoId, pesoG}]` substitui a lista completa; omitir a lista preserva a composição existente. `filamentoId` e `pesoG` do produto continuam disponíveis para compatibilidade (primeiro material e peso total).
+
 | Módulo | Rota web | Endpoints API | O que faz |
 | --- | --- | --- | --- |
 | **Calculadora** | `/calculadora` | `POST /pricing/calcular` | Cálculo stateless de viabilidade de produto hipotético |
