@@ -6,7 +6,6 @@ import {
 } from '../src/modules/pedidos/atendimento.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { ProducaoService } from '../src/modules/producao/producao.service';
-import { NotFoundException } from '@nestjs/common';
 
 function makeProducaoMock() {
   return { mudarStatus: vi.fn().mockResolvedValue({}) } as unknown as ProducaoService & {
@@ -276,42 +275,6 @@ describe('AtendimentoService — status vindo do marketplace', () => {
     const args = mock.jobProducao.findMany.mock.calls[0]?.[0];
     expect(args.where.status.in).toEqual(['FILA', 'IMPRIMINDO', 'CONCLUIDO']);
     expect(mock.jobProducao.updateMany).not.toHaveBeenCalled();
-  });
-
-  it('falha ao baixar filamentos mantém o status anterior para tentar de novo no próximo sync', async () => {
-    const { mock } = mockComPedidoExistente();
-    const producao = makeProducaoMock();
-    producao.mudarStatus.mockRejectedValue(new Error('Receita ambígua'));
-    const svc = new AtendimentoService(mock as unknown as PrismaService, producao);
-
-    await expect(svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }))).rejects.toThrow(
-      'Receita ambígua',
-    );
-
-    expect(mock.pedidoMarketplace.update).not.toHaveBeenCalled();
-  });
-
-  it('ignora job excluído manualmente entre a consulta e o fechamento', async () => {
-    const { mock } = mockComPedidoExistente();
-    const producao = makeProducaoMock();
-    producao.mudarStatus.mockRejectedValue(new NotFoundException('Job job1 não existe'));
-    const svc = new AtendimentoService(mock as unknown as PrismaService, producao);
-
-    const resultado = await svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }));
-
-    expect(resultado.statusAtualizado).toBe('ENVIADO');
-  });
-
-  it('não confunde filamento ausente com job excluído', async () => {
-    const { mock } = mockComPedidoExistente();
-    const producao = makeProducaoMock();
-    producao.mudarStatus.mockRejectedValue(new NotFoundException('Filamento f1 não existe'));
-    const svc = new AtendimentoService(mock as unknown as PrismaService, producao);
-
-    await expect(svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }))).rejects.toThrow(
-      'Filamento f1',
-    );
-    expect(mock.pedidoMarketplace.update).not.toHaveBeenCalled();
   });
 
   it('READY_TO_SHIP não muda o status interno', async () => {

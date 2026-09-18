@@ -1,8 +1,12 @@
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
+import { NotFoundException } from '@nestjs/common';
 import { ProducaoService } from '../src/modules/producao/producao.service';
-import { AtendimentoService } from '../src/modules/pedidos/atendimento.service';
+import {
+  AtendimentoService,
+  type PedidoImportado,
+} from '../src/modules/pedidos/atendimento.service';
 import type { EstoqueService } from '../src/modules/estoque/estoque.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
 
@@ -46,28 +50,34 @@ function preparar() {
   return { mock, tx, estoque, service };
 }
 
+function prepararAtendimento() {
+  const contexto = preparar();
+  contexto.mock.jobProducao.findMany.mockResolvedValue([{ id: 'j1' }]);
+  const prisma = {
+    ...contexto.mock,
+    pedidoMarketplace: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'ped1', status: 'ATENDIDO' }),
+      update: vi.fn().mockResolvedValue({}),
+    },
+    pedidoItem: { findMany: vi.fn().mockResolvedValue([{ jobProducaoId: 'j1' }]) },
+  };
+  const atendimento = new AtendimentoService(asPrisma(prisma), contexto.service);
+  const pedido: PedidoImportado = {
+    canal: 'SHOPEE',
+    externalId: 'pedido1',
+    statusExterno: 'SHIPPED',
+    totalCentavos: 1000,
+    dataPedido: new Date(),
+    itens: [{ skuExterno: 'sku', nomeExterno: 'Luminária', qtd: 3, precoUnitarioCentavos: 1000 }],
+  };
+  return { ...contexto, prisma, atendimento, pedido };
+}
+
 describe('produção com múltiplos filamentos', () => {
   it('envio direto pelo marketplace reutiliza a produção e baixa os cinco filamentos', async () => {
-    const { mock, tx, estoque, service } = preparar();
-    mock.jobProducao.findMany.mockResolvedValue([{ id: 'j1' }]);
-    const prisma = {
-      ...mock,
-      pedidoMarketplace: {
-        findUnique: vi.fn().mockResolvedValue({ id: 'ped1', status: 'ATENDIDO' }),
-        update: vi.fn().mockResolvedValue({}),
-      },
-      pedidoItem: { findMany: vi.fn().mockResolvedValue([{ jobProducaoId: 'j1' }]) },
-    };
-    const atendimento = new AtendimentoService(asPrisma(prisma), service);
+    const { tx, estoque, prisma, atendimento, pedido } = prepararAtendimento();
 
-    await atendimento.importar({
-      canal: 'SHOPEE',
-      externalId: 'pedido1',
-      statusExterno: 'SHIPPED',
-      totalCentavos: 1000,
-      dataPedido: new Date(),
-      itens: [{ skuExterno: 'sku', nomeExterno: 'Luminária', qtd: 3, precoUnitarioCentavos: 1000 }],
-    });
+    await atendimento.importar(pedido);
 
     expect(estoque.registrarEmTransacao).toHaveBeenCalledTimes(5);
     expect(tx.jobProducao.update).toHaveBeenCalledWith(
@@ -80,6 +90,35 @@ describe('produção com múltiplos filamentos', () => {
         data: expect.objectContaining({ status: 'ENVIADO' }),
       }),
     );
+  });
+
+  it('falha ao baixar filamentos mantém o pedido anterior para tentar de novo no próximo sync', async () => {
+    const { estoque, prisma, atendimento, pedido } = prepararAtendimento();
+    estoque.registrarEmTransacao.mockRejectedValue(new Error('Falha na baixa'));
+
+    await expect(atendimento.importar(pedido)).rejects.toThrow('Falha na baixa');
+
+    expect(prisma.pedidoMarketplace.update).not.toHaveBeenCalled();
+  });
+
+  it('ignora job excluído manualmente entre a consulta e o fechamento', async () => {
+    const { tx, atendimento, pedido } = prepararAtendimento();
+    tx.jobProducao.findUnique.mockResolvedValue(null);
+
+    const resultado = await atendimento.importar(pedido);
+
+    expect(resultado.statusAtualizado).toBe('ENVIADO');
+  });
+
+  it('não confunde filamento ausente com job excluído', async () => {
+    const { estoque, prisma, atendimento, pedido } = prepararAtendimento();
+    estoque.registrarEmTransacao.mockRejectedValue(
+      new NotFoundException('Filamento f1 não existe'),
+    );
+
+    await expect(atendimento.importar(pedido)).rejects.toThrow('Filamento f1');
+
+    expect(prisma.pedidoMarketplace.update).not.toHaveBeenCalled();
   });
 
   it('baixa cinco materiais pelos pesos informados × quantidade, sem perder frações de grama', async () => {
