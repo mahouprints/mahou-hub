@@ -38,7 +38,8 @@ export class ProducaoController {
   @Get('historico')
   @ApiOperation({
     summary: 'Histórico de produção agregado no tempo',
-    description: 'Série de buckets {inicio,total}. periodo = diario | semanal | mensal | anual (default mensal).',
+    description:
+      'Série de buckets {inicio,total}. periodo = diario | semanal | mensal | anual (default mensal).',
   })
   historico(@Query('periodo') periodo?: string) {
     return this.service.historico(HistoricoPeriodoEnum.catch('mensal').parse(periodo));
@@ -61,7 +62,8 @@ export class ProducaoController {
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Muda o status do job',
-    description: 'Ao marcar como CONCLUIDO (impresso), baixa o filamento consumido automaticamente.',
+    description:
+      'Ao marcar como CONCLUIDO (impresso), baixa o filamento consumido automaticamente.',
   })
   mudarStatus(
     @Param('id') id: string,

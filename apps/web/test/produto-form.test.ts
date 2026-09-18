@@ -10,8 +10,7 @@ import {
 const preenchido: FormState = {
   ...PRODUTO_FORM_VAZIO,
   nome: 'Tampa avulsa',
-  filamentoId: 'pla',
-  pesoG: '50,5',
+  filamentos: [{ filamentoId: 'pla', pesoGStr: '50,5' }],
   tempoH: '1,25',
   precoReais: '39,90',
   insumos: [{ insumoId: 'acrilico', qtdStr: '0,125' }],
@@ -24,6 +23,7 @@ describe('cadastro manual de produto', () => {
       inspiracao: null,
       modelo3dUrl: null,
       pesoG: 50.5,
+      filamentos: [{ filamentoId: 'pla', pesoG: 50.5 }],
       tempoH: 1.25,
       precoCentavos: 3990,
       embalagemCentavos: 0,
@@ -47,8 +47,6 @@ describe('cadastro manual de produto', () => {
 
   it.each([
     ['nome', '  ', 'nome'],
-    ['filamentoId', '', 'filamento'],
-    ['pesoG', '0', 'peso'],
     ['tempoH', '-1', 'tempo'],
     ['precoReais', '', 'preço'],
     ['embalagemReais', 'inválido', 'embalagem'],

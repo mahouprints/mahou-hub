@@ -8,5 +8,6 @@ import { ProducaoController } from './producao.controller';
   imports: [EstoqueModule],
   providers: [ProducaoService],
   controllers: [ProducaoController],
+  exports: [ProducaoService],
 })
 export class ProducaoModule {}

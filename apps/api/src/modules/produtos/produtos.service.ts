@@ -10,6 +10,11 @@ import {
 import { ProdutoCreateSchema, type ProdutoCreate, type ProdutoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImagensService } from '../imagens/imagens.service';
+import {
+  composicaoParaAtualizar,
+  dadosComposicao,
+  linhasComposicao,
+} from './composicao-filamentos';
 
 export type ProdutoListSortBy = 'criadoEm' | 'atualizadoEm' | 'nome' | 'precoCentavos';
 export type ProdutoListSortDir = 'asc' | 'desc';
@@ -109,6 +114,7 @@ export class ProdutosService {
         take,
         include: {
           filamento: true,
+          filamentos: { include: { filamento: true }, orderBy: { ordem: 'asc' } },
           insumos: { include: { insumo: true } },
           imagens: { orderBy: { ordem: 'asc' } },
         },
@@ -132,6 +138,7 @@ export class ProdutosService {
       where: { id },
       include: {
         filamento: true,
+        filamentos: { include: { filamento: true }, orderBy: { ordem: 'asc' } },
         insumos: { include: { insumo: true } },
         imagens: { orderBy: { ordem: 'asc' } },
         // A ficha do modelo original vai junto pra tela poder comparar o que foi
@@ -165,15 +172,20 @@ export class ProdutosService {
   }
 
   async create(data: ProdutoCreate) {
-    const { insumos, ...resto } = data;
+    const { insumos, filamentos, ...resto } = data;
     return this.prisma.produto.create({
       data: {
         ...resto,
+        ...dadosComposicao(filamentos),
+        filamentos: filamentos ? { create: linhasComposicao(filamentos) } : undefined,
         insumos: insumos?.length
           ? { create: insumos.map((i) => ({ insumoId: i.insumoId, qtd: i.qtd })) }
           : undefined,
       },
-      include: { insumos: { include: { insumo: true } } },
+      include: {
+        insumos: { include: { insumo: true } },
+        filamentos: { include: { filamento: true }, orderBy: { ordem: 'asc' } },
+      },
     });
   }
 
@@ -182,15 +194,36 @@ export class ProdutosService {
    * Se `insumos` não vier, lista atual é preservada.
    */
   async update(id: string, data: ProdutoUpdate) {
-    const { insumos, ...resto } = data;
+    const { insumos, filamentos: entradaFilamentos, ...resto } = data;
     return this.prisma.$transaction(async (tx) => {
-      const atual = await tx.produto.findUnique({ where: { id } });
+      const atual = await tx.produto.findUnique({ where: { id }, include: { filamentos: true } });
       if (!atual) throw new NotFoundException(`Produto ${id} não existe`);
-      const rascunho = this.concluirRascunho(atual, data);
+      const filamentos = composicaoParaAtualizar(atual, {
+        ...resto,
+        filamentos: entradaFilamentos,
+      });
+      const alteracoes = { ...resto, ...dadosComposicao(filamentos) };
+      const rascunho = this.concluirRascunho(atual, {
+        ...alteracoes,
+        filamentos:
+          filamentos ??
+          (atual.filamentos?.length
+            ? atual.filamentos.map((item) => ({
+                filamentoId: item.filamentoId,
+                pesoG: Number(item.pesoG),
+              }))
+            : undefined),
+      });
       const atualizado = await tx.produto.update({
         where: { id },
-        data: { ...resto, ...(rascunho === false ? { rascunho } : {}) },
+        data: { ...alteracoes, ...(rascunho === false ? { rascunho } : {}) },
       });
+      if (filamentos !== undefined) {
+        await tx.produtoFilamento.deleteMany({ where: { produtoId: id } });
+        await tx.produtoFilamento.createMany({
+          data: linhasComposicao(filamentos).map((item) => ({ ...item, produtoId: id })),
+        });
+      }
       if (insumos !== undefined) {
         await tx.produtoInsumo.deleteMany({ where: { produtoId: id } });
         if (insumos.length > 0) {
@@ -331,7 +364,10 @@ export class ProdutosService {
         ...p,
         // Safeguard: sinaliza produto usando filamento desativado, pra corrigir na mão
         // (em vez de quebrar). O pricing ainda calcula com o filamento inativo.
-        filamentoInativo: !p.filamento.ativo,
+        filamentoInativo: p.filamentos?.length
+          ? p.filamentos.some((item) => !item.filamento.ativo)
+          : !p.filamento.ativo,
+        filamentos: p.filamentos?.map((item) => ({ ...item, pesoG: Number(item.pesoG) })) ?? [],
         pesoG: Number(p.pesoG),
         tempoH: Number(p.tempoH),
         custoInsumosCentavos: custoInsumos,
@@ -346,6 +382,10 @@ export class ProdutosService {
             potenciaA1W: p.filamento.potenciaA1W,
             potenciaH2cW: p.filamento.potenciaH2cW,
           },
+          filamentos: p.filamentos?.map((item) => ({
+            pesoG: Number(item.pesoG),
+            filamento: item.filamento,
+          })),
           embalagemCentavos: p.embalagemCentavos,
           custoInsumosCentavos: custoInsumos,
           precoCentavos: p.precoCentavos,
@@ -410,6 +450,7 @@ export type { CalculoSaida };
 type ProdutoComIncludes = Prisma.ProdutoGetPayload<{
   include: {
     filamento: true;
+    filamentos: { include: { filamento: true } };
     insumos: { include: { insumo: true } };
     imagens: true;
   };

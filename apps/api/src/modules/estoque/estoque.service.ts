@@ -21,19 +21,26 @@ export class EstoqueService {
    * Saída que deixaria o saldo negativo é bloqueada (derruba a transação).
    */
   async registrarMovimento(input: MovimentoCreate, opts: { permitirNegativo?: boolean } = {}) {
+    return this.prisma.$transaction((tx) => this.registrarEmTransacao(tx, input, opts));
+  }
+
+  /** Compartilha a transação do domínio; ex.: concluir job com cinco baixas atômicas. */
+  registrarEmTransacao(
+    tx: Prisma.TransactionClient,
+    input: MovimentoCreate,
+    opts: { permitirNegativo?: boolean } = {},
+  ) {
     const permitir = opts.permitirNegativo ?? false;
-    return this.prisma.$transaction(async (tx) => {
-      switch (input.tipoItem) {
-        case 'PRODUTO':
-          return this.moverVariacao(tx, input, permitir);
-        case 'FILAMENTO':
-          return this.moverFilamento(tx, input, permitir);
-        case 'INSUMO':
-          return this.moverInsumo(tx, input, permitir);
-        default:
-          throw new BadRequestException('tipoItem inválido');
-      }
-    });
+    switch (input.tipoItem) {
+      case 'PRODUTO':
+        return this.moverVariacao(tx, input, permitir);
+      case 'FILAMENTO':
+        return this.moverFilamento(tx, input, permitir);
+      case 'INSUMO':
+        return this.moverInsumo(tx, input, permitir);
+      default:
+        throw new BadRequestException('tipoItem inválido');
+    }
   }
 
   private async moverVariacao(

@@ -54,6 +54,8 @@ export interface CalculoEntrada {
   tempoH: number;
   impressora: Impressora;
   filamento: Filamento;
+  /** Consumo por material; filamento principal continua definindo a potência da impressão. */
+  filamentos?: Array<{ pesoG: number; filamento: Filamento }>;
   embalagemCentavos: number;
   /** Soma `qtd × custoUnitário` dos Insumos do produto. Opcional — default 0. */
   custoInsumosCentavos?: number;

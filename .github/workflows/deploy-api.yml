@@ -72,9 +72,10 @@ jobs:
       - name: Pull e restart na VPS
         run: |
           ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            set -e
             cd /opt/mahou-hub/infra
             docker pull ghcr.io/${{ github.repository_owner }}/mahou-hub-api:latest
+            docker compose --env-file .env.prod --profile prod up -d postgres
+            docker compose --env-file .env.prod --profile prod run --rm --no-deps api prisma migrate deploy
             docker compose --env-file .env.prod --profile prod up -d postgres api
-            sleep 5
-            docker compose --env-file .env.prod --profile prod exec -T api prisma migrate deploy
           EOF

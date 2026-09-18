@@ -7,6 +7,7 @@ import {
   taxaMercadoLivreCentavos,
   taxaShopeeCentavos,
   taxaTikTokCentavos,
+  type CalculoEntrada,
   type CalculoSaida,
   type FaixaMercadoLivre as FaixaMlPricing,
   type FaixaShopee as FaixaShopeePricing,
@@ -37,34 +38,37 @@ export class PricingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async calcular(input: CalcularInput): Promise<CalculoSaida> {
-    const filamento = await this.resolverFilamento(input);
-    const parametros = await this.carregarParametros();
-    const tabelaShopee = await this.carregarTabelaShopee();
-    const tabelaMl = await this.carregarTabelaMl();
-
-    return calcularProduto({
+    const filamentos = await this.resolverFilamentos(input.filamentos);
+    const filamento = filamentos?.[0]?.filamento ?? (await this.resolverFilamento(input));
+    return this.calcularResolvido({
       pesoG: input.pesoG,
       tempoH: input.tempoH,
       impressora: input.impressora,
       filamento,
+      filamentos,
       embalagemCentavos: input.embalagemCentavos,
       custoInsumosCentavos: input.custoInsumosCentavos ?? 0,
       precoCentavos: input.precoCentavos,
-      parametros,
-      tabelaShopee,
-      tabelaMercadoLivre: tabelaMl,
     });
   }
 
   async simular(input: SimularInput): Promise<SimularOutput> {
     const produto = await this.prisma.produto.findUnique({
       where: { id: input.produtoId },
-      include: { filamento: true, insumos: { include: { insumo: true } } },
+      include: {
+        filamento: true,
+        filamentos: { include: { filamento: true } },
+        insumos: { include: { insumo: true } },
+      },
     });
     if (!produto) throw new NotFoundException(`Produto ${input.produtoId} não existe`);
 
-    const calculado = await this.calcular({
-      filamentoId: produto.filamentoId,
+    const calculado = await this.calcularResolvido({
+      filamento: produto.filamento,
+      filamentos: produto.filamentos.map((item) => ({
+        pesoG: Number(item.pesoG),
+        filamento: item.filamento,
+      })),
       pesoG: Number(produto.pesoG),
       tempoH: Number(produto.tempoH),
       impressora: produto.impressora,
@@ -126,6 +130,30 @@ export class PricingService {
       budgetDiarioMinimoCentavos: p.adsBudgetDiarioMinimoCentavos,
       tetoBudgetDiarioCentavos: p.adsTetoBudgetDiarioCentavos,
     };
+  }
+
+  private async calcularResolvido(
+    entrada: Omit<CalculoEntrada, 'parametros' | 'tabelaShopee' | 'tabelaMercadoLivre'>,
+  ): Promise<CalculoSaida> {
+    const [parametros, tabelaShopee, tabelaMercadoLivre] = await Promise.all([
+      this.carregarParametros(),
+      this.carregarTabelaShopee(),
+      this.carregarTabelaMl(),
+    ]);
+    return calcularProduto({ ...entrada, parametros, tabelaShopee, tabelaMercadoLivre });
+  }
+
+  private async resolverFilamentos(itens: CalcularInput['filamentos']) {
+    if (!itens?.length) return undefined;
+    const filamentos = await this.prisma.filamento.findMany({
+      where: { id: { in: itens.map((item) => item.filamentoId) } },
+    });
+    const porId = new Map(filamentos.map((filamento) => [filamento.id, filamento]));
+    return itens.map((item) => {
+      const filamento = porId.get(item.filamentoId);
+      if (!filamento) throw new NotFoundException(`Filamento ${item.filamentoId} não existe`);
+      return { pesoG: item.pesoG, filamento };
+    });
   }
 
   private async resolverFilamento(input: CalcularInput): Promise<FilamentoPricing> {

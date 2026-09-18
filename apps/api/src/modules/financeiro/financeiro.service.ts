@@ -27,7 +27,11 @@ export class FinanceiroService {
       where: { dataVenda: { gte, lt } },
       include: {
         produto: {
-          include: { filamento: true, insumos: { include: { insumo: true } } },
+          include: {
+            filamento: true,
+            filamentos: { include: { filamento: true } },
+            insumos: { include: { insumo: true } },
+          },
         },
       },
     });
@@ -68,6 +72,10 @@ export class FinanceiroService {
           potenciaA1W: v.produto.filamento.potenciaA1W,
           potenciaH2cW: v.produto.filamento.potenciaH2cW,
         },
+        filamentos: v.produto.filamentos.map((item) => ({
+          pesoG: Number(item.pesoG),
+          filamento: item.filamento,
+        })),
         embalagemCentavos: v.produto.embalagemCentavos,
         custoInsumosCentavos: custoInsumosUnit,
         precoCentavos: v.precoUnitarioCentavos, // preço REAL da venda
@@ -111,7 +119,8 @@ export class FinanceiroService {
       acc.taxasMarketplaceCentavos -
       acc.custosGeraisCentavos;
 
-    acc.margem = acc.faturamentoCentavos > 0 ? acc.lucroLiquidoCentavos / acc.faturamentoCentavos : 0;
+    acc.margem =
+      acc.faturamentoCentavos > 0 ? acc.lucroLiquidoCentavos / acc.faturamentoCentavos : 0;
 
     return acc;
   }

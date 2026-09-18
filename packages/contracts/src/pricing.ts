@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ImpressoraEnum } from './enums';
+import { ComposicaoFilamentosSchema } from './produto-filamento';
 
 /**
  * Input da Calculadora (`POST /pricing/calcular`) — stateless, recebe ID de filamento
@@ -7,6 +8,7 @@ import { ImpressoraEnum } from './enums';
  */
 export const CalcularInputSchema = z.object({
   filamentoId: z.string().optional(),
+  filamentos: ComposicaoFilamentosSchema.optional(),
   filamentoCustoKgCentavos: z.number().int().nonnegative().optional(),
   filamentoPotenciaA1W: z.number().int().nonnegative().optional(),
   filamentoPotenciaH2cW: z.number().int().nonnegative().optional(),

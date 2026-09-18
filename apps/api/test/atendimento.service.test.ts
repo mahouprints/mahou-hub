@@ -1,7 +1,18 @@
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
-import { AtendimentoService, type PedidoImportado } from '../src/modules/pedidos/atendimento.service';
+import {
+  AtendimentoService,
+  type PedidoImportado,
+} from '../src/modules/pedidos/atendimento.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
+import type { ProducaoService } from '../src/modules/producao/producao.service';
+import { NotFoundException } from '@nestjs/common';
+
+function makeProducaoMock() {
+  return { mudarStatus: vi.fn().mockResolvedValue({}) } as unknown as ProducaoService & {
+    mudarStatus: ReturnType<typeof vi.fn>;
+  };
+}
 
 /**
  * Mock focado no fluxo de atendimento. `$transaction` executa o callback com o próprio
@@ -24,14 +35,21 @@ function makeMock(overrides: Record<string, unknown> = {}) {
     },
     produtoVariacao: { findUnique: vi.fn().mockResolvedValue(null), update: vi.fn() },
     movimentoEstoque: { create: vi.fn().mockResolvedValue({}) },
-    venda: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    venda: {
+      create: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     jobProducao: {
       create: vi.fn().mockResolvedValue({ id: 'job1' }),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      findMany: vi.fn().mockResolvedValue([{ id: 'job1' }]),
     },
     ...overrides,
   };
-  const mock = { ...tx, $transaction: vi.fn(async (cb: never) => (cb as never as (t: unknown) => unknown)(tx)) };
+  const mock = {
+    ...tx,
+    $transaction: vi.fn(async (cb: never) => (cb as never as (t: unknown) => unknown)(tx)),
+  };
   return { mock, tx };
 }
 
@@ -45,7 +63,12 @@ function pedidoFake(over: Partial<PedidoImportado> = {}): PedidoImportado {
     prazoEnvio: new Date(Date.now() + 96 * 3_600_000),
     dataPedido: new Date(),
     itens: [
-      { skuExterno: 'MOB-BRANCO', nomeExterno: 'Suporte de Móbile', qtd: 1, precoUnitarioCentavos: 7490 },
+      {
+        skuExterno: 'MOB-BRANCO',
+        nomeExterno: 'Suporte de Móbile',
+        qtd: 1,
+        precoUnitarioCentavos: 7490,
+      },
     ],
     ...over,
   };
@@ -55,9 +78,12 @@ describe('AtendimentoService', () => {
   it('baixa do estoque quando há peça pronta', async () => {
     const { mock, tx } = makeMock();
     tx.produtoVariacao.findUnique.mockResolvedValue({
-      id: 'v1', produtoId: 'p1', estoqueAtual: 5, nome: 'Branco',
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: 5,
+      nome: 'Branco',
     });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake());
 
@@ -76,9 +102,12 @@ describe('AtendimentoService', () => {
   it('cria job de produção quando não há peça pronta', async () => {
     const { mock, tx } = makeMock();
     tx.produtoVariacao.findUnique.mockResolvedValue({
-      id: 'v1', produtoId: 'p1', estoqueAtual: 0, nome: 'Branco',
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: 0,
+      nome: 'Branco',
     });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake());
 
@@ -98,9 +127,12 @@ describe('AtendimentoService', () => {
   it('estoque insuficiente vai inteiro pra produção, sem baixa parcial', async () => {
     const { mock, tx } = makeMock();
     tx.produtoVariacao.findUnique.mockResolvedValue({
-      id: 'v1', produtoId: 'p1', estoqueAtual: 2, nome: 'Branco',
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: 2,
+      nome: 'Branco',
     });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(
       pedidoFake({
@@ -116,7 +148,7 @@ describe('AtendimentoService', () => {
   it('SKU desconhecido deixa o item sem vínculo e bloqueia o pedido', async () => {
     const { mock, tx } = makeMock();
     tx.produtoVariacao.findUnique.mockResolvedValue(null);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake());
 
@@ -135,7 +167,7 @@ describe('AtendimentoService', () => {
   it('reimportar pedido existente não baixa estoque de novo', async () => {
     const { mock, tx } = makeMock();
     mock.pedidoMarketplace.findUnique.mockResolvedValue({ id: 'ped1', status: 'ATENDIDO' });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake());
 
@@ -148,9 +180,12 @@ describe('AtendimentoService', () => {
   it('prazo apertado entra na fila com prioridade alta', async () => {
     const { mock, tx } = makeMock();
     tx.produtoVariacao.findUnique.mockResolvedValue({
-      id: 'v1', produtoId: 'p1', estoqueAtual: 0, nome: 'Branco',
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: 0,
+      nome: 'Branco',
     });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(pedidoFake({ prazoEnvio: new Date(Date.now() + 6 * 3_600_000) }));
     expect(tx.jobProducao.create.mock.calls[0]?.[0].data.prioridade).toBe(100);
@@ -159,9 +194,12 @@ describe('AtendimentoService', () => {
   it('sem prazo informado o card não fura a fila', async () => {
     const { mock, tx } = makeMock();
     tx.produtoVariacao.findUnique.mockResolvedValue({
-      id: 'v1', produtoId: 'p1', estoqueAtual: 0, nome: 'Branco',
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: 0,
+      nome: 'Branco',
     });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(pedidoFake({ prazoEnvio: null }));
     expect(tx.jobProducao.create.mock.calls[0]?.[0].data.prioridade).toBe(0);
@@ -172,7 +210,7 @@ describe('AtendimentoService', () => {
     tx.produtoVariacao.findUnique
       .mockResolvedValueOnce({ id: 'v1', produtoId: 'p1', estoqueAtual: 9, nome: 'A' })
       .mockResolvedValueOnce(null);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(
       pedidoFake({
@@ -200,7 +238,7 @@ describe('AtendimentoService — status vindo do marketplace', () => {
 
   it('SHIPPED na Shopee marca o pedido como ENVIADO', async () => {
     const { mock } = mockComPedidoExistente();
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }));
 
@@ -212,7 +250,7 @@ describe('AtendimentoService — status vindo do marketplace', () => {
   // bancada, então conta como enviado pro controle de produção.
   it('PROCESSED também conta como ENVIADO', async () => {
     const { mock } = mockComPedidoExistente();
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake({ statusExterno: 'PROCESSED' }));
     expect(r.statusAtualizado).toBe('ENVIADO');
@@ -220,7 +258,7 @@ describe('AtendimentoService — status vindo do marketplace', () => {
 
   it('CANCELLED marca como CANCELADO', async () => {
     const { mock } = mockComPedidoExistente();
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake({ statusExterno: 'CANCELLED' }));
     expect(r.statusAtualizado).toBe('CANCELADO');
@@ -228,19 +266,57 @@ describe('AtendimentoService — status vindo do marketplace', () => {
 
   it('pedido enviado fecha os cards de produção abertos', async () => {
     const { mock } = mockComPedidoExistente();
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const producao = makeProducaoMock();
+    const svc = new AtendimentoService(mock as unknown as PrismaService, producao);
 
     await svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }));
 
-    const args = mock.jobProducao.updateMany.mock.calls[0]?.[0];
-    expect(args.data.status).toBe('ENVIADO');
+    expect(producao.mudarStatus).toHaveBeenCalledWith('job1', 'ENVIADO');
     // Card já embalado/enviado manualmente não é reescrito — preserva o histórico.
+    const args = mock.jobProducao.findMany.mock.calls[0]?.[0];
     expect(args.where.status.in).toEqual(['FILA', 'IMPRIMINDO', 'CONCLUIDO']);
+    expect(mock.jobProducao.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('falha ao baixar filamentos mantém o status anterior para tentar de novo no próximo sync', async () => {
+    const { mock } = mockComPedidoExistente();
+    const producao = makeProducaoMock();
+    producao.mudarStatus.mockRejectedValue(new Error('Receita ambígua'));
+    const svc = new AtendimentoService(mock as unknown as PrismaService, producao);
+
+    await expect(svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }))).rejects.toThrow(
+      'Receita ambígua',
+    );
+
+    expect(mock.pedidoMarketplace.update).not.toHaveBeenCalled();
+  });
+
+  it('ignora job excluído manualmente entre a consulta e o fechamento', async () => {
+    const { mock } = mockComPedidoExistente();
+    const producao = makeProducaoMock();
+    producao.mudarStatus.mockRejectedValue(new NotFoundException('Job job1 não existe'));
+    const svc = new AtendimentoService(mock as unknown as PrismaService, producao);
+
+    const resultado = await svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }));
+
+    expect(resultado.statusAtualizado).toBe('ENVIADO');
+  });
+
+  it('não confunde filamento ausente com job excluído', async () => {
+    const { mock } = mockComPedidoExistente();
+    const producao = makeProducaoMock();
+    producao.mudarStatus.mockRejectedValue(new NotFoundException('Filamento f1 não existe'));
+    const svc = new AtendimentoService(mock as unknown as PrismaService, producao);
+
+    await expect(svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }))).rejects.toThrow(
+      'Filamento f1',
+    );
+    expect(mock.pedidoMarketplace.update).not.toHaveBeenCalled();
   });
 
   it('READY_TO_SHIP não muda o status interno', async () => {
     const { mock } = mockComPedidoExistente();
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake({ statusExterno: 'READY_TO_SHIP' }));
 
@@ -252,7 +328,7 @@ describe('AtendimentoService — status vindo do marketplace', () => {
   // reverter um pedido já ENVIADO pra outro estado.
   it('status desconhecido não regride o pedido', async () => {
     const { mock } = mockComPedidoExistente('ENVIADO');
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake({ statusExterno: 'STATUS_QUE_NAO_EXISTE' }));
 
@@ -262,7 +338,7 @@ describe('AtendimentoService — status vindo do marketplace', () => {
 
   it('reenviar o mesmo status não refaz o trabalho', async () => {
     const { mock } = mockComPedidoExistente('ENVIADO');
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }));
 
@@ -272,7 +348,7 @@ describe('AtendimentoService — status vindo do marketplace', () => {
 
   it('shipped do Mercado Livre também marca ENVIADO', async () => {
     const { mock } = mockComPedidoExistente();
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.importar(pedidoFake({ canal: 'ML', statusExterno: 'shipped' }));
     expect(r.statusAtualizado).toBe('ENVIADO');
@@ -310,7 +386,7 @@ describe('AtendimentoService.vincularItem — o botão "vincular a uma variaçã
       estoqueAtual: 5,
       nome: 'Azul',
     });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.vincularItem('it-orfao', 'v1');
 
@@ -324,7 +400,7 @@ describe('AtendimentoService.vincularItem — o botão "vincular a uma variaçã
 
   it('baixa o estoque da variação escolhida', async () => {
     const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 5, nome: 'Azul' });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.vincularItem('it-orfao', 'v1');
 
@@ -336,7 +412,7 @@ describe('AtendimentoService.vincularItem — o botão "vincular a uma variaçã
 
   it('sem peça pronta, manda pra fila de produção na cor certa', async () => {
     const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 0, nome: 'Azul' });
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.vincularItem('it-orfao', 'v1');
 
@@ -351,7 +427,7 @@ describe('AtendimentoService.vincularItem — o botão "vincular a uma variaçã
   it('desatravanca o pedido quando não sobra nenhum item órfão', async () => {
     const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 5, nome: 'Azul' });
     tx.pedidoItem.count.mockResolvedValue(0);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.vincularItem('it-orfao', 'v1');
 
@@ -363,7 +439,7 @@ describe('AtendimentoService.vincularItem — o botão "vincular a uma variaçã
   it('mantém o pedido bloqueado enquanto sobrar item sem vínculo', async () => {
     const { mock, tx } = mockComOrfao({ id: 'v1', produtoId: 'p1', estoqueAtual: 5, nome: 'Azul' });
     tx.pedidoItem.count.mockResolvedValue(1);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     const r = await svc.vincularItem('it-orfao', 'v1');
 
@@ -373,7 +449,7 @@ describe('AtendimentoService.vincularItem — o botão "vincular a uma variaçã
 
   it('recusa vincular a uma variação que não existe', async () => {
     const { mock } = mockComOrfao(null);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await expect(svc.vincularItem('it-orfao', 'fantasma')).rejects.toThrow(/não existe/);
   });
@@ -395,7 +471,7 @@ describe('AtendimentoService — pedido de marketplace vira Venda', () => {
   it('item atendido do estoque gera venda com produto, cor e canal', async () => {
     // Sem isso o dashboard financeiro não enxergava um centavo de marketplace.
     const { mock, tx } = mockComVariacao(10);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(pedidoFake());
 
@@ -410,7 +486,7 @@ describe('AtendimentoService — pedido de marketplace vira Venda', () => {
 
   it('item que foi pra produção também gera venda — o cliente já pagou', async () => {
     const { mock, tx } = mockComVariacao(0);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(pedidoFake());
 
@@ -421,7 +497,7 @@ describe('AtendimentoService — pedido de marketplace vira Venda', () => {
     // Não dá pra faturar o que não se sabe o que é.
     const { mock, tx } = makeMock();
     tx.produtoVariacao.findUnique.mockResolvedValue(null);
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(pedidoFake());
 
@@ -440,7 +516,7 @@ describe('AtendimentoService — pedido de marketplace vira Venda', () => {
   it('cancelar o pedido remove as vendas dele', async () => {
     const { mock } = pedidoJaImportado('ATENDIDO');
     mock.venda = { create: vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 1 }) };
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(pedidoFake({ statusExterno: 'CANCELLED' }));
 
@@ -452,7 +528,7 @@ describe('AtendimentoService — pedido de marketplace vira Venda', () => {
   it('pedido que só mudou pra enviado não mexe em venda nenhuma', async () => {
     const { mock } = pedidoJaImportado('ATENDIDO');
     mock.venda = { create: vi.fn(), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) };
-    const svc = new AtendimentoService(mock as unknown as PrismaService);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
 
     await svc.importar(pedidoFake({ statusExterno: 'SHIPPED' }));
 

@@ -1,12 +1,29 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { JobStatus, Prisma } from '@prisma/client';
-import type {
-  HistoricoPeriodo,
-  JobCreate,
-  ProducaoHistoricoBucket,
-} from '@mahou-hub/contracts';
+import type { HistoricoPeriodo, JobCreate, ProducaoHistoricoBucket } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
+import {
+  calcularConsumoFilamentos,
+  consumoParaEstorno,
+  somarConsumoFilamentos,
+  type ConsumoFilamento,
+} from './consumo-filamentos';
+
+const PRODUTO_CONSUMO_SELECT = {
+  nome: true,
+  pesoG: true,
+  filamentoId: true,
+  filamentos: {
+    orderBy: { ordem: 'asc' },
+    select: { filamentoId: true, pesoG: true },
+  },
+} satisfies Prisma.ProdutoSelect;
+const JOB_CONSUMO_INCLUDE = {
+  produto: { select: PRODUTO_CONSUMO_SELECT },
+  variacao: { select: { nome: true, filamentoId: true, pesoG: true } },
+} satisfies Prisma.JobProducaoInclude;
+type JobComConsumo = Prisma.JobProducaoGetPayload<{ include: typeof JOB_CONSUMO_INCLUDE }>;
 
 // generate_series + date_trunc por período. unit/step/offset são literais fixos (sem injeção).
 const HISTORICO_CFG: Record<HistoricoPeriodo, { unit: string; step: string; offset: string }> = {
@@ -28,8 +45,24 @@ export class ProducaoService {
     const jobs = await this.prisma.jobProducao.findMany({
       orderBy: [{ prioridade: 'desc' }, { dataInicio: 'asc' }],
       include: {
-        produto: { select: { nome: true, pesoG: true, filamento: { select: { nome: true } } } },
-        variacao: { select: { nome: true, pesoG: true, filamento: { select: { nome: true } } } },
+        produto: {
+          select: {
+            ...PRODUTO_CONSUMO_SELECT,
+            filamento: { select: { nome: true } },
+            filamentos: {
+              orderBy: { ordem: 'asc' },
+              include: { filamento: { select: { nome: true } } },
+            },
+          },
+        },
+        variacao: {
+          select: {
+            nome: true,
+            filamentoId: true,
+            pesoG: true,
+            filamento: { select: { nome: true } },
+          },
+        },
       },
     });
     return jobs.map((j) => ({
@@ -49,11 +82,20 @@ export class ProducaoService {
       produtoNome: j.produto.nome,
       variacaoId: j.variacaoId,
       variacaoNome: j.variacao?.nome ?? null,
-      filamentoNome: j.variacao?.filamento?.nome ?? j.produto.filamento.nome,
+      filamentoNome:
+        j.produto.filamentos.length > 1
+          ? j.produto.filamentos.map((item) => item.filamento.nome).join(' + ')
+          : (j.variacao?.filamento?.nome ?? j.produto.filamento.nome),
       // Card do estoque pronto não consome filamento: mostra 0.
       consumoGramas: j.daEstoque
         ? 0
-        : Math.round(Number(j.variacao?.pesoG ?? j.produto.pesoG) * j.qtd),
+        : somarConsumoFilamentos(
+            calcularConsumoFilamentos(
+              j.produto,
+              j.produto.filamentos.length > 1 ? null : j.variacao,
+              j.qtd,
+            ),
+          ),
     }));
   }
 
@@ -130,50 +172,26 @@ export class ProducaoService {
    * Filamento não é estornado ao voltar de CONCLUIDO: a peça foi fisicamente impressa.
    */
   async mudarStatus(id: string, status: JobStatus) {
-    const job = await this.prisma.jobProducao.findUnique({
-      where: { id },
-      include: {
-        produto: { select: { nome: true, pesoG: true, filamentoId: true } },
-        variacao: { select: { nome: true, filamentoId: true, pesoG: true } },
+    // Todas as cores e as flags precisam confirmar juntas. Serializable impede duas
+    // conclusões simultâneas de debitarem a mesma impressão mais de uma vez.
+    return this.prisma.$transaction(
+      async (tx) => {
+        const job = await this.carregarJobComConsumo(tx, id);
+        const foiImpresso = status === 'CONCLUIDO' || status === 'EMBALADO' || status === 'ENVIADO';
+        const consumo = await this.baixarReceita(tx, job, foiImpresso);
+        const prontos = await this.movimentarProntos(tx, job, status);
+        return tx.jobProducao.update({
+          where: { id },
+          data: {
+            status,
+            ...consumo,
+            ...prontos,
+            ...(foiImpresso && !job.dataFim ? { dataFim: new Date() } : {}),
+          },
+        });
       },
-    });
-    if (!job) throw new NotFoundException(`Job ${id} não existe`);
-
-    const extra: Prisma.JobProducaoUpdateInput = {};
-    const rotulo = this.rotulo(job.produto.nome, job.variacao?.nome);
-    const foiImpresso = status === 'CONCLUIDO' || status === 'EMBALADO' || status === 'ENVIADO';
-
-    if (foiImpresso && !job.daEstoque && !job.consumoRegistrado) {
-      // O peso sai da variação quando ela tem um próprio: kit de 3 e tamanho G consomem
-      // mais rolo que a peça-base. Variação de cor não define peso e cai no do produto.
-      const pesoUnitario = job.variacao?.pesoG ?? job.produto.pesoG;
-      const gramas = Math.round(Number(pesoUnitario) * job.qtd);
-      const filamentoId = job.variacao?.filamentoId ?? job.produto.filamentoId;
-      if (gramas > 0)
-        await this.movimentarFilamento(filamentoId, -gramas, `Impressão: ${rotulo} x${job.qtd}`);
-      extra.consumoRegistrado = true;
-    }
-
-    if (job.daEstoque && job.variacaoId) {
-      const embalado = status === 'EMBALADO' || status === 'ENVIADO';
-      if (embalado && !job.consumoProdutoRegistrado) {
-        await this.ajustarProntos(job.variacaoId, -job.qtd, 'VENDA', `Embalado: ${rotulo} x${job.qtd}`);
-        extra.consumoProdutoRegistrado = true;
-      } else if (!embalado && job.consumoProdutoRegistrado) {
-        await this.ajustarProntos(
-          job.variacaoId,
-          job.qtd,
-          'AJUSTE',
-          `Estorno (voltou de embalado): ${rotulo} x${job.qtd}`,
-        );
-        extra.consumoProdutoRegistrado = false;
-      }
-    }
-
-    return this.prisma.jobProducao.update({
-      where: { id },
-      data: { status, ...extra, ...(foiImpresso && !job.dataFim ? { dataFim: new Date() } : {}) },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   /**
@@ -181,38 +199,72 @@ export class ProducaoService {
    * estoque de prontos (se já embalou). Sem isso sobrava baixa órfã de um job inexistente.
    */
   async remove(id: string) {
-    const job = await this.prisma.jobProducao.findUnique({
-      where: { id },
-      include: {
-        produto: { select: { nome: true, pesoG: true, filamentoId: true } },
-        variacao: { select: { nome: true, filamentoId: true, pesoG: true } },
+    return this.prisma.$transaction(
+      async (tx) => {
+        const job = await this.carregarJobComConsumo(tx, id);
+        const rotulo = this.rotulo(job.produto.nome, job.variacao?.nome);
+        const consumo = job.consumoRegistrado
+          ? consumoParaEstorno(job.consumoFilamentos, job.produto, job.variacao, job.qtd)
+          : [];
+        await this.movimentarReceita(
+          tx,
+          consumo,
+          1,
+          `Estorno (job excluído): ${rotulo} x${job.qtd}`,
+        );
+        const prontosEstornados = job.consumoProdutoRegistrado && job.variacaoId ? job.qtd : 0;
+        if (prontosEstornados > 0) {
+          await this.ajustarProntos(
+            tx,
+            job.variacaoId!,
+            prontosEstornados,
+            'AJUSTE',
+            `Estorno (job excluído): ${rotulo} x${job.qtd}`,
+          );
+        }
+        await tx.jobProducao.delete({ where: { id } });
+        const gramas = somarConsumoFilamentos(consumo);
+        return { ok: true, estornado: gramas > 0, gramas, prontosEstornados };
       },
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  private async carregarJobComConsumo(tx: Prisma.TransactionClient, id: string) {
+    const job = await tx.jobProducao.findUnique({ where: { id }, include: JOB_CONSUMO_INCLUDE });
     if (!job) throw new NotFoundException(`Job ${id} não existe`);
+    return job;
+  }
+
+  private async baixarReceita(
+    tx: Prisma.TransactionClient,
+    job: JobComConsumo,
+    foiImpresso: boolean,
+  ): Promise<Prisma.JobProducaoUpdateInput> {
+    if (!foiImpresso || job.daEstoque || job.consumoRegistrado) return {};
+    const consumo = calcularConsumoFilamentos(job.produto, job.variacao, job.qtd);
     const rotulo = this.rotulo(job.produto.nome, job.variacao?.nome);
+    await this.movimentarReceita(tx, consumo, -1, `Impressão: ${rotulo} x${job.qtd}`);
+    return { consumoRegistrado: true, consumoFilamentos: consumo };
+  }
 
-    // Mesmo peso que a baixa usou — estornar pelo peso do produto devolveria menos rolo
-    // do que saiu quando a variação é um kit.
-    const gramas = job.consumoRegistrado
-      ? Math.round(Number(job.variacao?.pesoG ?? job.produto.pesoG) * job.qtd)
-      : 0;
-    if (gramas > 0) {
-      const filamentoId = job.variacao?.filamentoId ?? job.produto.filamentoId;
-      await this.movimentarFilamento(filamentoId, gramas, `Estorno (job excluído): ${rotulo} x${job.qtd}`);
-    }
-
-    const prontosEstornados = job.consumoProdutoRegistrado && job.variacaoId ? job.qtd : 0;
-    if (prontosEstornados > 0) {
-      await this.ajustarProntos(
-        job.variacaoId!,
-        prontosEstornados,
-        'AJUSTE',
-        `Estorno (job excluído): ${rotulo} x${job.qtd}`,
-      );
-    }
-
-    await this.prisma.jobProducao.delete({ where: { id } });
-    return { ok: true, estornado: gramas > 0, gramas, prontosEstornados };
+  private async movimentarProntos(
+    tx: Prisma.TransactionClient,
+    job: JobComConsumo,
+    status: JobStatus,
+  ): Promise<Prisma.JobProducaoUpdateInput> {
+    if (!job.daEstoque || !job.variacaoId) return {};
+    const embalado = status === 'EMBALADO' || status === 'ENVIADO';
+    if (embalado === job.consumoProdutoRegistrado) return {};
+    const rotulo = this.rotulo(job.produto.nome, job.variacao?.nome);
+    await this.ajustarProntos(
+      tx,
+      job.variacaoId,
+      embalado ? -job.qtd : job.qtd,
+      embalado ? 'VENDA' : 'AJUSTE',
+      `${embalado ? 'Embalado' : 'Estorno (voltou de embalado)'}: ${rotulo} x${job.qtd}`,
+    );
+    return { consumoProdutoRegistrado: embalado };
   }
 
   /** Série temporal de peças produzidas (bucketadas por dataFim), pro gráfico de histórico. */
@@ -240,20 +292,36 @@ export class ProducaoService {
     return variacaoNome ? `${produtoNome} ${variacaoNome}` : produtoNome;
   }
 
-  private movimentarFilamento(filamentoId: string, quantidade: number, observacao: string) {
-    return this.estoque.registrarMovimento(
-      { tipoItem: 'FILAMENTO', filamentoId, quantidade, motivo: 'PRODUCAO', observacao },
-      { permitirNegativo: true },
-    );
+  private async movimentarReceita(
+    tx: Prisma.TransactionClient,
+    consumo: ConsumoFilamento[],
+    sinal: 1 | -1,
+    observacao: string,
+  ) {
+    for (const item of consumo) {
+      await this.estoque.registrarEmTransacao(
+        tx,
+        {
+          tipoItem: 'FILAMENTO',
+          filamentoId: item.filamentoId,
+          quantidade: item.gramas * sinal,
+          motivo: 'PRODUCAO',
+          observacao,
+        },
+        { permitirNegativo: true },
+      );
+    }
   }
 
   private ajustarProntos(
+    tx: Prisma.TransactionClient,
     variacaoId: string,
     quantidade: number,
     motivo: 'VENDA' | 'AJUSTE',
     observacao: string,
   ) {
-    return this.estoque.registrarMovimento(
+    return this.estoque.registrarEmTransacao(
+      tx,
       { tipoItem: 'PRODUTO', variacaoId, quantidade, motivo, observacao },
       { permitirNegativo: true },
     );

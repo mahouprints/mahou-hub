@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { PedidoImport, PedidoItemImport, PedidoStatus } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ProducaoService } from '../producao/producao.service';
 import { statusInterno, statusJobPara } from './status-marketplace';
 
 // Os tipos vêm do schema Zod em `packages/contracts` — os aliases existem só pra
@@ -14,7 +15,10 @@ export type PedidoImportado = PedidoImport;
 export class AtendimentoService {
   private readonly logger = new Logger(AtendimentoService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly producao: ProducaoService,
+  ) {}
 
   /**
    * Importa um pedido e tenta atender cada item.
@@ -98,11 +102,6 @@ export class AtendimentoService {
     const novo = statusInterno(pedido.canal, pedido.statusExterno);
     const mudou = novo !== null && novo !== statusAtual;
 
-    await this.prisma.pedidoMarketplace.update({
-      where: { id: pedidoId },
-      data: { statusExterno: pedido.statusExterno, ...(mudou ? { status: novo } : {}) },
-    });
-
     if (mudou) {
       await this.fecharJobsDoPedido(pedidoId, novo);
       await this.desfazerVendasSeCancelado(pedidoId, novo);
@@ -111,6 +110,13 @@ export class AtendimentoService {
           `(${pedido.statusExterno})`,
       );
     }
+
+    // Só confirma o status após os jobs: falha numa composição deve ser tentada de
+    // novo no próximo sync, sem deixar ENVIADO com filamento ainda não debitado.
+    await this.prisma.pedidoMarketplace.update({
+      where: { id: pedidoId },
+      data: { statusExterno: pedido.statusExterno, ...(mudou ? { status: novo } : {}) },
+    });
 
     return {
       pedidoId,
@@ -138,10 +144,21 @@ export class AtendimentoService {
     const jobIds = itens.map((i) => i.jobProducaoId).filter((id): id is string => id !== null);
     if (jobIds.length === 0) return;
 
-    await this.prisma.jobProducao.updateMany({
+    const jobs = await this.prisma.jobProducao.findMany({
       where: { id: { in: jobIds }, status: { in: ['FILA', 'IMPRIMINDO', 'CONCLUIDO'] } },
-      data: { status: statusJob },
+      select: { id: true },
     });
+    for (const job of jobs) {
+      try {
+        await this.producao.mudarStatus(job.id, statusJob);
+      } catch (erro) {
+        // A exclusão manual entre as duas leituras era ignorada pelo updateMany.
+        // Outros 404 (ex.: filamento ausente) precisam falhar para permitir novo sync.
+        if (erro instanceof NotFoundException && erro.message === `Job ${job.id} não existe`)
+          continue;
+        throw erro;
+      }
+    }
   }
 
   /**

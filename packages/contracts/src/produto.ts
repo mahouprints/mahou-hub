@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { CanalEnum, ImpressoraEnum } from './enums';
 import { ProdutoInsumoInputSchema } from './insumo';
+import { ComposicaoFilamentosSchema, ProdutoFilamentoInputSchema } from './produto-filamento';
 
 /**
  * Método planejado pra obter a foto final do produto:
@@ -22,6 +23,7 @@ export const ProdutoSchema = z.object({
   alturaCm: z.number().positive().nullable(),
   profundidadeCm: z.number().positive().nullable(),
   filamentoId: z.string(),
+  filamentos: z.array(ProdutoFilamentoInputSchema).optional(),
   // pesoG/tempoH precisam ser >0 num produto completo; rascunhos podem ter 0.
   pesoG: z.number().nonnegative(),
   tempoH: z.number().nonnegative(),
@@ -56,6 +58,7 @@ export const ProdutoCreateSchema = ProdutoSchema.omit({
   anunciado: z.boolean().default(false),
   metodoImagem: MetodoImagemEnum.nullable().optional(),
   insumos: z.array(ProdutoInsumoInputSchema).optional(),
+  filamentos: ComposicaoFilamentosSchema.optional(),
 });
 
 export const ProdutoUpdateSchema = ProdutoCreateSchema.partial();

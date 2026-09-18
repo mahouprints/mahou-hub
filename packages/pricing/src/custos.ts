@@ -16,6 +16,24 @@ export function custoFilamentoCentavos(pesoG: number, custoKgCentavos: number): 
 }
 
 /**
+ * Soma materiais antes de arredondar para evitar acumular centavos por cor.
+ * Ex.: dois materiais de 0,3 centavo cada custam 1 centavo ao todo.
+ */
+export function custoFilamentosCentavos(
+  filamentos: Array<{ pesoG: number; filamento: Pick<Filamento, 'custoKgCentavos'> }>,
+): number {
+  const custoTotal = filamentos.reduce((total, item) => {
+    const custoKg = item.filamento.custoKgCentavos;
+    if (item.pesoG < 0 || custoKg < 0) {
+      throw new Error(`Entradas devem ser >= 0; recebi pesoG=${item.pesoG}, custoKg=${custoKg}`);
+    }
+    // Pesos da composição têm duas casas: calcular com inteiros evita 1,5 virar 1,499999…
+    return total + Math.round(item.pesoG * 100) * custoKg;
+  }, 0);
+  return arredondarCentavos(custoTotal / 100000);
+}
+
+/**
  * Custo de energia da impressão.
  * Réplica da fórmula da coluna J (Custo Energético) da aba Produtos:
  *   tempo (h) * potência (W) / 1000 * tarifa (R$/kWh)

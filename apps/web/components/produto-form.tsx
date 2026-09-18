@@ -6,12 +6,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { CalcularOutput, Filamento, Insumo, Parametro } from '@mahou-hub/contracts';
 import { apiFetch, apiUrl, fetchComRetry } from '@/lib/api-client';
-import { centavosParaReais } from '@/lib/format';
 import { parseDecimalBr, parseDecimalParaCentavos } from '@/lib/parsing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InputDecimal } from '@/components/ui/input-decimal';
+import { ProdutoFilamentosSecao } from '@/components/produto-filamentos-secao';
+import {
+  converterFilamentosForm,
+  filamentosDoFormulario,
+  linhasFilamentosDoProduto,
+  pesoTotalFilamentos,
+} from '@/lib/produto-filamentos';
 import { ProdutoPreview } from '@/components/produto-preview';
 import { ProdutoInsumosSecao } from '@/components/produto-insumos-secao';
 import { ProdutoImagensInicial } from '@/components/produto-imagens-inicial';
@@ -52,8 +58,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
         alturaCm: produto.alturaCm != null ? String(produto.alturaCm).replace('.', ',') : '',
         profundidadeCm:
           produto.profundidadeCm != null ? String(produto.profundidadeCm).replace('.', ',') : '',
-        filamentoId: produto.filamentoId,
-        pesoG: String(produto.pesoG).replace('.', ','),
+        filamentos: linhasFilamentosDoProduto(produto),
         tempoH: String(produto.tempoH).replace('.', ','),
         impressora: produto.impressora,
         embalagemReais: (produto.embalagemCentavos / 100).toFixed(2).replace('.', ','),
@@ -94,6 +99,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
     queryFn: () => apiFetch<Insumo[]>('/insumos'),
   });
 
+  const filamentosDisponiveis = filamentosDoFormulario(filamentos ?? [], produto);
   const insumosDisponiveis = insumosDoFormulario(insumosAtivos ?? [], produto);
 
   /**
@@ -109,12 +115,18 @@ export function ProdutoForm({ produto, inicial }: Props) {
   }, 0);
 
   useEffect(() => {
-    const peso = parseDecimalBr(form.pesoG);
+    let composicao;
+    try {
+      composicao = converterFilamentosForm(form.filamentos);
+    } catch {
+      setPreview(null);
+      return;
+    }
+    const peso = pesoTotalFilamentos(composicao);
     const tempo = parseDecimalBr(form.tempoH);
     const embalagem = parseDecimalParaCentavos(form.embalagemReais);
     const preco = parseDecimalParaCentavos(form.precoReais);
     if (
-      !form.filamentoId ||
       !Number.isFinite(peso) ||
       peso <= 0 ||
       !Number.isFinite(tempo) ||
@@ -125,11 +137,15 @@ export function ProdutoForm({ produto, inicial }: Props) {
       setPreview(null);
       return;
     }
+    const controller = new AbortController();
+    setPreview(null);
     const t = setTimeout(() => {
       apiFetch<CalcularOutput>('/pricing/calcular', {
         method: 'POST',
+        signal: controller.signal,
         json: {
-          filamentoId: form.filamentoId,
+          filamentos: composicao,
+          filamentoId: composicao[0]!.filamentoId,
           pesoG: peso,
           tempoH: tempo,
           impressora: form.impressora,
@@ -139,9 +155,14 @@ export function ProdutoForm({ produto, inicial }: Props) {
         },
       })
         .then(setPreview)
-        .catch(() => setPreview(null));
+        .catch(() => {
+          if (!controller.signal.aborted) setPreview(null);
+        });
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      controller.abort();
+    };
   }, [form, custoInsumosCentavos]);
 
   async function onSubmit(e: FormEvent) {
@@ -183,7 +204,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
       }
       await qc.invalidateQueries({ queryKey: ['produtos'] });
       await qc.invalidateQueries({ queryKey: ['produto', produtoId] });
-      await qc.invalidateQueries({ queryKey: ['produto-pricing', produtoId] });
+      await qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
       router.push(`/produtos/${produtoId}`);
     } catch (e) {
       setErroFormulario(e instanceof Error ? e.message : 'Erro ao salvar produto');
@@ -266,24 +287,11 @@ export function ProdutoForm({ produto, inicial }: Props) {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="filamento">Filamento</Label>
-              <Select
-                value={form.filamentoId}
-                onValueChange={(v) => setForm({ ...form, filamentoId: v })}
-              >
-                <SelectTrigger id="filamento">
-                  <SelectValue placeholder="— selecione —" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filamentos?.map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.nome} ({centavosParaReais(f.custoKgCentavos)}/kg)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <ProdutoFilamentosSecao
+              linhas={form.filamentos}
+              filamentos={filamentosDisponiveis}
+              onChange={(linhas) => setForm({ ...form, filamentos: linhas })}
+            />
 
             <ProdutoInsumosSecao
               linhas={form.insumos}
@@ -292,25 +300,14 @@ export function ProdutoForm({ produto, inicial }: Props) {
               subtotalCentavos={custoInsumosCentavos}
             />
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="peso">Peso (g)</Label>
-                <InputDecimal
-                  id="peso"
-                  value={form.pesoG}
-                  onChange={(s) => setForm({ ...form, pesoG: s })}
-                  decimals={1}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="tempo">Tempo (h)</Label>
-                <InputDecimal
-                  id="tempo"
-                  value={form.tempoH}
-                  onChange={(s) => setForm({ ...form, tempoH: s })}
-                  decimals={2}
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tempo">Tempo total por unidade (h)</Label>
+              <InputDecimal
+                id="tempo"
+                value={form.tempoH}
+                onChange={(tempoH) => setForm({ ...form, tempoH })}
+                decimals={2}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -431,7 +428,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                Preencha filamento, peso, tempo e preço para ver o cálculo.
+                Preencha os filamentos, seus pesos, o tempo total e o preço para ver o cálculo.
               </p>
             )}
           </CardContent>
