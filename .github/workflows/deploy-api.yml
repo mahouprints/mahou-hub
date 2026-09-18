@@ -76,6 +76,6 @@ jobs:
             cd /opt/mahou-hub/infra
             docker pull ghcr.io/${{ github.repository_owner }}/mahou-hub-api:latest
             docker compose --env-file .env.prod --profile prod up -d postgres
-            docker compose --env-file .env.prod --profile prod run --rm --no-deps api prisma migrate deploy
+            docker compose --env-file .env.prod --profile prod run --rm --no-deps -T api prisma migrate deploy < /dev/null
             docker compose --env-file .env.prod --profile prod up -d postgres api
           EOF
