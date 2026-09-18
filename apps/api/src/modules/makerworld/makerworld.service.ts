@@ -139,10 +139,8 @@ export class MakerworldService {
       where: { id },
       include: {
         anuncios: { orderBy: { marketplace: 'asc' } },
-        // `produtoId` sozinho não diz se o produto ESTÁ na vitrine: o vínculo continua
-        // depois que ele volta pra revisão (é o mesmo produto). A tela precisa dos dois
-        // pra não travar no botão "já está na vitrine" com o produto fora dela.
-        produto: { select: { naVitrine: true, canaisAnunciados: true } },
+        // O vínculo permanece ao arquivar: o mesmo produto pode ser reativado.
+        produto: { select: { ativo: true, canaisAnunciados: true } },
       },
     });
     if (!modelo) throw new NotFoundException(`Modelo MakerWorld ${id} não encontrado`);
@@ -179,7 +177,7 @@ export class MakerworldService {
   }
 
   /**
-   * "Anunciei este" — o modelo vira Produto de verdade e entra na Vitrine.
+   * "Anunciei este" — o modelo vira Produto e entra no catálogo ativo.
    *
    * Só a partir daqui existem venda e estoque: modelo de prospecção não tem nem um
    * nem outro, quem tem é Produto (via Venda e ProdutoVariacao). O nome sai do título
@@ -196,14 +194,12 @@ export class MakerworldService {
     if (!modelo) throw new NotFoundException(`Modelo MakerWorld ${id} não encontrado`);
 
     if (modelo.produtoId) {
-      // Produto que já existe: pode ser reanúncio depois de ter voltado pra revisão. O
-      // status do modelo volta junto, senão ele fica na vitrine e em "Favoritos" ao mesmo
-      // tempo — dois lugares dizendo coisas diferentes sobre o mesmo produto.
+      // Reutiliza o produto arquivado para preservar suas vendas e variações.
       return this.prisma.$transaction(async (tx) => {
         await tx.modeloMakerWorld.update({ where: { id }, data: { status: 'VIROU_PRODUTO' } });
         return tx.produto.update({
           where: { id: modelo.produtoId! },
-          data: { ...this.flagsDeAnuncio(canais), naVitrine: true },
+          data: { ...this.flagsDeAnuncio(canais), ativo: true },
         });
       });
     }
@@ -217,7 +213,7 @@ export class MakerworldService {
     });
     if (!filamento) {
       throw new BadRequestException(
-        'Nenhum filamento ativo cadastrado — cadastre um antes de mandar produto pra vitrine',
+        'Nenhum filamento ativo cadastrado — cadastre um antes de adicionar o produto ao catálogo',
       );
     }
 
@@ -238,14 +234,13 @@ export class MakerworldService {
           rascunho: false,
           ativo: true,
           ...this.flagsDeAnuncio(canais),
-          naVitrine: true,
         },
       });
       await tx.modeloMakerWorld.update({
         where: { id },
         data: { status: 'VIROU_PRODUTO', produtoId: produto.id },
       });
-      this.logger.log(`Modelo ${id} virou Produto ${produto.id} e entrou na vitrine`);
+      this.logger.log(`Modelo ${id} virou Produto ${produto.id} e entrou no catálogo`);
       return produto;
     });
   }

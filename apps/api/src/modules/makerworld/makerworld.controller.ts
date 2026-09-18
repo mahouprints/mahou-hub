@@ -55,7 +55,7 @@ export class MakerworldController {
 
   @Post(':id/anunciei')
   @ApiOperation({
-    summary: 'Marca como anunciado: vira Produto e entra na vitrine',
+    summary: 'Marca como anunciado: vira Produto e entra no catálogo',
     description: 'Body opcional `{ canais: ["SHOPEE","ML"] }` diz em quais marketplaces saiu.',
   })
   marcarAnunciado(
@@ -85,9 +85,7 @@ export class MakerworldController {
 
   @Post('bulk-status')
   @ApiOperation({ summary: 'Marca vários modelos de uma vez (favoritar/descartar em massa)' })
-  mudarStatus(
-    @Body(new ZodValidationPipe(MakerworldBulkStatusSchema)) body: MakerworldBulkStatus,
-  ) {
+  mudarStatus(@Body(new ZodValidationPipe(MakerworldBulkStatusSchema)) body: MakerworldBulkStatus) {
     return this.service.mudarStatusEmLote(body.ids, body.status);
   }
 }

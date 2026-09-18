@@ -28,6 +28,26 @@ function montar(
 describe('VariacoesService', () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it('exclui variações de produtos arquivados das opções de estoque, pedidos e produção', async () => {
+    const { svc, mock } = montar();
+
+    await svc.listParaEstoque();
+
+    expect(mock.produtoVariacao.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { ativo: true, produto: { ativo: true } } }),
+    );
+  });
+
+  it('mantém a consulta das variações no detalhe histórico de um produto arquivado', async () => {
+    const { svc, mock } = montar();
+
+    await svc.listByProduto('produto-arquivado', true);
+
+    expect(mock.produtoVariacao.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { produtoId: 'produto-arquivado' } }),
+    );
+  });
+
   it('gera o SKU quando não recebe um, usando a sigla da cor do filamento', async () => {
     const { svc, mock } = montar({ siglaCor: 'AZ' });
 

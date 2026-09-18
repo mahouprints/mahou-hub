@@ -207,10 +207,10 @@ describe('MakerworldService', () => {
     expect(pricing.economiaDeCustoPronto).not.toHaveBeenCalled();
   });
 
-  it('marcarAnunciado não cria produto duplicado quando o modelo já virou produto', async () => {
+  it('marcarAnunciado reativa o produto arquivado sem duplicar', async () => {
     const { mock, tx } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue({ id: 'm1', produtoId: 'p1', anuncios: [] });
-    tx.produto.update.mockResolvedValue({ id: 'p1', naVitrine: true });
+    tx.produto.update.mockResolvedValue({ id: 'p1', ativo: true });
     const svc = new MakerworldService(asPrisma(mock), pricingFake());
 
     await svc.marcarAnunciado('m1', ['SHOPEE', 'ML']);
@@ -218,10 +218,9 @@ describe('MakerworldService', () => {
     expect(mock.produto.create).not.toHaveBeenCalled();
     expect(tx.produto.update).toHaveBeenCalledWith({
       where: { id: 'p1' },
-      data: { anunciado: true, canaisAnunciados: ['SHOPEE', 'ML'], naVitrine: true },
+      data: { anunciado: true, canaisAnunciados: ['SHOPEE', 'ML'], ativo: true },
     });
-    // Reanúncio tira o modelo de "Favoritos": ele não pode estar na vitrine e na fila
-    // de revisão ao mesmo tempo.
+    // Reanunciar mantém o vínculo de conversão e preserva vendas do produto original.
     expect(tx.modeloMakerWorld.update).toHaveBeenCalledWith({
       where: { id: 'm1' },
       data: { status: 'VIROU_PRODUTO' },
@@ -252,7 +251,7 @@ describe('MakerworldService', () => {
     // está de fato à venda.
     expect(data.nome).toBe('Polvo Articulado Flexivel Impressao 3D');
     expect(data.precoCentavos).toBe(1990);
-    expect(data.naVitrine).toBe(true);
+    expect(data.ativo).toBe(true);
     expect(data.anunciado).toBe(true);
   });
 

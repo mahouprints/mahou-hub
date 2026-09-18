@@ -94,13 +94,12 @@ export default function MakerWorldPage() {
   const [nicho, setNicho] = useState<string>('todos');
   const [status, setStatus] = useState<string>('NOVO');
 
-  // Contagem por estado no próprio filtro: sem isso, modelo que volta da vitrine cai em
+  // Contagem por estado no próprio filtro: sem isso, modelo que é arquivado cai em
   // "Favoritos" e some da vista de quem abre a tela no padrão "Não revisados".
   const { data: resumo } = useQuery({
     queryKey: ['makerworld-resumo'],
-    queryFn: () => apiFetch<{ porStatus: Array<{ status: string; quantidade: number }> }>(
-      '/makerworld/resumo',
-    ),
+    queryFn: () =>
+      apiFetch<{ porStatus: Array<{ status: string; quantidade: number }> }>('/makerworld/resumo'),
   });
   const contar = (s: string) => {
     const n = resumo?.porStatus.find((x) => x.status === s)?.quantidade ?? 0;
@@ -128,8 +127,7 @@ export default function MakerWorldPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['makerworld', params.toString()],
     placeholderData: (anterior) => anterior,
-    queryFn: () =>
-      apiFetch<{ itens: ModeloItem[]; total: number }>(`/makerworld?${params}`),
+    queryFn: () => apiFetch<{ itens: ModeloItem[]; total: number }>(`/makerworld?${params}`),
   });
 
   const mudarStatus = useMutation({
@@ -163,12 +161,21 @@ export default function MakerWorldPage() {
           <Input
             placeholder="Buscar por título, tag ou autor"
             value={busca}
-            onChange={(e) => { setBusca(e.target.value); setPagina(0); }}
+            onChange={(e) => {
+              setBusca(e.target.value);
+              setPagina(0);
+            }}
             className="pl-9"
           />
         </div>
 
-        <Select value={nicho} onValueChange={(v) => { setNicho(v); setPagina(0); }}>
+        <Select
+          value={nicho}
+          onValueChange={(v) => {
+            setNicho(v);
+            setPagina(0);
+          }}
+        >
           <SelectTrigger className="w-[190px]">
             <SelectValue placeholder="Nicho" />
           </SelectTrigger>
@@ -182,7 +189,13 @@ export default function MakerWorldPage() {
           </SelectContent>
         </Select>
 
-        <Select value={status} onValueChange={(v) => { setStatus(v); setPagina(0); }}>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v);
+            setPagina(0);
+          }}
+        >
           <SelectTrigger className="w-[160px]">
             <SelectValue />
           </SelectTrigger>
@@ -190,12 +203,18 @@ export default function MakerWorldPage() {
             <SelectItem value="NOVO">Não revisados{contar('NOVO')}</SelectItem>
             <SelectItem value="FAVORITO">Favoritos{contar('FAVORITO')}</SelectItem>
             <SelectItem value="DESCARTADO">Descartados{contar('DESCARTADO')}</SelectItem>
-            <SelectItem value="VIROU_PRODUTO">Na vitrine{contar('VIROU_PRODUTO')}</SelectItem>
+            <SelectItem value="VIROU_PRODUTO">No catálogo{contar('VIROU_PRODUTO')}</SelectItem>
             <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select value={notaMinima} onValueChange={(v) => { setNotaMinima(v); setPagina(0); }}>
+        <Select
+          value={notaMinima}
+          onValueChange={(v) => {
+            setNotaMinima(v);
+            setPagina(0);
+          }}
+        >
           <SelectTrigger className="w-[150px]">
             <SelectValue />
           </SelectTrigger>
@@ -210,7 +229,10 @@ export default function MakerWorldPage() {
         <Button
           variant={esconderIp ? 'default' : 'outline'}
           size="sm"
-          onClick={() => { setEsconderIp((v) => !v); setPagina(0); }}
+          onClick={() => {
+            setEsconderIp((v) => !v);
+            setPagina(0);
+          }}
         >
           <AlertTriangle className="mr-1.5 size-4" />
           Esconder risco de marca
@@ -228,8 +250,8 @@ export default function MakerWorldPage() {
       {!isLoading && itens.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">
           Nada aqui com esses filtros. Rode o bot em{' '}
-          <code className="rounded bg-muted px-1">scripts/makerworld</code> para importar
-          modelos novos.
+          <code className="rounded bg-muted px-1">scripts/makerworld</code> para importar modelos
+          novos.
         </Card>
       )}
 
@@ -280,9 +302,7 @@ export default function MakerWorldPage() {
                 </Badge>
               </div>
 
-              <p className="line-clamp-2 text-xs text-muted-foreground">
-                {modelo.justificativaIa}
-              </p>
+              <p className="line-clamp-2 text-xs text-muted-foreground">{modelo.justificativaIa}</p>
 
               <dl className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs">
                 <dt className="text-muted-foreground">Preço sug.</dt>

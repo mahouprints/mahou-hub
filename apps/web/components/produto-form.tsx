@@ -4,33 +4,26 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Trash2 } from 'lucide-react';
-import type {
-  CalcularOutput,
-  Filamento,
-  Insumo,
-  Parametro,
-  Produto,
-  ProdutoCreate,
-  ProdutoImagem,
-} from '@mahou-hub/contracts';
+import type { CalcularOutput, Filamento, Insumo, Parametro } from '@mahou-hub/contracts';
 import { apiFetch, apiUrl, fetchComRetry } from '@/lib/api-client';
-import { centavosParaReais, pct } from '@/lib/format';
+import { centavosParaReais } from '@/lib/format';
 import { parseDecimalBr, parseDecimalParaCentavos } from '@/lib/parsing';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InputDecimal } from '@/components/ui/input-decimal';
-import { Badge } from '@/components/ui/badge';
-import { UploadDropzone } from '@/components/upload-dropzone';
-import { ImagensSection } from '@/components/imagens-section';
+import { ProdutoPreview } from '@/components/produto-preview';
+import { ProdutoInsumosSecao } from '@/components/produto-insumos-secao';
+import { ProdutoImagensInicial } from '@/components/produto-imagens-inicial';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  PRODUTO_FORM_VAZIO,
+  converterProdutoForm,
+  insumosDoFormulario,
+  type FormState,
+  type ProdutoComInsumos,
+} from '@/lib/produto-form';
+import { ImagensSection } from '@/components/imagens-section';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -39,59 +32,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-/** GET /produtos/:id devolve insumos e imagens populados; declaramos local pra não poluir contracts. */
-type ProdutoComInsumos = Produto & {
-  insumos?: Array<{ insumoId: string; qtd: number | string }>;
-  imagens?: ProdutoImagem[];
-};
-
 interface Props {
   produto?: ProdutoComInsumos | null;
   inicial?: Partial<FormState>;
 }
-
-interface InsumoLinha {
-  insumoId: string;
-  qtdStr: string; // string pro input controlled
-}
-
-interface FormState {
-  nome: string;
-  inspiracao: string;
-  modelo3dUrl: string;
-  larguraCm: string;
-  alturaCm: string;
-  profundidadeCm: string;
-  filamentoId: string;
-  pesoG: string;
-  tempoH: string;
-  impressora: 'A1' | 'H2C';
-  embalagemReais: string;
-  precoReais: string;
-  canalPrincipal: 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
-  metodoImagem: 'IA' | 'FOTO' | '';
-  insumos: InsumoLinha[];
-}
-
-const VAZIO: FormState = {
-  nome: '',
-  inspiracao: '',
-  modelo3dUrl: '',
-  larguraCm: '',
-  alturaCm: '',
-  profundidadeCm: '',
-  filamentoId: '',
-  pesoG: '',
-  tempoH: '',
-  impressora: 'A1',
-  // Embalagem default 0: custos pequenos sem rastreio individual ficam nos
-  // Insumos cadastrados; quem não usa o campo deixa zerado.
-  embalagemReais: '0,00',
-  precoReais: '',
-  canalPrincipal: 'SHOPEE',
-  metodoImagem: '',
-  insumos: [],
-};
 
 export function ProdutoForm({ produto, inicial }: Props) {
   const router = useRouter();
@@ -122,11 +66,12 @@ export function ProdutoForm({ produto, inicial }: Props) {
         })),
       };
     }
-    return { ...VAZIO, ...inicial };
+    return { ...PRODUTO_FORM_VAZIO, ...inicial };
   });
 
   const [preview, setPreview] = useState<CalcularOutput | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [erroFormulario, setErroFormulario] = useState<string | null>(null);
   // Buffer de imagens selecionadas no form (só usado em modo criar).
   // No fluxo de edição, o user gerencia as imagens direto no detail.
   const [imagensPendentes, setImagensPendentes] = useState<File[]>([]);
@@ -144,10 +89,12 @@ export function ProdutoForm({ produto, inicial }: Props) {
     queryFn: () => apiFetch<Parametro>('/parametros'),
   });
 
-  const { data: insumosDisponiveis } = useQuery({
+  const { data: insumosAtivos } = useQuery({
     queryKey: ['insumos'],
     queryFn: () => apiFetch<Insumo[]>('/insumos'),
   });
+
+  const insumosDisponiveis = insumosDoFormulario(insumosAtivos ?? [], produto);
 
   /**
    * Soma o custo dos insumos selecionados no form (em centavos). Usado tanto pro
@@ -166,7 +113,15 @@ export function ProdutoForm({ produto, inicial }: Props) {
     const tempo = parseDecimalBr(form.tempoH);
     const embalagem = parseDecimalParaCentavos(form.embalagemReais);
     const preco = parseDecimalParaCentavos(form.precoReais);
-    if (!form.filamentoId || !Number.isFinite(peso) || !Number.isFinite(tempo) || !Number.isFinite(preco) || preco <= 0) {
+    if (
+      !form.filamentoId ||
+      !Number.isFinite(peso) ||
+      peso <= 0 ||
+      !Number.isFinite(tempo) ||
+      tempo <= 0 ||
+      !Number.isFinite(preco) ||
+      preco <= 0
+    ) {
       setPreview(null);
       return;
     }
@@ -191,32 +146,12 @@ export function ProdutoForm({ produto, inicial }: Props) {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (salvando) return;
+    setErroFormulario(null);
     setSalvando(true);
     try {
-      const payload: ProdutoCreate = {
-        nome: form.nome.trim(),
-        inspiracao: form.inspiracao.trim() || null,
-        modelo3dUrl: form.modelo3dUrl.trim() || null,
-        larguraCm: parseDimensaoCm(form.larguraCm),
-        alturaCm: parseDimensaoCm(form.alturaCm),
-        profundidadeCm: parseDimensaoCm(form.profundidadeCm),
-        filamentoId: form.filamentoId,
-        pesoG: parseDecimalBr(form.pesoG),
-        tempoH: parseDecimalBr(form.tempoH),
-        impressora: form.impressora,
-        embalagemCentavos: (() => {
-          const v = parseDecimalParaCentavos(form.embalagemReais);
-          return Number.isFinite(v) ? v : 0; // vazio/inválido vira 0
-        })(),
-        precoCentavos: parseDecimalParaCentavos(form.precoReais),
-        canalPrincipal: form.canalPrincipal,
-        metodoImagem: form.metodoImagem === '' ? null : form.metodoImagem,
-        ativo: true,
-        anunciado: produto?.anunciado ?? false,
-        insumos: form.insumos
-          .filter((l) => l.insumoId && Number.isFinite(parseDecimalBr(l.qtdStr)) && parseDecimalBr(l.qtdStr) > 0)
-          .map((l) => ({ insumoId: l.insumoId, qtd: parseDecimalBr(l.qtdStr) })),
-      };
+      const payload = converterProdutoForm(form, produto);
+      let produtoId = produto?.id;
       if (produto) {
         await apiFetch(`/produtos/${produto.id}`, { method: 'PATCH', json: payload });
         toast.success('Produto atualizado');
@@ -225,6 +160,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
           method: 'POST',
           json: payload,
         });
+        produtoId = criado.id;
         // Upload das imagens pendentes depois que o produto existe (precisa do ID).
         // Falhas no upload viram aviso, mas o produto fica criado normalmente —
         // user pode subir manualmente na tela de detalhe depois.
@@ -246,9 +182,11 @@ export function ProdutoForm({ produto, inicial }: Props) {
         }
       }
       await qc.invalidateQueries({ queryKey: ['produtos'] });
-      router.push('/produtos');
+      await qc.invalidateQueries({ queryKey: ['produto', produtoId] });
+      await qc.invalidateQueries({ queryKey: ['produto-pricing', produtoId] });
+      router.push(`/produtos/${produtoId}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Erro ao salvar produto');
+      setErroFormulario(e instanceof Error ? e.message : 'Erro ao salvar produto');
     } finally {
       setSalvando(false);
     }
@@ -263,7 +201,9 @@ export function ProdutoForm({ produto, inicial }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>{editando ? 'Editar produto' : 'Novo produto'}</CardTitle>
-          <CardDescription>Dados que vão para o catálogo</CardDescription>
+          <CardDescription>
+            Custos e quantidades referentes a uma unidade do produto
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
@@ -279,7 +219,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="inspiracao">Inspiração (URL)</Label>
+                <Label htmlFor="inspiracao">Inspiração (URL opcional)</Label>
                 <Input
                   id="inspiracao"
                   value={form.inspiracao}
@@ -288,7 +228,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="modelo3d">Modelo 3D (URL)</Label>
+                <Label htmlFor="modelo3d">Modelo 3D (URL opcional)</Label>
                 <Input
                   id="modelo3d"
                   value={form.modelo3dUrl}
@@ -303,18 +243,21 @@ export function ProdutoForm({ produto, inicial }: Props) {
               {/* Ordem: largura, profundidade, altura — espelha a apresentação L×P×A. */}
               <div className="grid grid-cols-3 gap-2">
                 <InputDecimal
+                  aria-label="Largura (cm)"
                   value={form.larguraCm}
                   onChange={(s) => setForm({ ...form, larguraCm: s })}
                   decimals={1}
                   placeholder="largura"
                 />
                 <InputDecimal
+                  aria-label="Profundidade (cm)"
                   value={form.profundidadeCm}
                   onChange={(s) => setForm({ ...form, profundidadeCm: s })}
                   decimals={1}
                   placeholder="profundidade"
                 />
                 <InputDecimal
+                  aria-label="Altura (cm)"
                   value={form.alturaCm}
                   onChange={(s) => setForm({ ...form, alturaCm: s })}
                   decimals={1}
@@ -324,12 +267,12 @@ export function ProdutoForm({ produto, inicial }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Filamento</Label>
+              <Label htmlFor="filamento">Filamento</Label>
               <Select
                 value={form.filamentoId}
                 onValueChange={(v) => setForm({ ...form, filamentoId: v })}
               >
-                <SelectTrigger>
+                <SelectTrigger id="filamento">
                   <SelectValue placeholder="— selecione —" />
                 </SelectTrigger>
                 <SelectContent>
@@ -342,7 +285,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
               </Select>
             </div>
 
-            <InsumosSecao
+            <ProdutoInsumosSecao
               linhas={form.insumos}
               onChange={(insumos) => setForm({ ...form, insumos })}
               insumosDisponiveis={insumosDisponiveis ?? []}
@@ -351,16 +294,18 @@ export function ProdutoForm({ produto, inicial }: Props) {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Peso (g)</Label>
+                <Label htmlFor="peso">Peso (g)</Label>
                 <InputDecimal
+                  id="peso"
                   value={form.pesoG}
                   onChange={(s) => setForm({ ...form, pesoG: s })}
                   decimals={1}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Tempo (h)</Label>
+                <Label htmlFor="tempo">Tempo (h)</Label>
                 <InputDecimal
+                  id="tempo"
                   value={form.tempoH}
                   onChange={(s) => setForm({ ...form, tempoH: s })}
                   decimals={2}
@@ -370,12 +315,12 @@ export function ProdutoForm({ produto, inicial }: Props) {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Impressora</Label>
+                <Label htmlFor="impressora">Impressora</Label>
                 <Select
                   value={form.impressora}
                   onValueChange={(v) => setForm({ ...form, impressora: v as 'A1' | 'H2C' })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="impressora">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -385,12 +330,14 @@ export function ProdutoForm({ produto, inicial }: Props) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Canal principal</Label>
+                <Label htmlFor="canal">Canal principal</Label>
                 <Select
                   value={form.canalPrincipal}
-                  onValueChange={(v) => setForm({ ...form, canalPrincipal: v as FormState['canalPrincipal'] })}
+                  onValueChange={(v) =>
+                    setForm({ ...form, canalPrincipal: v as FormState['canalPrincipal'] })
+                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="canal">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -404,44 +351,51 @@ export function ProdutoForm({ produto, inicial }: Props) {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Método da imagem final</Label>
+              <Label htmlFor="metodo-imagem">Método da imagem final</Label>
               <Select
                 value={form.metodoImagem === '' ? 'NULL' : form.metodoImagem}
                 onValueChange={(v) =>
                   setForm({ ...form, metodoImagem: v === 'NULL' ? '' : (v as 'IA' | 'FOTO') })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id="metodo-imagem">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NULL">— não decidido —</SelectItem>
-                  <SelectItem value="IA">Gerar via IA (skill /gerar-imagem)</SelectItem>
+                  <SelectItem value="IA">Gerar com IA</SelectItem>
                   <SelectItem value="FOTO">Fotografar (imprimir e tirar foto)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Define em qual fila o produto entra. A skill de geração só pega <code>IA</code>.
+                Escolha como será feita a imagem final do produto.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Embalagem (R$)</Label>
+                <Label htmlFor="embalagem">Embalagem (R$)</Label>
                 <InputDecimal
+                  id="embalagem"
                   value={form.embalagemReais}
                   onChange={(s) => setForm({ ...form, embalagemReais: s })}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label>Preço (R$)</Label>
+                <Label htmlFor="preco">Preço (R$)</Label>
                 <InputDecimal
+                  id="preco"
                   value={form.precoReais}
                   onChange={(s) => setForm({ ...form, precoReais: s })}
                 />
               </div>
             </div>
 
+            {erroFormulario && (
+              <p role="alert" className="text-sm text-destructive">
+                {erroFormulario}
+              </p>
+            )}
             <div className="flex gap-2 pt-2">
               <Button type="button" variant="ghost" onClick={() => router.push('/produtos')}>
                 Cancelar
@@ -463,7 +417,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
           </CardHeader>
           <CardContent>
             {preview ? (
-              <Preview
+              <ProdutoPreview
                 preview={preview}
                 thresholdVerde={thresholdVerde}
                 thresholdAmarelo={thresholdAmarelo}
@@ -499,7 +453,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
             {editando && produto ? (
               <ImagensSection produtoId={produto.id} imagens={produto.imagens ?? []} />
             ) : (
-              <ImagensInicialSecao
+              <ProdutoImagensInicial
                 arquivos={imagensPendentes}
                 onArquivos={setImagensPendentes}
                 origem={origemImagens}
@@ -513,447 +467,3 @@ export function ProdutoForm({ produto, inicial }: Props) {
     </div>
   );
 }
-
-type CanalKey = 'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK';
-const CANAL_PREVIEW_LABEL: Record<CanalKey, string> = {
-  SHOPEE: 'Shopee',
-  ML: 'Mercado Livre',
-  SITE: 'Site próprio',
-  TIKTOK: 'TikTok Shop',
-};
-
-interface CanalPreviewInfo {
-  key: CanalKey;
-  liquidoCentavos: number;
-  margem: number;
-  lucroHCentavos: number | null;
-  taxaCentavos: number;
-}
-
-/**
- * Preview com mesma estética do detail page: veredito + custos por unidade +
- * comparativo de canais. Mais legível que a antiga lista vertical com 18 linhas.
- */
-function Preview({
-  preview,
-  thresholdVerde,
-  thresholdAmarelo,
-  canal,
-  embalagemCentavos,
-  custoInsumosCentavos,
-  precoCentavos,
-}: {
-  preview: CalcularOutput;
-  thresholdVerde: number;
-  thresholdAmarelo: number;
-  canal: CanalKey;
-  embalagemCentavos: number;
-  custoInsumosCentavos: number;
-  precoCentavos: number;
-}) {
-  const margemPrincipal =
-    canal === 'SHOPEE'
-      ? preview.margemShopee
-      : canal === 'ML'
-        ? preview.margemMl
-        : canal === 'TIKTOK'
-          ? preview.margemTikTok
-          : preview.margemSite;
-  const variant: 'success' | 'warning' | 'danger' =
-    margemPrincipal >= thresholdVerde
-      ? 'success'
-      : margemPrincipal >= thresholdAmarelo
-        ? 'warning'
-        : 'danger';
-  const veredito =
-    margemPrincipal >= thresholdVerde
-      ? 'Vale a pena'
-      : margemPrincipal >= thresholdAmarelo
-        ? 'Atenção'
-        : 'Não compensa';
-
-  const canais: CanalPreviewInfo[] = [
-    {
-      key: 'SHOPEE',
-      liquidoCentavos: preview.liquidoShopeeCentavos,
-      margem: preview.margemShopee,
-      lucroHCentavos: preview.lucroPorHoraShopeeCentavos,
-      taxaCentavos: preview.taxaShopeeCentavos,
-    },
-    {
-      key: 'ML',
-      liquidoCentavos: preview.liquidoMlCentavos,
-      margem: preview.margemMl,
-      lucroHCentavos: preview.lucroPorHoraMlCentavos,
-      taxaCentavos: preview.taxaMlCentavos,
-    },
-    {
-      key: 'SITE',
-      liquidoCentavos: preview.liquidoSiteCentavos,
-      margem: preview.margemSite,
-      lucroHCentavos: preview.lucroPorHoraSiteCentavos,
-      taxaCentavos: 0,
-    },
-    {
-      key: 'TIKTOK',
-      liquidoCentavos: preview.liquidoTikTokCentavos,
-      margem: preview.margemTikTok,
-      lucroHCentavos: preview.lucroPorHoraTikTokCentavos,
-      taxaCentavos: preview.taxaTikTokCentavos,
-    },
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Badge variant={variant} className="text-sm">
-          {veredito}
-        </Badge>
-        <p className="text-sm text-muted-foreground">
-          Margem do canal principal ({CANAL_PREVIEW_LABEL[canal]}):{' '}
-          <span className="font-semibold text-foreground">{pct(margemPrincipal)}</span>
-        </p>
-      </div>
-
-      <section>
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Custos por unidade
-        </h3>
-        <div className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-          <PreviewItem rotulo="Filamento" valor={centavosParaReais(preview.custoFilamentoCentavos)} />
-          <PreviewItem rotulo="Energia" valor={centavosParaReais(preview.custoEnergiaCentavos)} />
-          <PreviewItem rotulo="Embalagem" valor={centavosParaReais(embalagemCentavos)} />
-          <PreviewItem rotulo="Insumos" valor={centavosParaReais(custoInsumosCentavos)} />
-          <PreviewItem rotulo="Imposto" valor={centavosParaReais(preview.impostoCentavos)} />
-          <PreviewItem
-            rotulo="Custo total"
-            valor={centavosParaReais(preview.custoTotalProducaoCentavos)}
-            destaque
-          />
-        </div>
-      </section>
-
-      <section>
-        <div className="mb-2 flex items-baseline justify-between">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Por canal
-          </h3>
-          <span className="text-xs text-muted-foreground">
-            Preço de venda: {centavosParaReais(precoCentavos)}
-          </span>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {canais.map((c) => (
-            <CanalPreviewCard
-              key={c.key}
-              info={c}
-              principal={c.key === canal}
-              thresholdVerde={thresholdVerde}
-              thresholdAmarelo={thresholdAmarelo}
-            />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function CanalPreviewCard({
-  info,
-  principal,
-  thresholdVerde,
-  thresholdAmarelo,
-}: {
-  info: CanalPreviewInfo;
-  principal: boolean;
-  thresholdVerde: number;
-  thresholdAmarelo: number;
-}) {
-  const v: 'success' | 'warning' | 'danger' =
-    info.margem >= thresholdVerde
-      ? 'success'
-      : info.margem >= thresholdAmarelo
-        ? 'warning'
-        : 'danger';
-  return (
-    <div
-      className={
-        'rounded-lg border p-4 transition-colors ' +
-        (principal ? 'border-primary/60 bg-primary/5' : 'border-border bg-card/50')
-      }
-    >
-      <div className="mb-3 flex items-center justify-between text-sm font-medium">
-        <span>{CANAL_PREVIEW_LABEL[info.key]}</span>
-        {principal && <span className="text-xs text-primary-foreground">principal</span>}
-      </div>
-      <div className="space-y-3">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">Líquido</div>
-          <div className="text-xl font-semibold tabular-nums">
-            {centavosParaReais(info.liquidoCentavos)}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <div className="text-xs text-muted-foreground">Margem</div>
-            <Badge variant={v} className="font-normal">
-              {pct(info.margem)}
-            </Badge>
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">Lucro/h</div>
-            <div className="tabular-nums">
-              {info.lucroHCentavos != null ? centavosParaReais(info.lucroHCentavos) : '—'}
-            </div>
-          </div>
-        </div>
-        <div className="border-t border-border pt-2 text-xs text-muted-foreground">
-          Taxa:{' '}
-          <span className="tabular-nums text-foreground">
-            {info.taxaCentavos > 0 ? centavosParaReais(info.taxaCentavos) : '—'}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PreviewItem({
-  rotulo,
-  valor,
-  destaque,
-}: {
-  rotulo: string;
-  valor: string;
-  destaque?: boolean;
-}) {
-  return (
-    <div
-      className={
-        'flex items-center justify-between gap-3 ' +
-        (destaque ? 'border-t border-border pt-2 font-semibold' : '')
-      }
-    >
-      <span className={destaque ? 'text-foreground' : 'text-muted-foreground'}>{rotulo}</span>
-      <span className="tabular-nums">{valor}</span>
-    </div>
-  );
-}
-
-function InsumosSecao({
-  linhas,
-  onChange,
-  insumosDisponiveis,
-  subtotalCentavos,
-}: {
-  linhas: InsumoLinha[];
-  onChange: (l: InsumoLinha[]) => void;
-  insumosDisponiveis: Insumo[];
-  subtotalCentavos: number;
-}) {
-  function adicionar() {
-    onChange([...linhas, { insumoId: '', qtdStr: '' }]);
-  }
-  function remover(idx: number) {
-    onChange(linhas.filter((_, i) => i !== idx));
-  }
-  function alterar(idx: number, patch: Partial<InsumoLinha>) {
-    onChange(linhas.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
-  }
-
-  // Insumos já escolhidos em outras linhas (pra esconder das opções)
-  const idsEmUso = new Set(linhas.map((l) => l.insumoId).filter(Boolean));
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label>Insumos consumidos</Label>
-        {subtotalCentavos > 0 && (
-          <span className="text-xs text-muted-foreground">
-            subtotal{' '}
-            <span className="font-medium text-foreground tabular-nums">
-              {centavosParaReais(subtotalCentavos)}
-            </span>
-          </span>
-        )}
-      </div>
-
-      {linhas.length === 0 && (
-        <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-          Nenhum insumo. Adicione caixa, fita, etiqueta etc. que esse produto consome.
-        </p>
-      )}
-
-      {linhas.map((linha, idx) => {
-        const insumo = insumosDisponiveis.find((i) => i.id === linha.insumoId);
-        const opcoes = insumosDisponiveis.filter(
-          (i) => i.id === linha.insumoId || !idsEmUso.has(i.id),
-        );
-        return (
-          <div key={idx} className="grid grid-cols-[1fr_120px_auto] items-center gap-2">
-            <Select
-              value={linha.insumoId}
-              onValueChange={(v) => alterar(idx, { insumoId: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="— selecione um insumo —" />
-              </SelectTrigger>
-              <SelectContent>
-                {opcoes.map((i) => (
-                  <SelectItem key={i.id} value={i.id}>
-                    {i.nome} ({centavosParaReais(i.custoUnitarioCentavos)}/{i.unidade})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <InputDecimal
-              value={linha.qtdStr}
-              onChange={(s) => alterar(idx, { qtdStr: s })}
-              decimals={3}
-              placeholder={insumo ? `qtd em ${insumo.unidade}` : 'qtd'}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => remover(idx)}
-              title="Remover linha"
-              className="h-9 w-9 text-muted-foreground hover:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        );
-      })}
-
-      <Button type="button" variant="outline" size="sm" onClick={adicionar}>
-        + Adicionar insumo
-      </Button>
-    </div>
-  );
-}
-
-/** Parse pra centímetros: aceita "10,5" ou "10.5"; vazio/inválido vira null. */
-/**
- * Buffer de imagens selecionadas antes de criar o produto. Não envia nada —
- * só acumula File[]; o submit do form faz upload depois que tem o ID do produto.
- * Renderizada apenas em modo criar (em editar, user usa a seção do detail).
- */
-function ImagensInicialSecao({
-  arquivos,
-  onArquivos,
-  origem,
-  onOrigemChange,
-  desabilitado,
-}: {
-  arquivos: File[];
-  onArquivos: (a: File[]) => void;
-  origem: 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA';
-  onOrigemChange: (o: 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA') => void;
-  desabilitado: boolean;
-}) {
-  function remover(idx: number) {
-    onArquivos(arquivos.filter((_, i) => i !== idx));
-  }
-
-  return (
-    <div className="space-y-3 rounded-lg border border-border/60 bg-card/30 p-4">
-      <div className="flex items-baseline justify-between">
-        <div>
-          <Label className="text-sm font-medium">Imagens</Label>
-          <p className="text-xs text-muted-foreground">
-            Opcional · enviadas após criar o produto
-          </p>
-        </div>
-        {arquivos.length > 0 && (
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {arquivos.length} {arquivos.length === 1 ? 'arquivo selecionado' : 'arquivos selecionados'}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3 text-xs">
-        <span className="uppercase tracking-wide text-muted-foreground">Origem</span>
-        <Select
-          value={origem}
-          onValueChange={(v) => onOrigemChange(v as 'INSPIRACAO' | 'MODELO_3D' | 'OUTRA')}
-        >
-          <SelectTrigger className="h-8 w-40 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="INSPIRACAO">Inspiração</SelectItem>
-            <SelectItem value="MODELO_3D">Modelo 3D</SelectItem>
-            <SelectItem value="OUTRA">Outra</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <UploadDropzone
-        onArquivos={(novos) => onArquivos([...arquivos, ...novos])}
-        disabled={desabilitado}
-        label="Arraste, clique ou cole (Ctrl+V) pra enviar"
-      />
-
-      {arquivos.length > 0 && (
-        <PreviewArquivos arquivos={arquivos} onRemover={remover} />
-      )}
-    </div>
-  );
-}
-
-/**
- * Preview dos arquivos selecionados com thumb da imagem (via URL.createObjectURL).
- * Revoga as object-URLs no unmount/mudança pra não vazar memória.
- */
-function PreviewArquivos({
-  arquivos,
-  onRemover,
-}: {
-  arquivos: File[];
-  onRemover: (idx: number) => void;
-}) {
-  const [urls, setUrls] = useState<string[]>([]);
-
-  useEffect(() => {
-    const novas = arquivos.map((f) => URL.createObjectURL(f));
-    setUrls(novas);
-    return () => novas.forEach((u) => URL.revokeObjectURL(u));
-  }, [arquivos]);
-
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-      {arquivos.map((f, i) => (
-        <div
-          key={`${f.name}-${i}`}
-          className="group relative aspect-square overflow-hidden rounded-md border border-border bg-muted"
-        >
-          {urls[i] && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={urls[i]} alt={f.name} className="h-full w-full object-cover" />
-          )}
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5">
-            <p className="truncate text-[10px] text-white">{f.name}</p>
-            <p className="text-[10px] text-white/70 tabular-nums">
-              {(f.size / 1024).toFixed(0)} KB
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onRemover(i)}
-            title="Remover"
-            className="absolute right-1.5 top-1.5 inline-flex h-6 w-6 items-center justify-center rounded-md bg-background/90 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100"
-          >
-            ×
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function parseDimensaoCm(s: string): number | null {
-  const n = parseDecimalBr(s);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-

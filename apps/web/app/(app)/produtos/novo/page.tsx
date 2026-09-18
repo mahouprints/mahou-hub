@@ -22,7 +22,7 @@ function ProdutoNovoContent() {
     impressora: (searchParams.get('impressora') as 'A1' | 'H2C') ?? 'A1',
     embalagemReais: searchParams.get('embalagemCentavos')
       ? (Number(searchParams.get('embalagemCentavos')) / 100).toFixed(2).replace('.', ',')
-      : '',
+      : '0,00',
     precoReais: searchParams.get('precoCentavos')
       ? (Number(searchParams.get('precoCentavos')) / 100).toFixed(2).replace('.', ',')
       : '',
@@ -35,7 +35,8 @@ function ProdutoNovoContent() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Novo produto</h1>
         <p className="text-sm text-muted-foreground">
-          Preencha os dados e veja o cálculo ao vivo no painel à direita.
+          Cadastre uma peça avulsa ou autoral. Informe peso, tempo e insumos por unidade; o custo é
+          calculado ao lado.
         </p>
       </header>
       <ProdutoForm inicial={inicial} />

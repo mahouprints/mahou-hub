@@ -103,6 +103,28 @@ describe('EstoqueService.registrarMovimento — filamento (gramas, Decimal)', ()
 });
 
 describe('EstoqueService.alertas', () => {
+  it('só considera produtos ativos e mantém o alerta quando o saldo chega ao mínimo', async () => {
+    const { mock } = makePrismaMock();
+    mock.filamento.findMany.mockResolvedValue([]);
+    mock.insumo.findMany.mockResolvedValue([]);
+    mock.produtoVariacao.findMany.mockResolvedValue([
+      { id: 'v1', nome: 'Azul', estoqueAtual: 2, estoqueMinimo: 2, produto: { nome: 'Vaso' } },
+      { id: 'v2', nome: 'Rosa', estoqueAtual: 3, estoqueMinimo: 2, produto: { nome: 'Vaso' } },
+    ]);
+    const svc = new EstoqueService(asPrisma(mock));
+
+    const alertas = await svc.alertas();
+
+    expect(mock.produtoVariacao.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { ativo: true, produto: { ativo: true }, estoqueMinimo: { gt: 0 } },
+      }),
+    );
+    expect(alertas).toEqual([
+      { tipo: 'PRODUTO', id: 'v1', nome: 'Vaso — Azul', unidade: 'un', saldo: 2, minimo: 2 },
+    ]);
+  });
+
   it('lista item no/abaixo do mínimo configurado (mínimo > 0)', async () => {
     const { mock } = makePrismaMock();
     mock.filamento.findMany.mockResolvedValue([

@@ -59,7 +59,7 @@ export class PricingService {
   async simular(input: SimularInput): Promise<SimularOutput> {
     const produto = await this.prisma.produto.findUnique({
       where: { id: input.produtoId },
-      include: { filamento: true },
+      include: { filamento: true, insumos: { include: { insumo: true } } },
     });
     if (!produto) throw new NotFoundException(`Produto ${input.produtoId} não existe`);
 
@@ -69,6 +69,10 @@ export class PricingService {
       tempoH: Number(produto.tempoH),
       impressora: produto.impressora,
       embalagemCentavos: produto.embalagemCentavos,
+      custoInsumosCentavos: produto.insumos.reduce(
+        (total, item) => total + Math.round(Number(item.qtd) * item.insumo.custoUnitarioCentavos),
+        0,
+      ),
       precoCentavos: produto.precoCentavos,
     });
 
@@ -77,7 +81,9 @@ export class PricingService {
         ? calculado.liquidoShopeeCentavos
         : produto.canalPrincipal === 'ML'
           ? calculado.liquidoMlCentavos
-          : calculado.liquidoSiteCentavos;
+          : produto.canalPrincipal === 'TIKTOK'
+            ? calculado.liquidoTikTokCentavos
+            : calculado.liquidoSiteCentavos;
 
     return simularCenario({
       horasPorDia: input.horasPorDia,

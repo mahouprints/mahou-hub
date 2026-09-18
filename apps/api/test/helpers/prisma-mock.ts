@@ -12,7 +12,7 @@ export function makePrismaMock() {
       upsert: vi.fn(),
       findMany: vi.fn(),
     },
-    produto: { create: vi.fn(), update: vi.fn() },
+    produto: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
     modeloMakerWorld: { update: vi.fn() },
     produtoVariacao: { findUnique: vi.fn(), update: vi.fn() },
     filamento: { findUnique: vi.fn(), update: vi.fn() },
@@ -61,7 +61,7 @@ export function makePrismaMock() {
       create: vi.fn(),
       deleteMany: vi.fn(),
     },
-    custo: { create: vi.fn() },
+    custo: { create: vi.fn(), findMany: vi.fn() },
     concorrente: { findMany: vi.fn() },
     modeloMakerWorld: {
       findUnique: vi.fn(),

@@ -3,13 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
 import { ProdutosService } from '../src/modules/produtos/produtos.service';
 import type { ImagensService } from '../src/modules/imagens/imagens.service';
-import type { MediaUrlService } from '../src/modules/imagens/media-url.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
-
-// Só a vitrine usa o MediaUrlService; nos demais testes o stub existe pro construtor.
-function makeMediaUrlMock(): MediaUrlService {
-  return { publicUrl: vi.fn((a: string) => `https://media.test/${a}`) } as unknown as MediaUrlService;
-}
 
 function makeImagensMock(): ImagensService {
   return { paraDto: vi.fn((row) => row) } as unknown as ImagensService;
@@ -51,7 +45,15 @@ function stubPricingDependencies(mock: ReturnType<typeof makePrismaMock>['mock']
   ]);
 }
 
-function fakeProduto(overrides: Partial<{ id: string; nome: string; anunciado: boolean; inspiracao: string | null; modelo3dUrl: string | null }> = {}) {
+function fakeProduto(
+  overrides: Partial<{
+    id: string;
+    nome: string;
+    anunciado: boolean;
+    inspiracao: string | null;
+    modelo3dUrl: string | null;
+  }> = {},
+) {
   return {
     id: overrides.id ?? 'p1',
     nome: overrides.nome ?? 'Produto X',
@@ -94,13 +96,22 @@ describe('ProdutosService.list — filtros', () => {
     stubPricingDependencies(mock);
     mock.produto.findMany.mockResolvedValue([] as never);
     mock.produto.count.mockResolvedValue(0 as never);
-    svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+    svc = new ProdutosService(asPrisma(mock), makeImagensMock());
   });
 
-  it('sempre filtra por ativo=true (soft-delete invisível)', async () => {
+  it('filtra por ativo=true por padrão', async () => {
     await svc.list();
     const call = mock.produto.findMany.mock.calls[0]?.[0];
     expect(call?.where.ativo).toBe(true);
+  });
+
+  it('permite listar arquivados com os demais filtros', async () => {
+    await svc.list({ ativo: false, anunciado: false, q: 'peça', page: 2, pageSize: 10 });
+    const call = mock.produto.findMany.mock.calls[0]?.[0];
+    expect(call.where).toMatchObject({ ativo: false, anunciado: false });
+    expect(call.where.AND).toHaveLength(1);
+    expect(call.skip).toBe(10);
+    expect(mock.produto.count).toHaveBeenCalledWith({ where: call.where });
   });
 
   it('temReferencia=true exige inspiracao OU modelo3dUrl preenchido', async () => {
@@ -120,10 +131,14 @@ describe('ProdutosService.list — filtros', () => {
 
   it('temImagens=true filtra com imagens.some, temImagens=false com imagens.none', async () => {
     await svc.list({ temImagens: true });
-    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({ imagens: { some: {} } });
+    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({
+      imagens: { some: {} },
+    });
     mock.produto.findMany.mockClear();
     await svc.list({ temImagens: false });
-    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({ imagens: { none: {} } });
+    expect(mock.produto.findMany.mock.calls[0]?.[0].where.AND).toContainEqual({
+      imagens: { none: {} },
+    });
   });
 
   it('temImagemGerada=true exige origem=GERADA, =false exige ausência', async () => {
@@ -191,7 +206,7 @@ describe('ProdutosService.marcarAnunciados', () => {
   it('chama updateMany com anunciado=true pra ids dados', async () => {
     const { mock } = makePrismaMock();
     mock.produto.updateMany.mockResolvedValue({ count: 2 } as never);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
     const r = await svc.marcarAnunciados(['a', 'b'], true);
     expect(r).toEqual({ ok: true, count: 2 });
     expect(mock.produto.updateMany).toHaveBeenCalledWith({
@@ -205,7 +220,7 @@ describe('ProdutosService.desativarMuitos', () => {
   it('soft-delete em massa preserva referência histórica', async () => {
     const { mock } = makePrismaMock();
     mock.produto.updateMany.mockResolvedValue({ count: 3 } as never);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
     const r = await svc.desativarMuitos(['x', 'y', 'z']);
     expect(r).toEqual({ ok: true, count: 3 });
     const call = mock.produto.updateMany.mock.calls[0]?.[0];
@@ -213,144 +228,131 @@ describe('ProdutosService.desativarMuitos', () => {
   });
 });
 
-describe('ProdutosService.vitrine', () => {
-  const linhaBase = {
-    id: 'p1',
-    nome: 'Polvo Articulado',
-    precoCentavos: 2490,
-    canalPrincipal: 'SHOPEE',
-    variacoes: [{ estoqueAtual: 3, estoqueMinimo: 5 }],
-  };
+describe('ProdutosService.definirCanaisAnunciados — catálogo independente dos anúncios', () => {
+  it.each([true, false])(
+    'retirar anúncios preserva o produto ativo=%s e a prospecção',
+    async (ativo) => {
+      const { mock, tx } = makePrismaMock();
+      mock.produto.findUnique.mockResolvedValue({ id: 'p1', ativo });
+      const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
 
-  it('cai no render do MakerWorld quando o produto ainda não tem foto', async () => {
+      await svc.definirCanaisAnunciados('p1', []);
+
+      expect(mock.produto.update).toHaveBeenCalledWith({
+        where: { id: 'p1' },
+        data: { canaisAnunciados: [], anunciado: false },
+      });
+      expect(tx.modeloMakerWorld.update).not.toHaveBeenCalled();
+    },
+  );
+
+  it('grava os canais únicos e liga a flag anunciado', async () => {
     const { mock } = makePrismaMock();
-    mock.produto.findMany.mockResolvedValue([
-      { ...linhaBase, imagens: [], modeloMakerWorld: { imagemUrl: 'https://mw/render.png' } },
-    ] as never);
-    mock.venda.findMany.mockResolvedValue([] as never);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
-
-    const [linha] = await svc.vitrine();
-
-    expect(linha?.imagemUrl).toBe('https://mw/render.png');
-    expect(linha?.imagemEhRender).toBe(true);
-    // 3 prontos contra mínimo 5 — a vitrine tem que gritar.
-    expect(linha?.abaixoDoMinimo).toBe(true);
-  });
-
-  it('foto própria ganha do render, e não marca como render', async () => {
-    const { mock } = makePrismaMock();
-    mock.produto.findMany.mockResolvedValue([
-      {
-        ...linhaBase,
-        imagens: [{ arquivo: 'produtos/p1/foto.jpg' }],
-        modeloMakerWorld: { imagemUrl: 'https://mw/render.png' },
-      },
-    ] as never);
-    mock.venda.findMany.mockResolvedValue([] as never);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
-
-    const [linha] = await svc.vitrine();
-
-    expect(linha?.imagemUrl).toBe('https://media.test/produtos/p1/foto.jpg');
-    expect(linha?.imagemEhRender).toBe(false);
-  });
-
-  it('soma unidades e receita usando o preço praticado em cada venda', async () => {
-    const { mock } = makePrismaMock();
-    mock.produto.findMany.mockResolvedValue([
-      { ...linhaBase, imagens: [], modeloMakerWorld: null },
-    ] as never);
-    mock.venda.findMany.mockResolvedValue([
-      { produtoId: 'p1', qtd: 2, precoUnitarioCentavos: 2490, dataVenda: new Date('2026-07-01') },
-      // Preço promocional: se a receita usasse Produto.precoCentavos, sairia inflada.
-      { produtoId: 'p1', qtd: 1, precoUnitarioCentavos: 1990, dataVenda: new Date('2026-07-20') },
-    ] as never);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
-
-    const [linha] = await svc.vitrine();
-
-    expect(linha?.unidadesVendidas).toBe(3);
-    expect(linha?.receitaCentavos).toBe(2 * 2490 + 1990);
-    expect(linha?.ultimaVenda).toBe(new Date('2026-07-20').toISOString());
-  });
-});
-
-describe('ProdutosService.definirCanaisAnunciados — volta pra revisão', () => {
-  function montarComModelo(temModelo: boolean) {
-    const { mock } = makePrismaMock();
-    mock.produto.findUnique.mockResolvedValue({
-      id: 'p1',
-      modeloMakerWorld: temModelo ? { id: 'm1' } : null,
-    });
-    const tx = {
-      produto: { update: vi.fn().mockImplementation((a: { data: unknown }) => a.data) },
-      modeloMakerWorld: { update: vi.fn() },
-    };
-    mock.$transaction.mockImplementation(async (cb: unknown) =>
-      (cb as (t: unknown) => unknown)(tx),
-    );
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
-    return { svc, tx };
-  }
-
-  it('tirar de todos os canais devolve o produto pra fila do MakerWorld', async () => {
-    const { svc, tx } = montarComModelo(true);
-
-    await svc.definirCanaisAnunciados('p1', []);
-
-    expect(tx.modeloMakerWorld.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'm1' }, data: { status: 'FAVORITO' } }),
-    );
-    expect(tx.produto.update.mock.calls[0]?.[0].data).toMatchObject({
-      anunciado: false,
-      naVitrine: false,
-    });
-  });
-
-  it('ainda anunciado em algum canal não sai da vitrine', async () => {
-    const { svc, tx } = montarComModelo(true);
-
-    await svc.definirCanaisAnunciados('p1', ['SHOPEE']);
-
-    expect(tx.modeloMakerWorld.update).not.toHaveBeenCalled();
-    expect(tx.produto.update.mock.calls[0]?.[0].data).not.toHaveProperty('naVitrine');
-  });
-
-  it('produto cadastrado à mão não tem pra onde voltar — só desmarca', async () => {
-    // Sem modelo de origem, tirar da vitrine deixaria o produto sem tela nenhuma.
-    const { svc, tx } = montarComModelo(false);
-
-    await svc.definirCanaisAnunciados('p1', []);
-
-    expect(tx.modeloMakerWorld.update).not.toHaveBeenCalled();
-    expect(tx.produto.update.mock.calls[0]?.[0].data).not.toHaveProperty('naVitrine');
-  });
-
-  it('grava os canais e liga a flag `anunciado`', async () => {
-    const { svc, tx } = montarComModelo(true);
-
-    await svc.definirCanaisAnunciados('p1', ['SHOPEE', 'ML']);
-
-    expect(tx.produto.update.mock.calls[0]?.[0].data).toMatchObject({
-      canaisAnunciados: ['SHOPEE', 'ML'],
-      anunciado: true,
-    });
-  });
-
-  it('canal repetido não vira selo duplicado', async () => {
-    const { svc, tx } = montarComModelo(true);
+    mock.produto.findUnique.mockResolvedValue({ id: 'p1' });
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
 
     await svc.definirCanaisAnunciados('p1', ['SHOPEE', 'SHOPEE', 'ML']);
 
-    expect(tx.produto.update.mock.calls[0]?.[0].data.canaisAnunciados).toEqual(['SHOPEE', 'ML']);
+    expect(mock.produto.update).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { canaisAnunciados: ['SHOPEE', 'ML'], anunciado: true },
+    });
   });
 
   it('produto inexistente é 404', async () => {
     const { mock } = makePrismaMock();
     mock.produto.findUnique.mockResolvedValue(null);
-    const svc = new ProdutosService(asPrisma(mock), makeImagensMock(), makeMediaUrlMock());
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
 
     await expect(svc.definirCanaisAnunciados('fantasma', ['SHOPEE'])).rejects.toThrow(/não existe/);
+  });
+});
+
+describe('ProdutosService.create — cadastro avulso', () => {
+  it('cadastra produto ativo com insumo fracionário sem origem MakerWorld', async () => {
+    const { mock } = makePrismaMock();
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
+    const produto = {
+      nome: 'Peça avulsa',
+      filamentoId: 'f1',
+      pesoG: 80,
+      tempoH: 2,
+      impressora: 'A1' as const,
+      embalagemCentavos: 100,
+      precoCentavos: 2000,
+      canalPrincipal: 'SITE' as const,
+      ativo: true,
+      anunciado: false,
+      rascunho: false,
+      inspiracao: null,
+      modelo3dUrl: null,
+      larguraCm: null,
+      alturaCm: null,
+      profundidadeCm: null,
+      metodoImagem: null,
+      insumos: [{ insumoId: 'i1', qtd: 0.5 }],
+    };
+
+    await svc.create(produto);
+
+    expect(mock.produto.create).toHaveBeenCalledWith({
+      data: { ...produto, insumos: { create: [{ insumoId: 'i1', qtd: 0.5 }] } },
+      include: { insumos: { include: { insumo: true } } },
+    });
+  });
+});
+
+describe('ProdutosService.update — completar rascunho', () => {
+  function prepararEdicao(rascunho = true) {
+    const { mock, tx } = makePrismaMock();
+    tx.produto.findUnique.mockResolvedValue({
+      ...fakeProduto(),
+      ativo: false,
+      rascunho,
+      pesoG: new Prisma.Decimal(0),
+      larguraCm: new Prisma.Decimal('4.5'),
+    });
+    return { tx, svc: new ProdutosService(asPrisma(mock), makeImagensMock()) };
+  }
+
+  it('completa pelo estado atual mais a edição, incluindo campos Decimal', async () => {
+    const { tx, svc } = prepararEdicao();
+
+    await svc.update('p1', { pesoG: 80, ativo: true });
+
+    expect(tx.produto.update).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { pesoG: 80, ativo: true, rascunho: false },
+    });
+  });
+
+  it('mantém rascunho quando a edição ainda deixa campos obrigatórios incompletos', async () => {
+    const { tx, svc } = prepararEdicao();
+
+    await svc.update('p1', { nome: 'Nome corrigido' });
+
+    expect(tx.produto.update).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { nome: 'Nome corrigido' },
+    });
+  });
+
+  it('não permite ativar rascunho incompleto', async () => {
+    const { tx, svc } = prepararEdicao();
+
+    await expect(svc.update('p1', { ativo: true })).rejects.toThrow(/Produto incompleto/);
+
+    expect(tx.produto.update).not.toHaveBeenCalled();
+  });
+
+  it('editar produto arquivado normal não o reativa', async () => {
+    const { tx, svc } = prepararEdicao(false);
+
+    await svc.update('p1', { nome: 'Produto arquivado atualizado' });
+
+    expect(tx.produto.update).toHaveBeenCalledWith({
+      where: { id: 'p1' },
+      data: { nome: 'Produto arquivado atualizado' },
+    });
   });
 });

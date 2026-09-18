@@ -293,7 +293,9 @@ export default function VendasPage() {
                     colSpan={sel.modoSelecao ? 8 : 7}
                     className="text-center text-sm text-muted-foreground"
                   >
-                    {data.length === 0 ? 'Nenhuma venda no período.' : 'Nenhuma venda bate com os filtros.'}
+                    {data.length === 0
+                      ? 'Nenhuma venda no período.'
+                      : 'Nenhuma venda bate com os filtros.'}
                   </TableCell>
                 </TableRow>
               )}
@@ -308,7 +310,8 @@ export default function VendasPage() {
         </Card>
       )}
 
-      <VendaDialog venda={emEdicao} open={dialogAberto} onOpenChange={setDialogAberto} />
+      {/* Cada abertura começa com os dados da venda escolhida, sem reutilizar o formulário anterior. */}
+      {dialogAberto && <VendaDialog venda={emEdicao} open onOpenChange={setDialogAberto} />}
     </div>
   );
 }

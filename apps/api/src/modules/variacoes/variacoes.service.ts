@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   SKU_MAX,
@@ -34,12 +30,14 @@ export class VariacoesService {
   }
 
   /**
-   * Todas as variações ativas com produto e cor (filamento). Alimenta a aba "Produtos
+   * Variações ativas de produtos ativos, com produto e cor (filamento). Alimenta a aba "Produtos
    * prontos" do estoque e o diálogo de job (que indexa por produtoId pra mostrar a qtd por cor).
    */
   listParaEstoque() {
     return this.prisma.produtoVariacao.findMany({
-      where: { ativo: true },
+      // Arquivar o produto preserva suas variações para o histórico, mas elas deixam
+      // de ser opções para novos pedidos e jobs de produção.
+      where: { ativo: true, produto: { ativo: true } },
       include: {
         filamento: { select: { nome: true } },
         produto: { select: { nome: true } },
@@ -56,7 +54,8 @@ export class VariacoesService {
     if (!produto) throw new NotFoundException(`Produto ${data.produtoId} não existe`);
 
     const sku =
-      data.sku ?? (await this.skuDisponivel(produto.nome, await this.sigla(data.filamentoId, data.nome)));
+      data.sku ??
+      (await this.skuDisponivel(produto.nome, await this.sigla(data.filamentoId, data.nome)));
     try {
       return await this.prisma.produtoVariacao.create({
         data: {

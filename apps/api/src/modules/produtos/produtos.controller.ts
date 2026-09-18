@@ -40,6 +40,7 @@ type BulkAnunciar = z.infer<typeof BulkAnunciarSchema>;
 const SORTABLE_FIELDS = ['criadoEm', 'atualizadoEm', 'nome', 'precoCentavos'] as const;
 
 const ListQuerySchema = z.object({
+  ativo: z.enum(['true', 'false']).optional(),
   anunciado: z.enum(['true', 'false']).optional(),
   canal: z.nativeEnum(Canal).optional(),
   // temImagens=true filtra produtos com >=1 ProdutoImagem (qualquer origem).
@@ -71,40 +72,103 @@ export class ProdutosController {
 
   @Get()
   @ApiOperation({
-    summary: 'Lista produtos ativos com filtros, busca e paginação',
+    summary: 'Lista produtos com filtros, busca e paginação',
     description:
       'Sem `page`/`pageSize` devolve todos os resultados (legado). Com paginação, ' +
       'devolve a página solicitada. Em ambos os casos, o total absoluto vai no header ' +
       '`X-Total-Count`. Headers expostos: `X-Total-Count`, `X-Page`, `X-Page-Size`.',
   })
-  @ApiQuery({ name: 'anunciado', required: false, enum: ['true', 'false'], description: 'Filtra por flag anunciado' })
-  @ApiQuery({ name: 'canal', required: false, enum: Canal, description: 'Filtra por canal principal' })
-  @ApiQuery({ name: 'temImagens', required: false, enum: ['true', 'false'], description: 'Filtra por presença de pelo menos 1 ProdutoImagem (qualquer origem)' })
-  @ApiQuery({ name: 'temImagemGerada', required: false, enum: ['true', 'false'], description: 'Filtra por presença de ProdutoImagem com origem=GERADA (foto final). Combine com temImagens=true pra fila da skill' })
-  @ApiQuery({ name: 'temReferencia', required: false, enum: ['true', 'false'], description: 'Filtra por presença de inspiração ou modelo3dUrl (URL textual, NÃO arquivo)' })
-  @ApiQuery({ name: 'metodoImagem', required: false, enum: ['IA', 'FOTO', 'NULL'], description: 'Filtra a fila: IA (skill), FOTO (fotografar) ou NULL (sem decisão)' })
-  @ApiQuery({ name: 'q', required: false, description: 'Busca textual (case-insensitive) em nome + inspiração' })
+  @ApiQuery({
+    name: 'ativo',
+    required: false,
+    enum: ['true', 'false'],
+    description: 'Ativos por padrão; false lista arquivados',
+  })
+  @ApiQuery({
+    name: 'anunciado',
+    required: false,
+    enum: ['true', 'false'],
+    description: 'Filtra por flag anunciado',
+  })
+  @ApiQuery({
+    name: 'canal',
+    required: false,
+    enum: Canal,
+    description: 'Filtra por canal principal',
+  })
+  @ApiQuery({
+    name: 'temImagens',
+    required: false,
+    enum: ['true', 'false'],
+    description: 'Filtra por presença de pelo menos 1 ProdutoImagem (qualquer origem)',
+  })
+  @ApiQuery({
+    name: 'temImagemGerada',
+    required: false,
+    enum: ['true', 'false'],
+    description:
+      'Filtra por presença de ProdutoImagem com origem=GERADA (foto final). Combine com temImagens=true pra fila da skill',
+  })
+  @ApiQuery({
+    name: 'temReferencia',
+    required: false,
+    enum: ['true', 'false'],
+    description: 'Filtra por presença de inspiração ou modelo3dUrl (URL textual, NÃO arquivo)',
+  })
+  @ApiQuery({
+    name: 'metodoImagem',
+    required: false,
+    enum: ['IA', 'FOTO', 'NULL'],
+    description: 'Filtra a fila: IA (skill), FOTO (fotografar) ou NULL (sem decisão)',
+  })
+  @ApiQuery({
+    name: 'q',
+    required: false,
+    description: 'Busca textual (case-insensitive) em nome + inspiração',
+  })
   @ApiQuery({ name: 'page', required: false, schema: { type: 'integer', minimum: 1 } })
-  @ApiQuery({ name: 'pageSize', required: false, schema: { type: 'integer', minimum: 1, maximum: 200 } })
+  @ApiQuery({
+    name: 'pageSize',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 200 },
+  })
   @ApiQuery({ name: 'sortBy', required: false, enum: SORTABLE_FIELDS })
   @ApiQuery({ name: 'sortDir', required: false, enum: ['asc', 'desc'] })
   async list(@Query() query: unknown, @Res({ passthrough: true }) res: Response) {
     const parsed = ListQuerySchema.safeParse(query);
     if (!parsed.success) {
-      throw new BadRequestException(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '));
+      throw new BadRequestException(
+        parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join(' · '),
+      );
     }
-    const { anunciado, canal, temImagens, temImagemGerada, temReferencia, metodoImagem, q, page, pageSize, sortBy, sortDir } = parsed.data;
+    const {
+      ativo,
+      anunciado,
+      canal,
+      temImagens,
+      temImagemGerada,
+      temReferencia,
+      metodoImagem,
+      q,
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
+    } = parsed.data;
     // Se passou page sem pageSize (ou vice-versa), preenche o outro com default
     // sensato — evita armadilha "page=2 sozinho" que devolveria a página inteira.
     const pageNorm = page ?? (pageSize ? 1 : undefined);
     const pageSizeNorm = pageSize ?? (page ? 50 : undefined);
 
     const { items, total } = await this.service.list({
+      ativo: ativo !== 'false',
       anunciado: anunciado === 'true' ? true : anunciado === 'false' ? false : undefined,
       canal,
       temImagens: temImagens === 'true' ? true : temImagens === 'false' ? false : undefined,
-      temImagemGerada: temImagemGerada === 'true' ? true : temImagemGerada === 'false' ? false : undefined,
-      temReferencia: temReferencia === 'true' ? true : temReferencia === 'false' ? false : undefined,
+      temImagemGerada:
+        temImagemGerada === 'true' ? true : temImagemGerada === 'false' ? false : undefined,
+      temReferencia:
+        temReferencia === 'true' ? true : temReferencia === 'false' ? false : undefined,
       metodoImagem,
       q,
       page: pageNorm,
@@ -119,13 +183,6 @@ export class ProdutosController {
       res.setHeader('X-Page-Size', String(pageSizeNorm));
     }
     return items;
-  }
-
-  // Antes de `:id` de propósito: registrada depois, "vitrine" cairia como um id.
-  @Get('vitrine')
-  @ApiOperation({ summary: 'Catálogo atual com vendas e estoque de prontos' })
-  vitrine() {
-    return this.service.vitrine();
   }
 
   @Get(':id')
@@ -182,7 +239,8 @@ export class ProdutosController {
   @Post('bulk-anunciar')
   @ApiOperation({
     summary: 'Marca/desmarca a flag `anunciado` em N produtos',
-    description: 'Usado pelo fluxo externo de publicação: consumer chama com ids e `anunciado: true` após publicar.',
+    description:
+      'Usado pelo fluxo externo de publicação: consumer chama com ids e `anunciado: true` após publicar.',
   })
   bulkAnunciar(@Body(new ZodValidationPipe(BulkAnunciarSchema)) data: BulkAnunciar) {
     return this.service.marcarAnunciados(data.ids, data.anunciado);

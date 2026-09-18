@@ -77,8 +77,8 @@ type PlanoAds = {
 type Detalhe = {
   id: string;
   produtoId: string | null;
-  /** Null quando nunca virou produto. `naVitrine` false = voltou pra revisão. */
-  produto: { naVitrine: boolean; canaisAnunciados: string[] } | null;
+  /** Null quando nunca virou produto. `ativo` false = produto arquivado. */
+  produto: { ativo: boolean; canaisAnunciados: string[] } | null;
   titulo: string;
   url: string;
   autor: string;
@@ -157,10 +157,10 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
       apiFetch(`/makerworld/${id}/anunciei`, { method: 'POST', json: { canais } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['makerworld'] });
-      queryClient.invalidateQueries({ queryKey: ['vitrine'] });
+      queryClient.invalidateQueries({ queryKey: ['produtos'] });
       setPerguntandoCanais(false);
-      toast.success('Produto criado e na vitrine');
-      router.push('/vitrine');
+      toast.success('Produto disponível no catálogo');
+      router.push('/produtos');
     },
   });
 
@@ -181,10 +181,10 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
         >
           MakerWorld <ExternalLink className="size-3.5" />
         </a>
-        {modelo.produto?.naVitrine ? (
+        {modelo.produto?.ativo ? (
           <Button variant="outline" size="sm" asChild>
-            <Link href="/vitrine">
-              <Store className="size-4" /> Já está na vitrine
+            <Link href={`/produtos/${modelo.produtoId}`}>
+              <Store className="size-4" /> Ver produto
             </Link>
           </Button>
         ) : (
@@ -197,7 +197,7 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
             {anunciei.isPending
               ? 'Salvando…'
               : modelo.produtoId
-                ? 'Voltar para a vitrine'
+                ? 'Restaurar produto'
                 : 'Anunciei este produto'}
           </Button>
         )}
@@ -245,8 +245,8 @@ function CardLicenca({ modelo }: { modelo: Detalhe }) {
         {!modelo.temFotoReal && (
           <p className="flex gap-2 text-xs text-muted-foreground">
             <AlertTriangle className="size-4 shrink-0" />
-            Sem foto real — a imagem é render do autor. Confirme o acabamento antes de
-            usar como foto de anúncio.
+            Sem foto real — a imagem é render do autor. Confirme o acabamento antes de usar como
+            foto de anúncio.
           </p>
         )}
       </CardContent>
@@ -383,8 +383,7 @@ function CardPlanoAds({ plano }: { plano: PlanoAds }) {
 
 function CardAnuncios({ anuncios }: { anuncios: Anuncio[] }) {
   const ordenados = [...anuncios].sort(
-    (a, b) =>
-      ORDEM_MARKETPLACE.indexOf(a.marketplace) - ORDEM_MARKETPLACE.indexOf(b.marketplace),
+    (a, b) => ORDEM_MARKETPLACE.indexOf(a.marketplace) - ORDEM_MARKETPLACE.indexOf(b.marketplace),
   );
   const [selecionado, setSelecionado] = useState<Marketplace | null>(
     ordenados[0]?.marketplace ?? null,
@@ -416,8 +415,8 @@ function CardAnuncios({ anuncios }: { anuncios: Anuncio[] }) {
         {!atual ? (
           <p className="text-sm text-muted-foreground">
             Nenhuma copy gerada ainda. Ela é escrita pela skill{' '}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">gerar-descricao</code>, fora
-            do Hub, e gravada aqui depois.
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">gerar-descricao</code>, fora do
+            Hub, e gravada aqui depois.
           </p>
         ) : (
           <BlocoAnuncio anuncio={atual} />
