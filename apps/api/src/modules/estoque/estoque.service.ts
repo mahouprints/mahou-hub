@@ -45,7 +45,11 @@ export class EstoqueService {
     const variacao = await tx.produtoVariacao.findUnique({ where: { id: input.variacaoId } });
     if (!variacao) throw new NotFoundException(`Variação ${input.variacaoId} não existe`);
     const novoSaldo = variacao.estoqueAtual + input.quantidade;
-    this.bloquearNegativo(novoSaldo < 0 && !permitirNegativo, variacao.estoqueAtual, input.quantidade);
+    this.bloquearNegativo(
+      novoSaldo < 0 && !permitirNegativo,
+      variacao.estoqueAtual,
+      input.quantidade,
+    );
     await tx.produtoVariacao.update({
       where: { id: variacao.id },
       data: { estoqueAtual: novoSaldo },
@@ -58,7 +62,8 @@ export class EstoqueService {
     input: MovimentoCreate,
     permitirNegativo: boolean,
   ) {
-    if (!input.filamentoId) throw new BadRequestException('filamentoId é obrigatório para FILAMENTO');
+    if (!input.filamentoId)
+      throw new BadRequestException('filamentoId é obrigatório para FILAMENTO');
     const filamento = await tx.filamento.findUnique({ where: { id: input.filamentoId } });
     if (!filamento) throw new NotFoundException(`Filamento ${input.filamentoId} não existe`);
     const novoSaldo = filamento.estoqueGramas.plus(input.quantidade);
@@ -153,7 +158,7 @@ export class EstoqueService {
       this.prisma.filamento.findMany({ where: { ativo: true, estoqueMinGramas: { gt: 0 } } }),
       this.prisma.insumo.findMany({ where: { ativo: true, estoqueMinimo: { gt: 0 } } }),
       this.prisma.produtoVariacao.findMany({
-        where: { ativo: true, estoqueMinimo: { gt: 0 } },
+        where: { ativo: true, produto: { ativo: true }, estoqueMinimo: { gt: 0 } },
         include: { produto: { select: { nome: true } } },
       }),
     ]);

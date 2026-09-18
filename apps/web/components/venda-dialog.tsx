@@ -30,7 +30,7 @@ import {
 
 interface Props {
   /** Venda em edição, ou undefined pra criar nova. */
-  venda?: Venda;
+  venda?: Venda & { produto?: { nome: string } };
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }
@@ -49,9 +49,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
   const [precoReais, setPrecoReais] = useState(
     venda ? (venda.precoUnitarioCentavos / 100).toFixed(2).replace('.', ',') : '',
   );
-  const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK'>(
-    venda?.canal ?? 'SHOPEE',
-  );
+  const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK'>(venda?.canal ?? 'SHOPEE');
   const [dataVenda, setDataVenda] = useState<Date | undefined>(
     venda ? new Date(venda.dataVenda) : new Date(),
   );
@@ -74,6 +72,8 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vendas'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['produto-estatisticas'] });
+      qc.invalidateQueries({ queryKey: ['produtos'] });
       toast.success(editando ? 'Venda atualizada' : 'Venda registrada');
       onOpenChange(false);
     },
@@ -85,7 +85,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
     const qtdNum = Number(qtd);
     if (
       !produtoId ||
-      !Number.isFinite(qtdNum) ||
+      !Number.isInteger(qtdNum) ||
       qtdNum <= 0 ||
       !Number.isFinite(precoCentavos) ||
       precoCentavos <= 0 ||
@@ -115,12 +115,17 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Produto</Label>
+            <Label htmlFor="venda-produto">Produto</Label>
             <Select value={produtoId} onValueChange={setProdutoId}>
-              <SelectTrigger>
+              <SelectTrigger id="venda-produto">
                 <SelectValue placeholder="— selecione —" />
               </SelectTrigger>
               <SelectContent>
+                {venda && !produtos?.some((p) => p.id === venda.produtoId) && (
+                  <SelectItem value={venda.produtoId}>
+                    {venda.produto?.nome ?? 'Produto desta venda'} (histórico)
+                  </SelectItem>
+                )}
                 {produtos?.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.nome}
@@ -144,8 +149,12 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Preço unitário (R$)</Label>
-              <InputDecimal value={precoReais} onChange={(s) => setPrecoReais(s)} />
+              <Label htmlFor="venda-preco">Preço unitário (R$)</Label>
+              <InputDecimal
+                id="venda-preco"
+                value={precoReais}
+                onChange={(s) => setPrecoReais(s)}
+              />
             </div>
           </div>
 
@@ -195,4 +204,3 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
     </Dialog>
   );
 }
-

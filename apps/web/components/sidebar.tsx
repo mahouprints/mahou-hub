@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 
 const NAV_PRINCIPAL = [
   { href: '/calculadora', label: 'Calculadora', icon: Calculator },
-  { href: '/vitrine', label: 'Vitrine', icon: Boxes },
+  { href: '/produtos', label: 'Produtos', icon: Boxes },
   { href: '/insumos', label: 'Insumos', icon: Package },
   { href: '/estoque', label: 'Estoque', icon: Warehouse },
   { href: '/recibos', label: 'Recibos', icon: Receipt },

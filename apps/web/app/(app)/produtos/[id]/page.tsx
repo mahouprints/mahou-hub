@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -8,8 +8,6 @@ import {
   ArrowLeft,
   Box,
   Calendar,
-  Check,
-  Circle,
   ExternalLink,
   Factory,
   Pencil,
@@ -32,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ModeloOrigemCard, type ModeloOrigem } from '@/components/modelo-origem-card';
+import { CanaisAnunciadosDialog } from '@/components/canais-anunciados-dialog';
 import { ImagensSection } from '@/components/imagens-section';
 import { VariacoesSection } from '@/components/variacoes-section';
 import { PlanoAdsPaineis } from '@/components/plano-ads-paineis';
@@ -59,19 +58,22 @@ const CANAL_LABEL: Record<Canal, string> = {
 export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const qc = useQueryClient();
+  const [editandoCanais, setEditandoCanais] = useState(false);
 
   const { data: produto, isLoading } = useQuery({
     queryKey: ['produto', id],
     queryFn: () => apiFetch<ProdutoComFilamento>(`/produtos/${id}`),
   });
 
-  const toggleAnunciado = useMutation({
-    mutationFn: (anunciado: boolean) =>
-      apiFetch(`/produtos/${id}`, { method: 'PATCH', json: { anunciado } }),
+  const salvarCanais = useMutation({
+    mutationFn: (canais: Canal[]) =>
+      apiFetch(`/produtos/${id}/canais-anunciados`, { method: 'PUT', json: { canais } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['produto', id] });
       qc.invalidateQueries({ queryKey: ['produtos'] });
-      toast.success(produto?.anunciado ? 'Marcado como pendente' : 'Marcado como anunciado');
+      qc.invalidateQueries({ queryKey: ['makerworld'] });
+      setEditandoCanais(false);
+      toast.success('Canais atualizados');
     },
   });
 
@@ -143,6 +145,7 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           </Button>
           <h1 className="text-2xl font-semibold tracking-tight">{produto.nome}</h1>
           <div className="flex flex-wrap gap-2">
+            {!produto.ativo && <Badge variant="warning">Arquivado</Badge>}
             <Badge variant="default">{produto.filamento.nome}</Badge>
             <Badge variant="default">{produto.impressora}</Badge>
             <Badge variant="default">{CANAL_LABEL[produto.canalPrincipal]}</Badge>
@@ -153,19 +156,11 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
         </div>
         <div className="flex items-center gap-2">
           <Button
-            variant={produto.anunciado ? 'outline' : 'default'}
-            onClick={() => toggleAnunciado.mutate(!produto.anunciado)}
-            disabled={toggleAnunciado.isPending}
+            variant="outline"
+            onClick={() => setEditandoCanais(true)}
+            disabled={!produto.ativo}
           >
-            {produto.anunciado ? (
-              <>
-                <Circle className="h-4 w-4" /> Marcar como pendente
-              </>
-            ) : (
-              <>
-                <Check className="h-4 w-4" /> Marcar como anunciado
-              </>
-            )}
+            Canais de anúncio
           </Button>
           <Button asChild variant="outline">
             <Link href={`/produtos/${id}/editar`}>
@@ -174,6 +169,14 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           </Button>
         </div>
       </header>
+      <CanaisAnunciadosDialog
+        open={editandoCanais}
+        onOpenChange={setEditandoCanais}
+        canaisIniciais={produto.canaisAnunciados ?? []}
+        nomeProduto={produto.nome}
+        salvando={salvarCanais.isPending}
+        onConfirmar={(canais) => salvarCanais.mutate(canais)}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <EspecificacoesCard produto={produto} />

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Canal, Prisma } from '@prisma/client';
 import {
   calcularProduto,
@@ -7,22 +7,14 @@ import {
   type FaixaShopee as FaixaShopeePricing,
   type ParametrosGlobais,
 } from '@mahou-hub/pricing';
-import type { ProdutoCreate, ProdutoUpdate } from '@mahou-hub/contracts';
+import { ProdutoCreateSchema, type ProdutoCreate, type ProdutoUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImagensService } from '../imagens/imagens.service';
-import { MediaUrlService } from '../imagens/media-url.service';
-
-type ProdutoComVitrine = Prisma.ProdutoGetPayload<{
-  include: {
-    variacoes: { select: { estoqueAtual: true; estoqueMinimo: true } };
-    imagens: { select: { arquivo: true } };
-    modeloMakerWorld: { select: { imagemUrl: true } };
-  };
-}>;
 
 export type ProdutoListSortBy = 'criadoEm' | 'atualizadoEm' | 'nome' | 'precoCentavos';
 export type ProdutoListSortDir = 'asc' | 'desc';
 export type ProdutoListOpts = {
+  ativo?: boolean;
   anunciado?: boolean;
   canal?: Canal;
   /** Quando definido, filtra por presença (`true`) ou ausência (`false`) de ProdutoImagem. */
@@ -50,64 +42,7 @@ export class ProdutosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly imagens: ImagensService,
-    private readonly mediaUrl: MediaUrlService,
   ) {}
-
-  /**
-   * Catálogo atual: o que está anunciado hoje, com venda e estoque na mesma linha.
-   *
-   * Filtra por `naVitrine`, não por `anunciado` — ver o comentário do campo no schema.
-   * Os 53 produtos herdados da loja antiga ficam de fora até alguém marcá-los.
-   */
-  async vitrine() {
-    const produtos = await this.prisma.produto.findMany({
-      where: { naVitrine: true },
-      include: {
-        variacoes: { where: { ativo: true }, select: { estoqueAtual: true, estoqueMinimo: true } },
-        imagens: { take: 1, orderBy: { ordem: 'asc' }, select: { arquivo: true } },
-        modeloMakerWorld: { select: { imagemUrl: true } },
-      },
-      orderBy: { criadoEm: 'desc' },
-    });
-    if (produtos.length === 0) return [];
-
-    const vendas = await this.prisma.venda.findMany({
-      where: { produtoId: { in: produtos.map((p) => p.id) } },
-      select: { produtoId: true, qtd: true, precoUnitarioCentavos: true, dataVenda: true },
-    });
-
-    return produtos.map((p) => this.linhaDaVitrine(p, vendas.filter((v) => v.produtoId === p.id)));
-  }
-
-  private linhaDaVitrine(
-    produto: ProdutoComVitrine,
-    vendas: { qtd: number; precoUnitarioCentavos: number; dataVenda: Date }[],
-  ) {
-    const primeira = produto.imagens[0];
-    const datas = vendas.map((v) => v.dataVenda.getTime());
-
-    return {
-      id: produto.id,
-      nome: produto.nome,
-      precoCentavos: produto.precoCentavos,
-      canalPrincipal: produto.canalPrincipal,
-      // Foto nossa ganha do render do MakerWorld: é a peça que sai da nossa impressora.
-      // O render é o fallback pra produto recém-vindo da prospecção, que ainda não tem
-      // foto — sem ele a vitrine nasce cheia de quadrado cinza.
-      imagemUrl: primeira
-        ? this.mediaUrl.publicUrl(primeira.arquivo)
-        : (produto.modeloMakerWorld?.imagemUrl ?? null),
-      imagemEhRender: !primeira && produto.modeloMakerWorld != null,
-      canaisAnunciados: produto.canaisAnunciados,
-      anunciado: produto.anunciado,
-      estoqueProntos: produto.variacoes.reduce((s, v) => s + v.estoqueAtual, 0),
-      // Sem variação cadastrada não existe estoque pra ficar abaixo do mínimo.
-      abaixoDoMinimo: produto.variacoes.some((v) => v.estoqueAtual < v.estoqueMinimo),
-      unidadesVendidas: vendas.reduce((s, v) => s + v.qtd, 0),
-      receitaCentavos: vendas.reduce((s, v) => s + v.qtd * v.precoUnitarioCentavos, 0),
-      ultimaVenda: datas.length > 0 ? new Date(Math.max(...datas)).toISOString() : null,
-    };
-  }
 
   /**
    * Lista produtos com pricing já calculado. Filtros e paginação opcionais.
@@ -118,7 +53,20 @@ export class ProdutosService {
    * quando parar.
    */
   async list(opts?: ProdutoListOpts) {
-    const { anunciado, canal, temImagens, temImagemGerada, temReferencia, metodoImagem, q, page, pageSize, sortBy = 'criadoEm', sortDir = 'desc' } = opts ?? {};
+    const {
+      ativo = true,
+      anunciado,
+      canal,
+      temImagens,
+      temImagemGerada,
+      temReferencia,
+      metodoImagem,
+      q,
+      page,
+      pageSize,
+      sortBy = 'criadoEm',
+      sortDir = 'desc',
+    } = opts ?? {};
     // temReferencia=true e busca textual usam ambos a chave `OR` no Prisma — combiná-los
     // direto no where sobrescreve o primeiro. Lista de AND mantém os dois ativos.
     // Tudo que mira a relação `imagens` precisa ir via AND — múltiplos spreads na chave
@@ -140,7 +88,7 @@ export class ProdutosService {
     if (temImagemGerada === true) andClauses.push({ imagens: { some: { origem: 'GERADA' } } });
     if (temImagemGerada === false) andClauses.push({ imagens: { none: { origem: 'GERADA' } } });
     const where: Prisma.ProdutoWhereInput = {
-      ativo: true,
+      ativo,
       ...(anunciado != null ? { anunciado } : {}),
       ...(canal ? { canalPrincipal: canal } : {}),
       // temReferencia=false → AND implícito (ambos null). =true cai no andClauses acima.
@@ -236,7 +184,13 @@ export class ProdutosService {
   async update(id: string, data: ProdutoUpdate) {
     const { insumos, ...resto } = data;
     return this.prisma.$transaction(async (tx) => {
-      const atualizado = await tx.produto.update({ where: { id }, data: resto });
+      const atual = await tx.produto.findUnique({ where: { id } });
+      if (!atual) throw new NotFoundException(`Produto ${id} não existe`);
+      const rascunho = this.concluirRascunho(atual, data);
+      const atualizado = await tx.produto.update({
+        where: { id },
+        data: { ...resto, ...(rascunho === false ? { rascunho } : {}) },
+      });
       if (insumos !== undefined) {
         await tx.produtoInsumo.deleteMany({ where: { produtoId: id } });
         if (insumos.length > 0) {
@@ -247,6 +201,27 @@ export class ProdutosService {
       }
       return atualizado;
     });
+  }
+
+  private concluirRascunho(atual: Prisma.ProdutoGetPayload<object>, alteracoes: ProdutoUpdate) {
+    if (!atual.rascunho) return undefined;
+    const completo = ProdutoCreateSchema.safeParse({
+      ...atual,
+      pesoG: Number(atual.pesoG),
+      tempoH: Number(atual.tempoH),
+      larguraCm: atual.larguraCm === null ? null : Number(atual.larguraCm),
+      alturaCm: atual.alturaCm === null ? null : Number(atual.alturaCm),
+      profundidadeCm: atual.profundidadeCm === null ? null : Number(atual.profundidadeCm),
+      ...alteracoes,
+    });
+    if (completo.success) return false;
+    if (alteracoes.ativo) {
+      const erros = completo.error.issues.map((erro) => `${erro.path.join('.')}: ${erro.message}`);
+      throw new BadRequestException(
+        `Produto incompleto; esperado cadastro válido: ${erros.join(' · ')}`,
+      );
+    }
+    return undefined;
   }
 
   async desativar(id: string) {
@@ -264,51 +239,21 @@ export class ProdutosService {
   }
 
   /**
-   * Marca/desmarca produtos como anunciados em massa. Útil pro fluxo externo
-   * de geração de imagem confirmar publicações em batch.
-   */
-  /**
-   * Define em quais marketplaces o produto está no ar.
-   *
-   * `anunciado` é mantido em sincronia porque o fluxo externo de geração de imagem
-   * filtra por ele (`?anunciado=false`) — se os dois divergirem, produto publicado volta
-   * pra fila de imagem, ou some dela sem estar publicado.
+   * Atualiza os canais sem arquivar o produto ou devolvê-lo à prospecção.
+   * A flag anunciado acompanha os canais porque o fluxo de imagem filtra por ela.
+   * Ex.: definirCanaisAnunciados(id, []) preserva o estado ativo e remove os anúncios.
    */
   async definirCanaisAnunciados(id: string, canais: Canal[]) {
-    const produto = await this.prisma.produto.findUnique({
-      where: { id },
-      select: { id: true, modeloMakerWorld: { select: { id: true } } },
-    });
+    const produto = await this.prisma.produto.findUnique({ where: { id }, select: { id: true } });
     if (!produto) throw new NotFoundException(`Produto ${id} não existe`);
-
-    // Set: a UI pode mandar repetido, e canal repetido na lista viraria selo duplicado.
     const unicos = [...new Set(canais)];
-
-    // Saiu de todos os canais e veio da prospecção: volta pra fila do MakerWorld, onde o
-    // Gabriel confere peso, licença e ficha antes de publicar de novo. Sem isso o produto
-    // ficaria na Vitrine ("o que está anunciado hoje") sem estar anunciado em lugar nenhum.
-    const voltaPraRevisao = unicos.length === 0 && produto.modeloMakerWorld !== null;
-
-    return this.prisma.$transaction(async (tx) => {
-      if (voltaPraRevisao) {
-        await tx.modeloMakerWorld.update({
-          where: { id: produto.modeloMakerWorld!.id },
-          // FAVORITO e não NOVO: ele já foi revisado e aprovado uma vez; devolver pro
-          // começo da triagem faria parecer que nunca passou por análise.
-          data: { status: 'FAVORITO' },
-        });
-      }
-      return tx.produto.update({
-        where: { id },
-        data: {
-          canaisAnunciados: unicos,
-          anunciado: unicos.length > 0,
-          ...(voltaPraRevisao ? { naVitrine: false } : {}),
-        },
-      });
+    return this.prisma.produto.update({
+      where: { id },
+      data: { canaisAnunciados: unicos, anunciado: unicos.length > 0 },
     });
   }
 
+  /** Marca publicações em lote; ex.: marcarAnunciados(['p1'], true). */
   async marcarAnunciados(ids: string[], anunciado: boolean) {
     const r = await this.prisma.produto.updateMany({
       where: { id: { in: ids } },
@@ -342,14 +287,15 @@ export class ProdutosService {
       orderBy: { dataVenda: 'desc' },
     });
 
-    const faturamentoCentavos = vendas.reduce(
-      (s, v) => s + v.precoUnitarioCentavos * v.qtd,
-      0,
-    );
+    const faturamentoCentavos = vendas.reduce((s, v) => s + v.precoUnitarioCentavos * v.qtd, 0);
     const ultimaVendaEm = vendas[0]?.dataVenda ?? null;
 
     const produzidos = await this.prisma.jobProducao.aggregate({
-      where: { produtoId: id, daEstoque: false, status: { in: ['CONCLUIDO', 'EMBALADO', 'ENVIADO'] } },
+      where: {
+        produtoId: id,
+        daEstoque: false,
+        status: { in: ['CONCLUIDO', 'EMBALADO', 'ENVIADO'] },
+      },
       _sum: { qtd: true },
     });
 

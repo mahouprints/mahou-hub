@@ -25,10 +25,14 @@ infra/
 
 ## Módulos
 
+A aba **Produtos** reúne o catálogo independentemente de anúncio ou origem MakerWorld. **Novo produto** cadastra peças avulsas, com insumos e quantidades por unidade. Arquivar retira o item do catálogo ativo e das opções de estoque sem apagar vendas, insumos vinculados ou histórico; o filtro **Arquivados** permite restaurar. `/vitrine` é apenas um acesso de compatibilidade à mesma tela.
+
+Os custos das vendas são calculados com os dados atuais do produto e dos insumos. Alterar o custo ou a composição de um produto também altera o cálculo dos relatórios históricos; não há snapshot de custo na venda.
+
 | Módulo | Rota web | Endpoints API | O que faz |
 | --- | --- | --- | --- |
 | **Calculadora** | `/calculadora` | `POST /pricing/calcular` | Cálculo stateless de viabilidade de produto hipotético |
-| **Produtos** | `/produtos` | `/produtos`, `/produtos/:id/estatisticas`, `/produtos/:id/imagens` | Catálogo CRUD + detalhe com pricing breakdown + histórico + imagens de referência + flag `anunciado` |
+| **Produtos** | `/produtos` | `/produtos`, `/produtos/:id/estatisticas`, `/produtos/:id/imagens` | Catálogo de produtos manuais e importados, custos por unidade, cadastro, edição, arquivamento e restauração; histórico e imagens no detalhe |
 | **Insumos** | `/insumos` | `/insumos` | Cadastro mestre de componentes (caixa, fita, etiqueta). Cada produto referencia N insumos com qtd; custo entra no pricing |
 | **Simulador** | `/simulador` | `POST /pricing/simular` | Projeta produção mensal (horas × utilização) → faturamento/lucro |
 | **Produção** | `/producao` | `/producao` | Kanban de jobs de impressão (FILA → IMPRIMINDO → CONCLUIDO …) |
@@ -75,6 +79,7 @@ Sem query params, comportamento histórico: devolve **array completo** dos produ
 Query params:
 - `q` — busca textual case-insensitive em `nome` + `inspiracao`
 - `canal` — `SHOPEE | ML | SITE | TIKTOK`
+- `ativo` — `true | false` (default `true`; `false` consulta os arquivados)
 - `anunciado` — `true | false`
 - `page` (≥1), `pageSize` (≤200, default 50 se só `page` for passado)
 - `sortBy` — `criadoEm | atualizadoEm | nome | precoCentavos` (default `criadoEm`)
