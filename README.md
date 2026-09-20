@@ -43,10 +43,23 @@ Na produção, cada filamento é baixado separadamente e o consumo efetivo fica 
 | **Financeiro** | `/financeiro` | `/financeiro/resumo?mes=YYYY-MM` | Dashboard com faturamento, custos gerais, custos com insumos, lucro líquido + margem |
 | · Vendas | `/financeiro/vendas` | `/vendas` (+ `/bulk-delete`) | Lançamento de vendas (produto, qtd, preço real, canal, data) |
 | · Custos | `/financeiro/custos` | `/custos` (+ `/bulk-delete`) | Custos gerais lançados manualmente. Marca `recorrente` gera N cópias futuras (configurável 1..60, default 12) |
+| · Relatórios | `/financeiro/relatorios` | `/financeiro/relatorio?periodo=DIARIO&referencia=2026-09-10`, `/relatorios/*` | Consulta diária, semanal, mensal e anual; gráficos, planilhas Google e e-mails |
 | **Concorrentes** | `/concorrentes` | `/concorrentes`, `/concorrentes/:id/precos` | Tracking de preços de concorrentes |
 | **Configurações** | `/configuracoes` | `/parametros`, `/filamentos`, `/parametros/taxas/{shopee,ml}` | Parâmetros globais (incluindo as 4 taxas TikTok), filamentos, tabelas Shopee/ML, gerar token de API |
 
 **Canais de venda suportados:** SHOPEE, ML, SITE, TIKTOK. Taxas TikTok são 4 percentuais configuráveis em `Parametro` (comissão plataforma, SFP, afiliado, processamento de pagamento).
+
+## Relatórios e Google Sheets
+
+Vendas e custos mostram suas observações abaixo do lançamento, com expansão quando passam de duas linhas. O relatório usa o mesmo cálculo do resumo mensal e inclui vendas arquivadas, filamentos, insumos por unidade, impostos, taxas e custos gerais por competência. Compras de estoque não são somadas novamente. Datas são dias civis, sem deslocamento por fuso.
+
+Em **Financeiro → Relatórios → Configurar envios**, salve a conta proprietária Google e os destinatários. O Hub gera um código Apps Script específico da instalação. Crie um projeto nessa conta, cole o código, execute `autorizarIntegracao` e autorize as permissões. Implante como aplicativo web, executando como você, com acesso “Qualquer pessoa”; cole a URL `/exec` no Hub. A URL só aceita pedidos assinados pelo servidor e as planilhas permanecem privadas, compartilhadas para leitura apenas com os destinatários configurados. Confirme um envio manual antes de ativar a agenda.
+
+A API agenda os fechamentos às **08:00 America/Bahia**: segunda-feira (semana anterior, segunda a domingo), dia 1 (mês anterior) e 1º de janeiro (ano anterior). **Diário é somente consulta e envio manual**. O cursor persistido retoma fechamentos perdidos após indisponibilidade, sem enviar períodos anteriores à ativação. Falhas têm até cinco tentativas com intervalo crescente; o histórico mostra o erro e permite solicitar novamente.
+
+Cada fechamento enviado guarda seu retrato financeiro e link; pedidos repetidos retornam a mesma planilha, sem duplicar e-mails. Períodos abertos têm uma prévia por dia, separada do fechamento. A consulta no Hub continua usando o cadastro atual. O receptor mantém controle próprio de idempotência: se um envio de e-mail ficar ambíguo, exige conferência do histórico do Apps Script em vez de enviar novamente às cegas.
+
+O segredo Google fica cifrado no banco com uma chave derivada de `JWT_SECRET`, nunca aparece na consulta de configuração e somente administradores podem gerar o código. Trocar conta/destinatários invalida a implantação anterior: prepare e implante o novo código. Rotacionar `JWT_SECRET` exige preparar novamente a integração Google (com a nova chave), além de invalidar as sessões.
 
 ## API pública (integrações externas)
 
@@ -222,7 +235,7 @@ Vercel rebuilda o frontend automaticamente em todo push. O Ignored Build Step (c
 - [ ] Testes em `apps/api` e `apps/web` (atualmente só pricing tem)
 - [ ] E2E com Playwright (estrutura prevista no CLAUDE.md, ainda não implementado)
 - [ ] Módulo Produção retrabalhado (kanban + consumo mensal)
-- [ ] Relatórios anuais no financeiro
+- [x] Relatórios diários, semanais, mensais e anuais com Google Sheets e e-mail
 - [ ] Captura automática de imagem a partir de URL (Shopee/MakerWorld scraping)
 
 ## Para agentes de IA

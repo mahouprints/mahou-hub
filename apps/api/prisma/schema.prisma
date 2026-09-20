@@ -952,3 +952,34 @@ enum PedidoItemAtendimento {
   /// Não havia peça pronta; job criado na fila de produção.
   EM_PRODUCAO
 }
+
+model ConfiguracaoRelatorios {
+  id                    Int      @id @default(1)
+  ativo                 Boolean  @default(false)
+  emailGoogle           String
+  destinatarios         String[]
+  webhookUrl            String?
+  segredoCifrado        String
+  ultimoAgendamentoEm   DateTime @default(now())
+  atualizadoEm          DateTime @updatedAt
+}
+
+model EnvioRelatorio {
+  id                String   @id @default(cuid())
+  chave             String   @unique
+  periodo           String
+  inicio            String
+  fim               String
+  status            String   @default("PENDENTE")
+  relatorio         Json
+  destinatarios     String[]
+  tentativas        Int      @default(0)
+  proximaTentativaEm DateTime @default(now())
+  processamentoEm   DateTime?
+  planilhaUrl       String?
+  erro              String?
+  criadoEm          DateTime @default(now())
+  enviadoEm         DateTime?
+
+  @@index([status, proximaTentativaEm])
+}

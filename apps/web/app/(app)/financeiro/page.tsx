@@ -37,7 +37,12 @@ export default function FinanceiroPage() {
       {data && <KpiGrid resumo={data} />}
       {data && <CanaisCard resumo={data} />}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <AcessoRapido
+          href="/financeiro/relatorios"
+          titulo="Relatórios"
+          descricao="Gráficos, planilhas e envios semanais, mensais e anuais"
+        />
         <AcessoRapido
           href="/financeiro/vendas"
           titulo="Vendas"
@@ -122,7 +127,8 @@ function CanaisCard({ resumo }: { resumo: ResumoFinanceiro }) {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{c.nome}</span>
                 <span className="tabular-nums">
-                  {centavosParaReais(valor)} <span className="text-muted-foreground">({pct(fatia)})</span>
+                  {centavosParaReais(valor)}{' '}
+                  <span className="text-muted-foreground">({pct(fatia)})</span>
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">

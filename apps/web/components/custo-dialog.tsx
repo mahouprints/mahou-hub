@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { CategoriaCusto, Custo, CustoCreate } from '@mahou-hub/contracts';
+import { dataUtcDoDiaLocal } from '@/lib/data-civil';
+import { Textarea } from '@/components/ui/textarea';
 import { apiFetch } from '@/lib/api-client';
 import { parseDecimalParaCentavos } from '@/lib/parsing';
 import { Button } from '@/components/ui/button';
@@ -56,7 +58,9 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
     custo ? (custo.valorCentavos / 100).toFixed(2).replace('.', ',') : '',
   );
   const [mes, setMes] = useState(
-    custo ? toMonthInput(new Date(custo.dataCompetencia)) : toMonthInput(new Date()),
+    custo
+      ? toMonthInput(new Date(custo.dataCompetencia))
+      : toMonthInput(dataUtcDoDiaLocal(new Date())),
   );
   // Recorrente só faz sentido na criação — após gerado, é só editar/deletar.
   const [recorrente, setRecorrente] = useState(false);
@@ -71,6 +75,7 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['custos'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       const n = Number(mesesRecorrencia);
       toast.success(
         editando
@@ -196,7 +201,7 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
 
           <div className="space-y-1.5">
             <Label htmlFor="obs">Observação</Label>
-            <Input
+            <Textarea
               id="obs"
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}

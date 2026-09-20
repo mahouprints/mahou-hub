@@ -6,11 +6,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ArrowLeft, CheckSquare, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Venda } from '@mahou-hub/contracts';
+import { formatarDataCivil } from '@/lib/data-civil';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
 import { useTablePagination } from '@/lib/use-table-pagination';
+import { ObservacaoExpansivel } from '@/components/observacao-expansivel';
 import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
@@ -98,6 +100,7 @@ export default function VendasPage() {
     onSuccess: (resp) => {
       qc.invalidateQueries({ queryKey: ['vendas'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       sel.acoes.limpar();
       toast.success(`${resp.count} ${resp.count === 1 ? 'venda excluída' : 'vendas excluídas'}`);
     },
@@ -258,6 +261,7 @@ export default function VendasPage() {
                     <span className="block truncate max-w-[260px]" title={v.produto.nome}>
                       {v.produto.nome}
                     </span>
+                    <ObservacaoExpansivel texto={v.observacao} referencia={v.produto.nome} />
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{v.qtd}</TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -270,7 +274,7 @@ export default function VendasPage() {
                     <Badge variant="default">{CANAL_LABEL[v.canal]}</Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {new Date(v.dataVenda).toLocaleDateString('pt-BR')}
+                    {formatarDataCivil(v.dataVenda)}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
@@ -324,6 +328,7 @@ function BotaoExcluirVenda({ vendaId, produtoNome }: { vendaId: string; produtoN
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vendas'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       setAberto(false);
       toast.success('Venda excluída');
     },
