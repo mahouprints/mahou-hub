@@ -4,6 +4,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Produto, Venda, VendaCreate } from '@mahou-hub/contracts';
+import { dataLocalDeDiaCivil, dataUtcDoDiaLocal } from '@/lib/data-civil';
+import { Textarea } from '@/components/ui/textarea';
 import { apiFetch } from '@/lib/api-client';
 import { parseDecimalParaCentavos } from '@/lib/parsing';
 import { Button } from '@/components/ui/button';
@@ -51,7 +53,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
   );
   const [canal, setCanal] = useState<'SHOPEE' | 'ML' | 'SITE' | 'TIKTOK'>(venda?.canal ?? 'SHOPEE');
   const [dataVenda, setDataVenda] = useState<Date | undefined>(
-    venda ? new Date(venda.dataVenda) : new Date(),
+    venda ? dataLocalDeDiaCivil(venda.dataVenda) : new Date(),
   );
   const [observacao, setObservacao] = useState(venda?.observacao ?? '');
 
@@ -72,6 +74,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['vendas'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       qc.invalidateQueries({ queryKey: ['produto-estatisticas'] });
       qc.invalidateQueries({ queryKey: ['produtos'] });
       toast.success(editando ? 'Venda atualizada' : 'Venda registrada');
@@ -99,7 +102,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
       qtd: qtdNum,
       precoUnitarioCentavos: precoCentavos,
       canal,
-      dataVenda,
+      dataVenda: dataUtcDoDiaLocal(dataVenda),
       observacao: observacao.trim() || null,
     });
   }
@@ -181,7 +184,7 @@ export function VendaDialog({ venda, open, onOpenChange }: Props) {
 
           <div className="space-y-1.5">
             <Label htmlFor="obs">Observação</Label>
-            <Input
+            <Textarea
               id="obs"
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}

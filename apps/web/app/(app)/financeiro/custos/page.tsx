@@ -11,6 +11,7 @@ import { centavosParaReais } from '@/lib/format';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
 import { useTablePagination } from '@/lib/use-table-pagination';
+import { ObservacaoExpansivel } from '@/components/observacao-expansivel';
 import { Pagination } from '@/components/pagination';
 import { SortableHead } from '@/components/sortable-head';
 import { Badge } from '@/components/ui/badge';
@@ -103,6 +104,7 @@ export default function CustosPage() {
     onSuccess: (resp) => {
       qc.invalidateQueries({ queryKey: ['custos'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       sel.acoes.limpar();
       toast.success(`${resp.count} ${resp.count === 1 ? 'custo excluído' : 'custos excluídos'}`);
     },
@@ -153,11 +155,13 @@ export default function CustosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={TODOS}>Todas</SelectItem>
-                  {(Object.entries(CATEGORIA_LABEL) as [CategoriaCusto, string][]).map(([v, lbl]) => (
-                    <SelectItem key={v} value={v}>
-                      {lbl}
-                    </SelectItem>
-                  ))}
+                  {(Object.entries(CATEGORIA_LABEL) as [CategoriaCusto, string][]).map(
+                    ([v, lbl]) => (
+                      <SelectItem key={v} value={v}>
+                        {lbl}
+                      </SelectItem>
+                    ),
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -257,7 +261,10 @@ export default function CustosPage() {
                       />
                     </TableCell>
                   )}
-                  <TableCell className="font-medium">{c.descricao}</TableCell>
+                  <TableCell className="font-medium">
+                    {c.descricao}
+                    <ObservacaoExpansivel texto={c.observacao} referencia={c.descricao} />
+                  </TableCell>
                   <TableCell>
                     <Badge variant="default">{CATEGORIA_LABEL[c.categoria]}</Badge>
                   </TableCell>
@@ -301,7 +308,9 @@ export default function CustosPage() {
                     colSpan={sel.modoSelecao ? 7 : 6}
                     className="text-center text-sm text-muted-foreground"
                   >
-                    {data.length === 0 ? 'Nenhum custo no período.' : 'Nenhum custo bate com os filtros.'}
+                    {data.length === 0
+                      ? 'Nenhum custo no período.'
+                      : 'Nenhum custo bate com os filtros.'}
                   </TableCell>
                 </TableRow>
               )}
@@ -316,7 +325,7 @@ export default function CustosPage() {
         </Card>
       )}
 
-      <CustoDialog custo={emEdicao} open={dialogAberto} onOpenChange={setDialogAberto} />
+      {dialogAberto && <CustoDialog custo={emEdicao} open onOpenChange={setDialogAberto} />}
     </div>
   );
 }
@@ -329,6 +338,7 @@ function BotaoExcluirCusto({ custoId, descricao }: { custoId: string; descricao:
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['custos'] });
       qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       setAberto(false);
       toast.success('Custo excluído');
     },

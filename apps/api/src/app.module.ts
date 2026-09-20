@@ -27,6 +27,7 @@ import { RecibosModule } from './modules/recibos/recibos.module';
 import { ProducaoModule } from './modules/producao/producao.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { HealthController } from './modules/health/health.controller';
+import { RelatoriosModule } from './modules/relatorios/relatorios.module';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { HealthController } from './modules/health/health.controller';
     VendasModule,
     CustosModule,
     FinanceiroModule,
+    RelatoriosModule,
     ConcorrentesModule,
     OportunidadesModule,
     MakerworldModule,
