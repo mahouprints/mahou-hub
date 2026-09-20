@@ -55,11 +55,18 @@ function relatorio() {
   };
 }
 
-type Escrita = { intervalo: unknown[]; valores?: unknown[][]; formula?: string; formato?: string };
+type Escrita = {
+  intervalo: unknown[];
+  valores?: unknown[][];
+  formula?: string;
+  formato?: string;
+  mesclado?: boolean;
+};
 class AbaFake {
   escritos: Escrita[] = [];
   graficos: unknown[] = [];
   linhas = 1000;
+  larguras = new Map<number, number>();
   constructor(public nome: string) {}
   getName() {
     return this.nome;
@@ -88,10 +95,12 @@ class AbaFake {
   setFrozenRows() {
     return this;
   }
-  autoResizeColumns() {
+  autoResizeColumns(inicio: number, quantidade: number) {
+    for (let coluna = inicio; coluna < inicio + quantidade; coluna++) this.larguras.set(coluna, 40);
     return this;
   }
-  setColumnWidth() {
+  setColumnWidth(coluna: number, largura: number) {
+    this.larguras.set(coluna, largura);
     return this;
   }
   getRange(...intervalo: unknown[]) {
@@ -121,6 +130,11 @@ class AbaFake {
       setFontWeight: () => range,
       setBackground: () => range,
       setWrap: () => range,
+      breakApart: () => range,
+      merge: () => {
+        registro.mesclado = true;
+        return range;
+      },
     };
     return range;
   }
@@ -373,6 +387,35 @@ describe('receptor Google Apps Script gerado', () => {
       { tipo: 'PIE', title: 'Custos gerais por categoria', width: 720, height: 320 },
     ]);
     expect(a.planilha.setSpreadsheetLocale).toHaveBeenCalledWith('pt_BR');
+  });
+
+  it('usa separador de fórmula pt_BR e conserva larguras após todas as tabelas do resumo', () => {
+    const a = ambiente();
+    expect(a.enviar().ok).toBe(true);
+    expect(a.planilha.setSpreadsheetLocale).toHaveBeenCalledWith('pt_BR');
+    const resumo = a.abas.find((aba) => aba.nome === 'Resumo')!;
+    expect(resumo.escritos).toContainEqual({
+      intervalo: ['B12'],
+      formula: '=IFERROR(B11/B4;0)',
+      formato: '0.00%',
+    });
+    expect([...resumo.larguras]).toEqual([
+      [1, 200],
+      [2, 130],
+      [3, 130],
+      [4, 130],
+      [5, 24],
+    ]);
+    expect(resumo.escritos).toContainEqual({
+      intervalo: ['A1:D1'],
+      valores: [['Mensal — fevereiro de 2028']],
+      mesclado: true,
+    });
+    expect(resumo.escritos).toContainEqual({
+      intervalo: ['A2:D2'],
+      valores: [['2028-02-01 a 2028-02-29']],
+      mesclado: true,
+    });
   });
 
   it('aumenta capacidade e gera totais para mais de mil vendas', () => {
