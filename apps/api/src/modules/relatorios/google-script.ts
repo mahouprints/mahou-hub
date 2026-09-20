@@ -161,7 +161,7 @@ function dinheiro(centavos) {
 
 function escreverTabela(aba, linha, cabecalho, registros) {
   garantirLinhas(aba, linha + registros.length + 2);
-  aba.getRange(linha, 1, 1, cabecalho.length).setValues([cabecalho]).setFontWeight('bold').setBackground('#e8ecf2');
+  aba.getRange(linha, 1, 1, cabecalho.length).setValues([cabecalho]).setFontWeight('bold').setBackground('#e8ecf2').setWrap(true);
   if (registros.length) aba.getRange(linha + 1, 1, registros.length, cabecalho.length).setValues(registros).setWrap(true);
   aba.setFrozenRows(linha === 1 ? 1 : 3);
   aba.autoResizeColumns(1, cabecalho.length);
@@ -174,7 +174,9 @@ function garantirLinhas(aba, quantidade) {
 
 function escreverResumo(aba, relatorio) {
   const resumo = relatorio.resumo;
-  aba.getRange(1, 1, 1, 2).setValues([[literal(relatorio.titulo), literal(relatorio.inicio + ' a ' + relatorio.fim)]]).setFontWeight('bold');
+  aba.getRange('A1:D2').breakApart();
+  aba.getRange('A1:D1').merge().setValue(literal(relatorio.titulo)).setFontWeight('bold').setWrap(true);
+  aba.getRange('A2:D2').merge().setValue(literal(relatorio.inicio + ' a ' + relatorio.fim)).setWrap(true);
   const indicadores = [
     ['Receita', dinheiro(resumo.faturamentoCentavos)], ['Custos variáveis', dinheiro(resumo.custosVariaveisCentavos)],
     ['Insumos consumidos', dinheiro(resumo.custosInsumosCentavos)], ['Custos gerais', dinheiro(resumo.custosGeraisCentavos)],
@@ -186,7 +188,7 @@ function escreverResumo(aba, relatorio) {
   aba.getRange('B4:B11').setNumberFormat('"R$" #,##0.00');
   aba.getRange('B10').setFormula('=SUM(B5:B9)');
   aba.getRange('B11').setFormula('=B4-B10');
-  aba.getRange('B12').setFormula('=IFERROR(B11/B4,0)').setNumberFormat('0.00%');
+  aba.getRange('B12').setFormula('=IFERROR(B11/B4;0)').setNumberFormat('0.00%');
   const serie = relatorio.serie.map(function(ponto) {
     return [literal(ponto.rotulo), dinheiro(ponto.faturamentoCentavos), dinheiro(ponto.gastosTotaisCentavos), dinheiro(ponto.lucroLiquidoCentavos)];
   });
@@ -202,6 +204,9 @@ function escreverResumo(aba, relatorio) {
   const canais = relatorio.porCanal.map(function(item) { return [literal(item.canal), dinheiro(item.faturamentoCentavos), dinheiro(item.lucroContribuicaoCentavos)]; });
   escreverTabela(aba, linhaCanal, ['Canal', 'Receita', 'Lucro antes dos custos gerais'], canais);
   if (canais.length) aba.getRange(linhaCanal + 1, 2, canais.length, 2).setNumberFormat('"R$" #,##0.00');
+  aba.setColumnWidth(1, 200);
+  [2, 3, 4].forEach(function(coluna) { aba.setColumnWidth(coluna, 130); });
+  aba.setColumnWidth(5, 24);
 }
 
 function inserirGrafico(aba, tipo, intervalo, linha, titulo) {
