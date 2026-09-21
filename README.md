@@ -51,6 +51,29 @@ Na produção, cada filamento é baixado separadamente e o consumo efetivo fica 
 
 ## Prospecção MakerWorld: brinquedos flexi
 
+Para pesquisar **brinquedos coloridos para máquina de sorteio**, use o modo `--maquina`:
+
+```powershell
+cd scripts/makerworld
+.\coletar-flexi.ps1 -Maquina -Ids 940411,1203888,712727,1046028 -MaxHoras 3
+# Ou reprocessar uma pasta de respostas públicas já salvas:
+npm run flexi -- --maquina --amostras dados/amostras --max-horas 3
+```
+
+Esse modo exige pelo menos duas cores distintas com consumo positivo no mesmo perfil,
+inclusive partes impressas em placas separadas. Mantém o limite publicado de 60 g e o
+tempo configurado, mas inclui todas as licenças como **inspirações pendentes** para o Hub.
+A licença original, suas obrigações e o veredicto permanecem intactos; restrições comerciais
+recebem `LICENCA_COMERCIAL_PENDENTE`, e AMS sem purga discriminada recebe `PURGA_NAO_INFORMADA`.
+O total incluindo purga, o tamanho e o apelo visual continuam sujeitos a conferência.
+
+O lote `dados/flexi-payload.json` inclui essas inspirações como `TALVEZ`, com a tag
+`maquina-coloridos`; não usa a classificação `flexi-60g`, reservada ao filtro estrito.
+Cores vêm antes de AMS na escolha, seguidas por autoria e uso do perfil. Peso baixo
+não rende nota de apelo: a seleção visual é feita na revisão, e os scores automáticos ficam
+zerados nesse modo. O relatório mantém todos esses itens em `pendentes`, mas permite
+exportá-los como referências para avaliação.
+
 Em `scripts/makerworld`, `npm run flexi` procura modelos flexi/articulados nas categorias do
 bot, verifica a licença comercial e prepara fotos, links e estimativas para a aba MakerWorld.
 O limite é **60 g por trabalho de impressão** e **2 horas por padrão**; o tempo pode ser

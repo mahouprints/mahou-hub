@@ -45,7 +45,7 @@ export interface ModeloListagem {
   tags: string[];
   isExclusive: boolean;
   isAIGC: boolean;
-  designCreator?: { name?: string; handle?: string };
+  designCreator?: { uid?: number; name?: string; handle?: string };
 }
 
 /** Perfil de impressão de um modelo — a fonte de peso e tempo reais. */
@@ -62,6 +62,7 @@ export interface PerfilImpressao {
   needAms: boolean;
   downloadCount: number;
   cover?: string;
+  instanceCreator?: { uid?: number; name?: string; handle?: string };
   extention?: {
     modelInfo?: {
       compatibility?: { devProductName?: string; nozzleDiameter?: number };
@@ -70,12 +71,12 @@ export interface PerfilImpressao {
         name?: string;
         weight: number;
         prediction: number;
-        filaments?: Array<{ color?: string; usedG?: string }>;
+        filaments?: Array<{ color?: string; usedG?: string | number }>;
       }>;
     };
   };
   pictures?: Array<{ url: string; isRealLifePhoto: number }>;
-  instanceFilaments?: Array<{ filamentType?: string }>;
+  instanceFilaments?: Array<{ filamentType?: string; color?: string; usedG?: string | number }>;
 }
 
 export interface ModeloDetalhe {
@@ -97,7 +98,7 @@ export interface ModeloDetalhe {
   categories: Array<{ id: number; name: string }>;
   instances: PerfilImpressao[];
   designExtension?: { design_pictures?: Array<{ url: string }> };
-  designCreator?: { name?: string; handle?: string };
+  designCreator?: { uid?: number; name?: string; handle?: string };
 }
 
 export class ErroMakerWorldHttp extends Error {

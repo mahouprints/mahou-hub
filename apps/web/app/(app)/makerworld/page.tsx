@@ -112,6 +112,8 @@ export default function MakerWorldPage() {
   const [esconderIp, setEsconderIp] = useState(true);
   const [pagina, setPagina] = useState(0);
   const modoFlexi = busca === 'flexi-60g';
+  const modoMaquina = busca === 'maquina-coloridos';
+  const incluirSemNota = modoFlexi || modoMaquina;
 
   // 24 por página não é escolha estética: as imagens vêm do CDN do MakerWorld em
   // resolução cheia, e pedir 120 de uma vez faz o CDN dropar a maioria — a tela
@@ -125,7 +127,7 @@ export default function MakerWorldPage() {
   if (busca) params.set('q', busca);
   if (nicho !== 'todos') params.set('nicho', nicho);
   if (status !== 'todos') params.set('status', status);
-  if (!modoFlexi && notaMinima !== 'todas') params.set('notaMinima', notaMinima);
+  if (!incluirSemNota && notaMinima !== 'todas') params.set('notaMinima', notaMinima);
   if (esconderIp) params.append('semAlertas', 'IP_TERCEIRO');
 
   const { data, isLoading } = useQuery({
@@ -138,7 +140,7 @@ export default function MakerWorldPage() {
     mutationFn: ({ id, novo }: { id: string; novo: Status }) =>
       apiFetch(`/makerworld/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: novo }),
+        json: { status: novo },
       }),
     onSuccess: (_, { novo }) => {
       queryClient.invalidateQueries({ queryKey: ['makerworld'] });
@@ -155,13 +157,13 @@ export default function MakerWorldPage() {
         <div>
           <h1 className="text-2xl font-semibold">Prospecção MakerWorld</h1>
           <p className="text-sm text-muted-foreground">
-            Modelos com licença que permite venda, filtrados por viabilidade de produção. Favorite o
-            que quiser produzir e confira a avaliação de cada modelo.
+            Ideias de modelos para produzir. Compare as imagens, o consumo publicado e as condições
+            de licença antes de escolher os favoritos.
           </p>
         </div>
         <ImportarModelos
-          onImportado={(soFlexis) => {
-            setBusca(soFlexis ? 'flexi-60g' : '');
+          onImportado={(selecao) => {
+            setBusca(selecao);
             setNicho('todos');
             setStatus('todos');
             setNotaMinima('todas');
@@ -171,6 +173,17 @@ export default function MakerWorldPage() {
       </div>
 
       <Card className="flex flex-wrap items-center gap-3 p-4">
+        <Button
+          variant={modoMaquina ? 'default' : 'outline'}
+          aria-pressed={modoMaquina}
+          onClick={() => {
+            setBusca(modoMaquina ? '' : 'maquina-coloridos');
+            setNicho('todos');
+            setPagina(0);
+          }}
+        >
+          Para máquina de sorteio
+        </Button>
         <Button
           variant={modoFlexi ? 'default' : 'outline'}
           aria-pressed={modoFlexi}
@@ -235,8 +248,8 @@ export default function MakerWorldPage() {
         </Select>
 
         <Select
-          value={modoFlexi ? 'todas' : notaMinima}
-          disabled={modoFlexi}
+          value={incluirSemNota ? 'todas' : notaMinima}
+          disabled={incluirSemNota}
           onValueChange={(v) => {
             setNotaMinima(v);
             setPagina(0);
@@ -279,6 +292,13 @@ export default function MakerWorldPage() {
         </p>
       )}
 
+      {modoMaquina && (
+        <p className="text-sm text-muted-foreground">
+          Seleção de coloridos para máquina de sorteio, ordenada pela avaliação visual quando
+          disponível. Confira o consumo total, o tamanho e a licença de cada modelo.
+        </p>
+      )}
+
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
       {!isLoading && itens.length === 0 && (
@@ -294,21 +314,21 @@ export default function MakerWorldPage() {
               href={modelo.url}
               target="_blank"
               rel="noreferrer"
-              className="relative block aspect-square bg-muted"
+              className="relative block aspect-square shrink-0 overflow-hidden bg-muted"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={modelo.imagemUrl}
                 alt={modelo.titulo}
                 loading="lazy"
-                className="size-full object-cover transition-transform hover:scale-105"
+                className={`absolute inset-0 size-full transition-transform hover:scale-105 ${modelo.tags.includes('maquina-coloridos') ? 'object-contain' : 'object-cover'}`}
               />
               <span
                 className={`absolute right-2 top-2 rounded-md bg-background/90 px-2 py-1 text-sm font-semibold ${modelo.alertas.includes('SEM_AVALIACAO_VISUAL') || modoFlexi ? 'text-foreground' : corDaNota(modelo.notaIa)}`}
               >
                 {modelo.alertas.includes('SEM_AVALIACAO_VISUAL') || modoFlexi
                   ? `Score objetivo ${modelo.scoreObjetivo}`
-                  : `IA ${modelo.notaIa}`}
+                  : `${modelo.tags.includes('maquina-coloridos') ? 'Apelo visual' : 'IA'} ${modelo.notaIa}`}
               </span>
             </a>
 
@@ -334,6 +354,14 @@ export default function MakerWorldPage() {
                 <Badge variant="outline" className="text-[10px]">
                   {modelo.licenca}
                 </Badge>
+                {modelo.licencaVeredicto === 'PROIBIDA' && (
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] text-amber-600 dark:text-amber-500"
+                  >
+                    Uso comercial não liberado
+                  </Badge>
+                )}
                 {modelo.tags.includes('MULTICOR_PROVAVEL') && (
                   <Badge variant="secondary" className="text-[10px]">
                     {ROTULOS_FLEXI.MULTICOR_PROVAVEL}
@@ -341,23 +369,39 @@ export default function MakerWorldPage() {
                 )}
               </div>
 
-              <p className="line-clamp-2 text-xs text-muted-foreground">{modelo.justificativaIa}</p>
+              <p
+                className={
+                  modelo.tags.includes('maquina-coloridos')
+                    ? 'line-clamp-4 text-xs text-foreground'
+                    : 'line-clamp-2 text-xs text-muted-foreground'
+                }
+              >
+                {modelo.justificativaIa}
+              </p>
 
               <dl className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-xs">
-                <dt className="text-muted-foreground">Preço sug.</dt>
-                <dd className="text-right font-medium">
-                  {centavosParaReais(modelo.precoSugeridoCentavos)}
-                </dd>
-                <dt className="text-muted-foreground">Margem</dt>
-                <dd className="text-right">{modelo.margemEstimadaPct}%</dd>
-                <dt className="flex items-center gap-1 text-muted-foreground">
-                  <Timer className="size-3" /> R$/hora
-                </dt>
-                <dd className="text-right font-medium text-emerald-600 dark:text-emerald-400">
-                  {centavosParaReais(modelo.lucroPorHoraCentavos)}
-                </dd>
+                {!modelo.tags.includes('maquina-coloridos') && (
+                  <>
+                    <dt className="text-muted-foreground">Preço sug.</dt>
+                    <dd className="text-right font-medium">
+                      {centavosParaReais(modelo.precoSugeridoCentavos)}
+                    </dd>
+                    <dt className="text-muted-foreground">Margem</dt>
+                    <dd className="text-right">{modelo.margemEstimadaPct}%</dd>
+                    <dt className="flex items-center gap-1 text-muted-foreground">
+                      <Timer className="size-3" /> R$/hora
+                    </dt>
+                    <dd className="text-right font-medium text-emerald-600 dark:text-emerald-400">
+                      {centavosParaReais(modelo.lucroPorHoraCentavos)}
+                    </dd>
+                  </>
+                )}
                 <dt className="text-muted-foreground">
-                  {modelo.unidadesPorKit > 1 ? `Kit de ${modelo.unidadesPorKit}` : 'Impressão'}
+                  {modelo.alertas.includes('PURGA_NAO_INFORMADA')
+                    ? 'Peso publicado'
+                    : modelo.unidadesPorKit > 1
+                      ? `Kit de ${modelo.unidadesPorKit}`
+                      : 'Impressão'}
                 </dt>
                 <dd className="text-right">
                   {Number(modelo.pesoGramas)}g · {Number(modelo.tempoHoras)}h

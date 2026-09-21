@@ -20,6 +20,7 @@ const RELATORIO = 'flexi-relatorio.json';
 const PAYLOAD = 'flexi-payload.json';
 
 interface OpcoesFlexi {
+  maquina: boolean;
   ids: number[];
   amostras: string | null;
   paginas: number;
@@ -55,15 +56,20 @@ function argumentoPositivo(valor: string | undefined, nome: string): number {
 /** Valida os limites antes da rede. Ex.: lerOpcoesFlexi(['--max-horas', '1.5']). */
 export function lerOpcoesFlexi(argumentos: string[]): OpcoesFlexi {
   const opcoes: OpcoesFlexi = {
+    maquina: false,
     ids: [],
     amostras: null,
     paginas: 3,
     limite: 80,
     limites: { ...LIMITES_FLEXI },
   };
-  for (let indice = 0; indice < argumentos.length; indice += 2) {
+  for (let indice = 0; indice < argumentos.length; indice++) {
     const nome = argumentos[indice]!;
-    const valor = argumentos[indice + 1];
+    if (nome === '--maquina') {
+      opcoes.maquina = true;
+      continue;
+    }
+    const valor = argumentos[++indice];
     if (nome === '--amostras') {
       if (!valor || valor.startsWith('--'))
         throw new Error('--amostras requer um diretório de JSONs.');
@@ -130,7 +136,7 @@ async function descobrirFlexi(
   }
   const flexis = [...modelos.values()].filter((m) => pareceFlexi(m.title, m.tags));
   const vendaveis = flexis.filter((modelo) => {
-    if (analisarLicenca(modelo.license).vendavel) return true;
+    if (opcoes.maquina || analisarLicenca(modelo.license).vendavel) return true;
     rejeitarModelo(relatorio, modelo, ['LICENCA_NAO_COMERCIAL_OU_DESCONHECIDA']);
     return false;
   });
@@ -167,7 +173,12 @@ function registrarDetalhe(
   arquivo?: { caminho: string; modificadoEm: string },
 ): void {
   const origem = modelo ?? modeloDoDetalhe(detalhe);
-  const resultado = selecionarFlexi(origem, detalhe, relatorio.opcoes.limites);
+  const resultado = selecionarFlexi(
+    origem,
+    detalhe,
+    relatorio.opcoes.limites,
+    relatorio.opcoes.maquina,
+  );
   if ('motivos' in resultado) return rejeitarModelo(relatorio, origem, resultado.motivos);
   if (arquivo) {
     resultado.candidato.coletadoEm = null;
@@ -221,9 +232,19 @@ async function coletarAmostras(relatorio: RelatorioFlexi): Promise<void> {
 async function gravarRelatorio(relatorio: RelatorioFlexi): Promise<void> {
   relatorio.candidatos.sort((a, b) => b.scoreObjetivo - a.scoreObjetivo);
   relatorio.pendentes.sort((a, b) => b.scoreObjetivo - a.scoreObjetivo);
-  const modelos = relatorio.concluida ? relatorio.candidatos.map(paraPayloadFlexi) : [];
+  const modelos = payloadDoRelatorio(relatorio);
   await writeFile(caminho(RELATORIO), JSON.stringify(relatorio, null, 2) + '\n', 'utf8');
   await writeFile(caminho(PAYLOAD), JSON.stringify({ modelos }, null, 2) + '\n', 'utf8');
+}
+
+/** Exporta inspirações pendentes só no modo máquina. Ex.: payloadDoRelatorio(relatorio). */
+export function payloadDoRelatorio(relatorio: RelatorioFlexi): PayloadFlexi[] {
+  if (!relatorio.concluida) return [];
+  const exportaveis = [
+    ...relatorio.candidatos,
+    ...(relatorio.opcoes.maquina ? relatorio.pendentes : []),
+  ];
+  return exportaveis.map(paraPayloadFlexi);
 }
 
 /** Coleta flexi para revisão; nunca escreve no Hub. Ex.: executarFlexi(['--ids', '892737']). */
@@ -250,7 +271,7 @@ export async function executarFlexi(argumentos: string[]): Promise<void> {
   }
   console.log(
     `Relatório: ${caminho(RELATORIO)}\nImportação: ${caminho(PAYLOAD)}\n` +
-      `${relatorio.candidatos.length} candidatos, ${relatorio.pendentes.length} pendentes de purga, ` +
+      `${relatorio.candidatos.length} candidatos, ${relatorio.pendentes.length} pendentes de revisão, ` +
       `${relatorio.rejeitados.length} rejeitados. Sem avaliação visual.`,
   );
 }
@@ -296,7 +317,7 @@ export async function subirFlexi(argumentos: string[]): Promise<void> {
   const relatorio = JSON.parse(await readFile(caminho(RELATORIO), 'utf8')) as RelatorioFlexi;
   if (!relatorio.concluida)
     throw new Error('Coleta incompleta: rode flexi novamente antes de importar.');
-  const payload = relatorio.candidatos.map(paraPayloadFlexi);
+  const payload = payloadDoRelatorio(relatorio);
   const env = await carregarEnv();
   const resultado = await enviarPayloadFlexi(payload, {
     confirmar: argumentos.includes('--confirmar'),
