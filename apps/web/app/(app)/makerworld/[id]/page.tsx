@@ -13,6 +13,7 @@ import { centavosParaReais, pct, tempoRelativo } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ROTULOS_FLEXI } from '../rotulos-flexi';
 
 type Marketplace = 'SHOPEE' | 'ML' | 'TIKTOK';
 
@@ -91,6 +92,7 @@ type Detalhe = {
   tempoHoras: string;
   unidadesPorKit: number;
   notaIa: number;
+  scoreObjetivo: number;
   veredictoIa: string;
   justificativaIa: string;
   alertas: string[];
@@ -172,7 +174,17 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{modelo.nicho}</Badge>
-        <Badge variant="outline">nota {modelo.notaIa}</Badge>
+        {modelo.alertas.includes('SEM_AVALIACAO_VISUAL') ? (
+          <>
+            <Badge variant="outline">Sem avaliação visual</Badge>
+            <Badge variant="outline">Score objetivo {modelo.scoreObjetivo}</Badge>
+          </>
+        ) : (
+          <Badge variant="outline">Nota IA {modelo.notaIa}</Badge>
+        )}
+        {modelo.tags.includes('MULTICOR_PROVAVEL') && (
+          <Badge variant="secondary">{ROTULOS_FLEXI.MULTICOR_PROVAVEL}</Badge>
+        )}
         <a
           href={modelo.url}
           target="_blank"
@@ -235,8 +247,12 @@ function CardLicenca({ modelo }: { modelo: Detalhe }) {
         {modelo.alertas.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {modelo.alertas.map((alerta) => (
-              <Badge key={alerta} variant="destructive" className="text-[10px]">
-                {alerta}
+              <Badge
+                key={alerta}
+                variant={ROTULOS_FLEXI[alerta] ? 'secondary' : 'destructive'}
+                className="text-[10px]"
+              >
+                {ROTULOS_FLEXI[alerta] ?? alerta}
               </Badge>
             ))}
           </div>
@@ -245,8 +261,9 @@ function CardLicenca({ modelo }: { modelo: Detalhe }) {
         {!modelo.temFotoReal && (
           <p className="flex gap-2 text-xs text-muted-foreground">
             <AlertTriangle className="size-4 shrink-0" />
-            Sem foto real — a imagem é render do autor. Confirme o acabamento antes de usar como
-            foto de anúncio.
+            {modelo.alertas.includes('SEM_AVALIACAO_VISUAL')
+              ? 'Foto ainda não verificada. Confira as imagens e o acabamento antes de produzir.'
+              : 'Sem foto real — a imagem é render do autor. Confirme o acabamento antes de usar como foto de anúncio.'}
           </p>
         )}
       </CardContent>

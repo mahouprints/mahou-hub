@@ -18,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ImportarModelos } from './importar-modelos';
+import { ROTULOS_FLEXI } from './rotulos-flexi';
 
 type Status = 'NOVO' | 'FAVORITO' | 'DESCARTADO' | 'VIROU_PRODUTO';
 type Veredicto = 'APROVADO' | 'TALVEZ' | 'REPROVADO';
@@ -48,6 +50,7 @@ type ModeloItem = {
   veredictoIa: Veredicto;
   justificativaIa: string;
   alertas: string[];
+  tags: string[];
   temFotoReal: boolean;
   status: Status;
 };
@@ -108,6 +111,7 @@ export default function MakerWorldPage() {
   const [notaMinima, setNotaMinima] = useState<string>('60');
   const [esconderIp, setEsconderIp] = useState(true);
   const [pagina, setPagina] = useState(0);
+  const modoFlexi = busca === 'flexi-60g';
 
   // 24 por página não é escolha estética: as imagens vêm do CDN do MakerWorld em
   // resolução cheia, e pedir 120 de uma vez faz o CDN dropar a maioria — a tela
@@ -116,12 +120,12 @@ export default function MakerWorldPage() {
   const params = new URLSearchParams({
     limit: String(POR_PAGINA),
     offset: String(pagina * POR_PAGINA),
-    ordenarPor: 'notaIa',
+    ordenarPor: modoFlexi ? 'scoreObjetivo' : 'notaIa',
   });
   if (busca) params.set('q', busca);
   if (nicho !== 'todos') params.set('nicho', nicho);
   if (status !== 'todos') params.set('status', status);
-  if (notaMinima !== 'todas') params.set('notaMinima', notaMinima);
+  if (!modoFlexi && notaMinima !== 'todas') params.set('notaMinima', notaMinima);
   if (esconderIp) params.append('semAlertas', 'IP_TERCEIRO');
 
   const { data, isLoading } = useQuery({
@@ -147,15 +151,37 @@ export default function MakerWorldPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Prospecção MakerWorld</h1>
-        <p className="text-sm text-muted-foreground">
-          Modelos com licença que permite venda, já filtrados por viabilidade de produção e
-          avaliados por IA. Favorite o que quiser produzir.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Prospecção MakerWorld</h1>
+          <p className="text-sm text-muted-foreground">
+            Modelos com licença que permite venda, filtrados por viabilidade de produção. Favorite o
+            que quiser produzir e confira a avaliação de cada modelo.
+          </p>
+        </div>
+        <ImportarModelos
+          onImportado={(soFlexis) => {
+            setBusca(soFlexis ? 'flexi-60g' : '');
+            setNicho('todos');
+            setStatus('todos');
+            setNotaMinima('todas');
+            setPagina(0);
+          }}
+        />
       </div>
 
       <Card className="flex flex-wrap items-center gap-3 p-4">
+        <Button
+          variant={modoFlexi ? 'default' : 'outline'}
+          aria-pressed={modoFlexi}
+          onClick={() => {
+            setBusca(modoFlexi ? '' : 'flexi-60g');
+            setNicho('todos');
+            setPagina(0);
+          }}
+        >
+          Flexis até 60 g
+        </Button>
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -209,7 +235,8 @@ export default function MakerWorldPage() {
         </Select>
 
         <Select
-          value={notaMinima}
+          value={modoFlexi ? 'todas' : notaMinima}
+          disabled={modoFlexi}
           onValueChange={(v) => {
             setNotaMinima(v);
             setPagina(0);
@@ -245,13 +272,18 @@ export default function MakerWorldPage() {
         </span>
       </Card>
 
+      {modoFlexi && (
+        <p className="text-sm text-muted-foreground">
+          Seleção do bot por peso e tempo do perfil de impressão, ordenada por score objetivo.
+          Inclui modelos sem avaliação visual. Edite a busca para sair desta seleção.
+        </p>
+      )}
+
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
       {!isLoading && itens.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">
-          Nada aqui com esses filtros. Rode o bot em{' '}
-          <code className="rounded bg-muted px-1">scripts/makerworld</code> para importar modelos
-          novos.
+          Nada aqui com esses filtros. Use “Importar resultados” para adicionar a seleção do bot.
         </Card>
       )}
 
@@ -272,9 +304,11 @@ export default function MakerWorldPage() {
                 className="size-full object-cover transition-transform hover:scale-105"
               />
               <span
-                className={`absolute right-2 top-2 rounded-md bg-background/90 px-2 py-1 text-sm font-semibold ${corDaNota(modelo.notaIa)}`}
+                className={`absolute right-2 top-2 rounded-md bg-background/90 px-2 py-1 text-sm font-semibold ${modelo.alertas.includes('SEM_AVALIACAO_VISUAL') || modoFlexi ? 'text-foreground' : corDaNota(modelo.notaIa)}`}
               >
-                {modelo.notaIa}
+                {modelo.alertas.includes('SEM_AVALIACAO_VISUAL') || modoFlexi
+                  ? `Score objetivo ${modelo.scoreObjetivo}`
+                  : `IA ${modelo.notaIa}`}
               </span>
             </a>
 
@@ -300,6 +334,11 @@ export default function MakerWorldPage() {
                 <Badge variant="outline" className="text-[10px]">
                   {modelo.licenca}
                 </Badge>
+                {modelo.tags.includes('MULTICOR_PROVAVEL') && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {ROTULOS_FLEXI.MULTICOR_PROVAVEL}
+                  </Badge>
+                )}
               </div>
 
               <p className="line-clamp-2 text-xs text-muted-foreground">{modelo.justificativaIa}</p>
@@ -331,17 +370,18 @@ export default function MakerWorldPage() {
                 <div className="flex flex-wrap gap-1">
                   {modelo.alertas.map((alerta) => {
                     const info = ALERTAS[alerta];
+                    const texto = info?.texto ?? ROTULOS_FLEXI[alerta] ?? alerta;
                     return (
                       <span
                         key={alerta}
-                        title={info?.texto ?? alerta}
+                        title={texto}
                         className={`rounded px-1.5 py-0.5 text-[10px] ${
                           info?.grave
                             ? 'bg-destructive/10 text-destructive'
                             : 'bg-muted text-muted-foreground'
                         }`}
                       >
-                        {info?.texto ?? alerta}
+                        {texto}
                       </span>
                     );
                   })}

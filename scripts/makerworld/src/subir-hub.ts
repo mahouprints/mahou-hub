@@ -12,7 +12,7 @@ import type { ModeloAvaliado } from './tipos.js';
 
 const aqui = dirname(fileURLToPath(import.meta.url));
 
-async function carregarEnv(): Promise<Record<string, string>> {
+export async function carregarEnv(): Promise<Record<string, string>> {
   const candidatos = [
     resolve(aqui, '../.env.local'),
     resolve(aqui, '../../../mcp-servers/mahou-hub/.env.local'),

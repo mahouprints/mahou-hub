@@ -53,4 +53,5 @@ jobs:
       - run: pnpm --filter api typecheck
       - run: pnpm --filter web typecheck
       - run: pnpm --filter api test
+      - run: pnpm --filter api exec tsx --test ../../scripts/makerworld/src/flexi.test.ts ../../scripts/makerworld/src/client.test.ts
       - run: pnpm --filter web test

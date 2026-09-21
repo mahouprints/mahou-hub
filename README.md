@@ -49,6 +49,65 @@ Na produção, cada filamento é baixado separadamente e o consumo efetivo fica 
 
 **Canais de venda suportados:** SHOPEE, ML, SITE, TIKTOK. Taxas TikTok são 4 percentuais configuráveis em `Parametro` (comissão plataforma, SFP, afiliado, processamento de pagamento).
 
+## Prospecção MakerWorld: brinquedos flexi
+
+Em `scripts/makerworld`, `npm run flexi` procura modelos flexi/articulados nas categorias do
+bot, verifica a licença comercial e prepara fotos, links e estimativas para a aba MakerWorld.
+O limite é **60 g por trabalho de impressão** e **2 horas por padrão**; o tempo pode ser
+ajustado. O bot não divide gramas/horas por peças ou placas para fazer um perfil caber no teto.
+
+```powershell
+cd scripts/makerworld
+npm install
+npm run flexi -- --max-horas 2 --paginas 3 --limite 80
+# Quando a listagem estiver bloqueada, use IDs de modelos encontrados em páginas públicas:
+npm run flexi -- --ids 892737,1530421 --max-horas 2
+# Reprocessa respostas JSON já salvas, sem rede; arquivos devem se chamar <id>.json:
+npm run flexi -- --amostras dados/amostras --ids 892737,1530421
+npm run flexi-subir
+npm run flexi-subir -- --confirmar
+npm run test:flexi
+```
+
+No Windows, o coletor nativo atualiza uma lista de IDs públicos antes da triagem. Exemplo
+com os 11 modelos verificados nesta pesquisa, a partir de `scripts/makerworld`:
+
+```powershell
+.\coletar-flexi.ps1 -Ids 1419875,1272708,103585,892737,145302,1231393,2187790,706106,2383771,2727631,2727635 -MaxHoras 2
+```
+
+Esse comando usa `Invoke-RestMethod` com identificação `MahouPrintsProspector/1.0`, salva
+as respostas completas e a proveniência em uma pasta exclusiva de `dados/amostras/` e
+executa a triagem somente sobre essa coleta. Aceita até 200 IDs positivos e interrompe no
+primeiro erro, sem reaproveitar arquivos antigos nem tentar novamente um bloqueio HTTP.
+Ele não importa no Hub. A descoberta automática por categorias continua dependendo do
+acesso permitido pelo servidor; o wrapper coleta apenas a lista de IDs fornecida.
+
+`--max-gramas` aceita um limite menor, até 60; `--paginas` é por categoria (1..50) e
+`--limite` limita modelos detalhados (1..200). A consulta usa identificação própria e pausa
+entre requisições. HTTP 403/429 interrompe a coleta: não há tentativa de contornar o bloqueio.
+
+Os arquivos locais `dados/flexi-relatorio.json` e `dados/flexi-payload.json` guardam a revisão e
+o lote `{ modelos: [...] }` para importar no Hub. O relatório separa candidatos, pendentes e
+rejeitados com motivos. **AMS sem consumo de purga informado fica pendente e fora do lote.**
+No modo `--amostras`, o relatório guarda a origem do arquivo; a justificativa mostra somente
+sua data, sem afirmar nova consulta ao site. Sem `--ids`, todos os JSONs `<id>.json`
+desse diretório são reprocessados, respeitando `--limite`.
+Perfis sem peso/tempo ou sem imagem própria são rejeitados. O bot privilegia múltiplas cores
+declaradas entre os perfis elegíveis e mantém imagem, peso, tempo e link do mesmo perfil.
+
+O filtro é uma heurística de metadados: apelo visual, cores, purga, impressora e configuração
+devem ser conferidos no fatiador. Os candidatos chegam como `TALVEZ`, sem avaliação visual,
+com score objetivo; `notaIa: 0` é somente a sentinela exigida pelo contrato legado, nunca uma
+nota atribuída por IA. Custos/preços usam as estimativas existentes do bot e cada anúncio
+tem `unidadesPorKit: 1`.
+
+`flexi-subir` simula por padrão. Com `--confirmar`, lê `MAHOU_API_TOKEN` e, opcionalmente,
+`MAHOU_API_BASE` do ambiente ou `.env.local` já usado pelo bot/MCP e faz upsert no endpoint
+`/makerworld/bulk-import`. Reexecutar não duplica modelos. Coleta incompleta esvazia o lote e
+impede envio; nenhuma licença desconhecida é tratada como permitida. O fluxo geral de
+prospecção e curadoria por IA continua disponível nos comandos anteriores.
+
 ## Relatórios e Google Sheets
 
 Vendas e custos mostram suas observações abaixo do lançamento, com expansão quando passam de duas linhas. O relatório usa o mesmo cálculo do resumo mensal e inclui vendas arquivadas, filamentos, insumos por unidade, impostos, taxas e custos gerais por competência. Compras de estoque não são somadas novamente. Datas são dias civis, sem deslocamento por fuso.
