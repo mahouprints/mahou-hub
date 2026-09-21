@@ -138,7 +138,7 @@ async function principal(): Promise<void> {
       console.log(
         'Comandos: coletar [--rapido] | enriquecer | filtrar | imagens | lotes | ' +
           'segunda-opiniao | consolidar | subir | status | ' +
-          'flexi [--ids 123,456] [--amostras dados/amostras] [--max-horas 2] ' +
+          'flexi [--maquina] [--ids 123,456] [--amostras dados/amostras] [--max-horas 2] ' +
           '[--limite 80] [--paginas 3] | flexi-subir [--confirmar]',
       );
       process.exitCode = 1;

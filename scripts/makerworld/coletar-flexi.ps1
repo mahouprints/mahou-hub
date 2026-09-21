@@ -6,7 +6,9 @@ param(
   [int[]]$Ids,
 
   [ValidateScript({ $_ -gt 0 -and -not [double]::IsInfinity($_) -and -not [double]::IsNaN($_) })]
-  [double]$MaxHoras = 2
+  [double]$MaxHoras = 2,
+
+  [switch]$Maquina
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,10 +39,12 @@ try {
   [IO.File]::WriteAllText((Join-Path $pastaExecucao 'proveniencia.json'), $jsonOrigens, $utf8SemBom)
   Write-Host "Respostas desta execucao: $pastaExecucao"
   $horasArgumento = $MaxHoras.ToString([Globalization.CultureInfo]::InvariantCulture)
+  $argumentosModo = @()
+  if ($Maquina) { $argumentosModo = @('--maquina') }
   Push-Location -LiteralPath $PSScriptRoot
   try {
     & $comandoNpm.Source run flexi -- --amostras $pastaExecucao --ids ($idsUnicos -join ',') `
-      --limite $idsUnicos.Count --max-horas $horasArgumento
+      --limite $idsUnicos.Count --max-horas $horasArgumento @argumentosModo
     if ($LASTEXITCODE -ne 0) { throw "Triagem flexi terminou com codigo $LASTEXITCODE." }
   } finally {
     Pop-Location

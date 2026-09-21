@@ -180,7 +180,9 @@ function Cabecalho({ modelo, id }: { modelo: Detalhe; id: string }) {
             <Badge variant="outline">Score objetivo {modelo.scoreObjetivo}</Badge>
           </>
         ) : (
-          <Badge variant="outline">Nota IA {modelo.notaIa}</Badge>
+          <Badge variant="outline">
+            {modelo.tags.includes('maquina-coloridos') ? 'Apelo visual' : 'Nota IA'} {modelo.notaIa}
+          </Badge>
         )}
         {modelo.tags.includes('MULTICOR_PROVAVEL') && (
           <Badge variant="secondary">{ROTULOS_FLEXI.MULTICOR_PROVAVEL}</Badge>
@@ -240,6 +242,11 @@ function CardLicenca({ modelo }: { modelo: Detalhe }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
+        {modelo.licencaVeredicto === 'PROIBIDA' && (
+          <p className="font-medium text-amber-600 dark:text-amber-500">
+            Uso comercial não liberado
+          </p>
+        )}
         <p className={exigeAtencao ? 'text-amber-600 dark:text-amber-500' : undefined}>
           {modelo.licencaObrigacao}
         </p>
@@ -305,7 +312,7 @@ function CardEconomia({ modelo }: { modelo: Detalhe }) {
           <Metrica rotulo="Lucro por hora" valor={centavosParaReais(e.lucroPorHoraCentavos)} />
           <Metrica rotulo="Tempo" valor={`${modelo.tempoHoras} h`} />
           <Metrica
-            rotulo="Peso"
+            rotulo={modelo.alertas.includes('PURGA_NAO_INFORMADA') ? 'Peso publicado' : 'Peso'}
             valor={
               modelo.unidadesPorKit > 1
                 ? `${modelo.pesoGramas} g · kit de ${modelo.unidadesPorKit}`

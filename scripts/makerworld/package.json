@@ -7,7 +7,7 @@
   "scripts": {
     "flexi": "npx -y tsx src/cli.ts flexi",
     "flexi-subir": "npx -y tsx src/cli.ts flexi-subir",
-    "test:flexi": "npx -y tsx --test src/flexi.test.ts src/client.test.ts",
+    "test:flexi": "npx -y tsx --test src/flexi.test.ts src/flexi-maquina.test.ts src/client.test.ts",
     "coletar": "npx -y tsx src/cli.ts coletar",
     "enriquecer": "npx -y tsx src/cli.ts enriquecer",
     "filtrar": "npx -y tsx src/cli.ts filtrar",

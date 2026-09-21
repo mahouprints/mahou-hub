@@ -18,6 +18,8 @@ export interface PerfilFlexi {
   downloads: number;
   materiais: number | null;
   cores: number | null;
+  coresConsumidas: string[];
+  doAutor: boolean;
   precisaAms: boolean | null;
   impressora: string | null;
   bicoMm: number | null;
@@ -27,6 +29,7 @@ export interface PerfilFlexi {
 }
 
 export interface CandidatoFlexi {
+  modo: 'estrito' | 'maquina';
   modelo: ModeloListagem;
   licenca: string;
   autor: string;
@@ -61,7 +64,29 @@ export function pareceFlexi(titulo: string, tags: string[] = []): boolean {
   );
 }
 
-function normalizarPerfil(perfil: PerfilImpressao, indice: number): PerfilFlexi | null {
+function coresConsumidas(perfil: PerfilImpressao): string[] {
+  const filamentos = [
+    ...(perfil.instanceFilaments ?? []),
+    ...(perfil.extention?.modelInfo?.plates ?? []).flatMap((p) => p.filaments ?? []),
+  ];
+  return [
+    ...new Set(
+      filamentos
+        .filter(
+          (f) =>
+            numeroPositivo(Number(f.usedG)) &&
+            /^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(f.color ?? ''),
+        )
+        .map((f) => f.color!.slice(0, 7).toUpperCase()),
+    ),
+  ];
+}
+
+function normalizarPerfil(
+  perfil: PerfilImpressao,
+  indice: number,
+  autorUid?: number,
+): PerfilFlexi | null {
   if (!numeroPositivo(perfil.weight) || !numeroPositivo(perfil.prediction)) return null;
   const fotos = Array.isArray(perfil.pictures) ? perfil.pictures : [];
   const imagens = fotos
@@ -83,6 +108,8 @@ function normalizarPerfil(perfil: PerfilImpressao, indice: number): PerfilFlexi 
       numeroPositivo(perfil.materialColorCnt) && Number.isInteger(perfil.materialColorCnt)
         ? perfil.materialColorCnt
         : null,
+    coresConsumidas: coresConsumidas(perfil),
+    doAutor: autorUid !== undefined && perfil.instanceCreator?.uid === autorUid,
     precisaAms: typeof perfil.needAms === 'boolean' ? perfil.needAms : null,
     impressora: perfil.extention?.modelInfo?.compatibility?.devProductName ?? null,
     bicoMm: perfil.extention?.modelInfo?.compatibility?.nozzleDiameter ?? null,
@@ -95,6 +122,25 @@ function normalizarPerfil(perfil: PerfilImpressao, indice: number): PerfilFlexi 
     ].slice(0, 4),
     temFotoReal: imagens.some((foto) => foto.isRealLifePhoto === 1),
   };
+}
+
+function compararPerfisMaquina(a: PerfilFlexi, b: PerfilFlexi): number {
+  return (
+    b.coresConsumidas.length - a.coresConsumidas.length ||
+    Number(b.doAutor) - Number(a.doAutor) ||
+    b.downloads - a.downloads ||
+    Number(a.precisaAms !== false) - Number(b.precisaAms !== false) ||
+    Number(b.bicoMm === 0.4) - Number(a.bicoMm === 0.4)
+  );
+}
+
+function perfilExplicitamenteParcial(titulo: string): boolean {
+  // Esses títulos descrevem componentes avulsos; "multipart" e "print by object" não fazem isso.
+  return (
+    /^(?:eco[ -]friendly\s+eyes\s*\(|snap[ -]on\s+(?:leg|tentacle)\b)/i.test(titulo.trim()) ||
+    /^(?:eyes?|legs?|tentacles?)\s+only(?:\s*[-,(]|$)/i.test(titulo.trim()) ||
+    /^(?:only|just|single)\s+(?:eyes?|leg|tentacle)(?:\s*[-,(]|$)/i.test(titulo.trim())
+  );
 }
 
 function compararPerfis(a: PerfilFlexi, b: PerfilFlexi): number {
@@ -116,6 +162,7 @@ export function selecionarFlexi(
   modelo: ModeloListagem,
   detalhe: ModeloDetalhe,
   limites: LimitesFlexi = LIMITES_FLEXI,
+  maquina = false,
 ): SelecaoFlexi {
   if (
     !Number.isSafeInteger(detalhe.id) ||
@@ -125,28 +172,43 @@ export function selecionarFlexi(
   ) {
     return { motivos: ['DETALHE_INVALIDO'] };
   }
-  if (!analisarLicenca(detalhe.license).vendavel)
-    return { motivos: ['LICENCA_NAO_COMERCIAL_OU_DESCONHECIDA'] };
+  const licenca = analisarLicenca(detalhe.license);
+  if (!maquina && !licenca.vendavel) return { motivos: ['LICENCA_NAO_COMERCIAL_OU_DESCONHECIDA'] };
   if (modelo.nsfw || detalhe.nsfw) return { motivos: ['CONTEUDO_ADULTO'] };
   if (!pareceFlexi(detalhe.title || modelo.title, modelo.tags))
     return { motivos: ['SEM_INDICIO_FLEXI'] };
-  const perfis = (detalhe.instances ?? []).map(normalizarPerfil).filter((p) => p !== null);
+  const perfis = (detalhe.instances ?? [])
+    .map((p, indice) => normalizarPerfil(p, indice, detalhe.designCreator?.uid))
+    .filter((p) => p !== null);
   if (perfis.length === 0) return { motivos: ['SEM_PESO_OU_TEMPO_VALIDO'] };
   const viaveis = perfis.filter((p) => p.gramas <= limites.gramas && p.horas <= limites.horas);
   if (viaveis.length === 0) return { motivos: ['NENHUM_PERFIL_DENTRO_DOS_LIMITES'] };
-  const perfil = viaveis.filter((p) => p.imagens.length > 0).sort(compararPerfis)[0];
+  const coloridos = maquina ? viaveis.filter((p) => p.coresConsumidas.length >= 2) : viaveis;
+  if (coloridos.length === 0) return { motivos: ['SEM_DUAS_CORES_CONSUMIDAS_NO_PERFIL'] };
+  const completos = maquina
+    ? coloridos.filter((p) => !perfilExplicitamenteParcial(p.titulo))
+    : coloridos;
+  if (completos.length === 0) return { motivos: ['SOMENTE_PERFIS_DE_PECAS_AVULSAS'] };
+  const perfil = completos
+    .filter((p) => p.imagens.length > 0)
+    .sort(maquina ? compararPerfisMaquina : compararPerfis)[0];
   if (!perfil) return { motivos: ['SEM_IMAGEM_DO_PERFIL_VIAVEL'] };
   const url = urlDoModelo(modelo.id, detalhe.slug || modelo.slug);
   return {
     candidato: {
+      modo: maquina ? 'maquina' : 'estrito',
       modelo: { ...modelo, title: detalhe.title || modelo.title },
       licenca: detalhe.license,
       autor: detalhe.designCreator?.name ?? modelo.designCreator?.name ?? '',
       url: perfil.id ? `${url}#profileId-${encodeURIComponent(perfil.id)}` : url,
       perfil,
-      scoreObjetivo: pontuarPerfil(perfil, limites),
+      scoreObjetivo: maquina ? 0 : pontuarPerfil(perfil, limites),
       coletadoEm: new Date().toISOString(),
-      pendencias: perfil.precisaAms === false ? [] : ['PURGA_NAO_INFORMADA'],
+      pendencias: [
+        ...(maquina ? ['SEM_AVALIACAO_VISUAL', 'DIMENSOES_NAO_CONFIRMADAS'] : []),
+        ...(perfil.precisaAms === false ? [] : ['PURGA_NAO_INFORMADA']),
+        ...(maquina && !licenca.vendavel ? ['LICENCA_COMERCIAL_PENDENTE'] : []),
+      ],
     },
   };
 }
@@ -161,12 +223,15 @@ function pontuarPerfil(perfil: PerfilFlexi, limites: LimitesFlexi): number {
 /** Converte evidência do perfil para o contrato existente. Ex.: paraPayloadFlexi(candidato). */
 export function paraPayloadFlexi(candidato: CandidatoFlexi) {
   const { modelo, perfil } = candidato;
+  const maquina = candidato.modo === 'maquina';
   const licenca = analisarLicenca(candidato.licenca);
   const custo = custoDeProducao(perfil.gramas, perfil.horas);
   const preco = precoParaMargem(custo.custoTotalCentavos);
   if (preco === null) throw new Error(`Modelo ${modelo.id}: custo fora da escada de preços.`);
-  const cores = perfil.cores === null ? 'cores desconhecidas' : `${perfil.cores} cores declaradas`;
-  if (candidato.pendencias.length > 0)
+  const quantidadeCores = maquina ? perfil.coresConsumidas.length : perfil.cores;
+  const cores =
+    quantidadeCores === null ? 'cores desconhecidas' : `${quantidadeCores} cores declaradas`;
+  if (!maquina && candidato.pendencias.length > 0)
     throw new Error(`Modelo ${modelo.id}: há pendências de consumo.`);
   return {
     externalId: String(modelo.id),
@@ -177,7 +242,7 @@ export function paraPayloadFlexi(candidato: CandidatoFlexi) {
     downloads: modelo.downloadCount ?? 0,
     curtidas: modelo.likeCount ?? 0,
     colecoes: modelo.collectionCount ?? 0,
-    licenca: candidato.licenca,
+    licenca: candidato.licenca || 'Não informada pelo MakerWorld',
     licencaVeredicto: licenca.veredicto,
     licencaObrigacao: licenca.obrigacao,
     nicho: 'FLEXI_ARTICULADO' as const,
@@ -194,6 +259,13 @@ export function paraPayloadFlexi(candidato: CandidatoFlexi) {
     veredictoIa: 'TALVEZ' as const,
     justificativaIa:
       `Triagem automática por metadados, sem avaliação visual/IA. ` +
+      (maquina
+        ? 'Inspiração para máquina de sorteio, pendente de avaliação. Peso/tempo publicados. ' +
+          (perfil.precisaAms === false
+            ? 'Confirme todas as peças/placas no fatiador. '
+            : 'Total com purga ainda não confirmado. ') +
+          'Tamanho a conferir. '
+        : '') +
       `Perfil ${perfil.id ?? `índice ${perfil.indice + 1}`} — ${perfil.titulo}: ` +
       `${perfil.gramas} g, ${(perfil.horas * 60).toFixed(1)} min, ${cores}. ` +
       `Impressora: ${perfil.impressora ?? 'não informada'}, bico: ${perfil.bicoMm ?? 'não informado'} mm; ` +
@@ -203,22 +275,25 @@ export function paraPayloadFlexi(candidato: CandidatoFlexi) {
         ? `Consulta à API em ${candidato.coletadoEm}.`
         : `Dados de arquivo salvo em ${candidato.arquivoModificadoEm}; sem atualização nesta execução.`),
     alertas: [
-      'SEM_AVALIACAO_VISUAL',
-      'ESTIMATIVA_DO_PERFIL_CONFIRMAR_PURGA_E_PLACAS',
-      'CUSTOS_E_PRECOS_ESTIMADOS',
-      ...(perfil.cores === null ? ['CORES_DESCONHECIDAS'] : []),
-      ...(perfil.bicoMm !== null && perfil.bicoMm !== 0.4 ? ['NOZZLE_DIFERENTE_0_4'] : []),
-      ...(/\b(sprunki|minecraft|jurassic (?:park|world))\b/i.test(
-        [modelo.title, ...(modelo.tags ?? [])].join(' '),
-      )
-        ? ['IP_TERCEIRO']
-        : []),
+      ...new Set([
+        'SEM_AVALIACAO_VISUAL',
+        'ESTIMATIVA_DO_PERFIL_CONFIRMAR_PURGA_E_PLACAS',
+        'CUSTOS_E_PRECOS_ESTIMADOS',
+        ...(maquina ? candidato.pendencias : []),
+        ...(perfil.cores === null ? ['CORES_DESCONHECIDAS'] : []),
+        ...(perfil.bicoMm !== null && perfil.bicoMm !== 0.4 ? ['NOZZLE_DIFERENTE_0_4'] : []),
+        ...(/\b(sprunki|minecraft|jurassic (?:park|world))\b/i.test(
+          [modelo.title, ...(modelo.tags ?? [])].join(' '),
+        )
+          ? ['IP_TERCEIRO']
+          : []),
+      ]),
     ],
     tags: [
       ...new Set([
-        'flexi-60g',
+        maquina ? 'maquina-coloridos' : 'flexi-60g',
         'SEM_AVALIACAO_VISUAL',
-        ...((perfil.cores ?? 0) > 1 ? ['MULTICOR_PROVAVEL'] : []),
+        ...((quantidadeCores ?? 0) > 1 ? ['MULTICOR_PROVAVEL'] : []),
         ...(modelo.tags ?? []),
       ]),
     ].slice(0, 15),

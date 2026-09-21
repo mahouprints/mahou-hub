@@ -15,11 +15,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { selecaoDoLote, type SelecaoMakerworld } from './selecao-modelos';
 
 type Previa = { nomeArquivo: string; payload: MakerworldBulkImport };
 
 /** Revisa um JSON do bot antes de importar. Ex.: <ImportarModelos onImportado={recarregar} />. */
-export function ImportarModelos({ onImportado }: { onImportado: (soFlexis: boolean) => void }) {
+export function ImportarModelos({
+  onImportado,
+}: {
+  onImportado: (selecao: SelecaoMakerworld) => void;
+}) {
   const arquivoInput = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const [previa, setPrevia] = useState<Previa | null>(null);
@@ -35,7 +40,7 @@ export function ImportarModelos({ onImportado }: { onImportado: (soFlexis: boole
       queryClient.invalidateQueries({ queryKey: ['makerworld-resumo'] });
       toast.success(`${resultado.criados} modelos novos; ${resultado.atualizados} atualizados.`);
       setPrevia(null);
-      onImportado(payload.modelos.every((modelo) => modelo.tags.includes('flexi-60g')));
+      onImportado(selecaoDoLote(payload.modelos));
     },
   });
 
@@ -97,6 +102,7 @@ export function ImportarModelos({ onImportado }: { onImportado: (soFlexis: boole
               <li key={`${modelo.externalId}-${indice}`}>
                 <span className="font-medium">{modelo.titulo}</span>
                 <span className="ml-2 text-muted-foreground">
+                  {modelo.alertas.includes('PURGA_NAO_INFORMADA') && 'Peso publicado: '}
                   {modelo.pesoGramas} g · {Math.round(modelo.tempoHoras * 60)} min
                 </span>
               </li>
