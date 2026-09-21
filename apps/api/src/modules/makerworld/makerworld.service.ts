@@ -71,13 +71,36 @@ export class MakerworldService {
 
       const existente = await this.prisma.modeloMakerWorld.findUnique({
         where: { externalId: modelo.externalId },
-        select: { id: true },
+        select: {
+          id: true,
+          notaIa: true,
+          veredictoIa: true,
+          justificativaIa: true,
+          alertas: true,
+        },
       });
+
+      // A triagem por metadados não substitui uma avaliação visual já feita.
+      const preservarAvaliacao =
+        existente &&
+        modelo.alertas.includes('SEM_AVALIACAO_VISUAL') &&
+        !existente.alertas.includes('SEM_AVALIACAO_VISUAL');
+      const atualizacao = preservarAvaliacao
+        ? {
+            ...dados,
+            notaIa: existente.notaIa,
+            veredictoIa: existente.veredictoIa,
+            justificativaIa: existente.justificativaIa,
+            alertas: [...new Set([...existente.alertas, ...modelo.alertas])].filter(
+              (alerta) => alerta !== 'SEM_AVALIACAO_VISUAL',
+            ),
+          }
+        : dados;
 
       await this.prisma.modeloMakerWorld.upsert({
         where: { externalId: modelo.externalId },
         create: { externalId: modelo.externalId, ...dados },
-        update: dados,
+        update: atualizacao,
       });
 
       if (existente) atualizados++;

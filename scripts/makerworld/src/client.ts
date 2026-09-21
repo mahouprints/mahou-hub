@@ -10,9 +10,8 @@
 
 const BASE = 'https://makerworld.com';
 
-// Navegador real: a Cloudflare na frente do MakerWorld devolve 403 pra User-Agent de bot.
-const UA =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+// Os detalhes públicos aceitam um cliente identificado; bloqueios não devem ser contornados.
+const UA = 'MahouPrintsProspector/1.0 (+https://github.com/mahouprints/mahou-hub)';
 
 /** Teto de janela do Elasticsearch por trás da busca — offset além disso devolve lista vazia. */
 export const OFFSET_MAXIMO = 10_000;
@@ -51,14 +50,30 @@ export interface ModeloListagem {
 
 /** Perfil de impressão de um modelo — a fonte de peso e tempo reais. */
 export interface PerfilImpressao {
+  id?: number;
+  profileId?: number;
   title: string;
   /** Gramas de filamento previstas pelo fatiador do autor. */
   weight: number;
   /** Tempo de impressão previsto, em SEGUNDOS. */
   prediction: number;
   materialCnt: number;
+  materialColorCnt?: number;
   needAms: boolean;
   downloadCount: number;
+  cover?: string;
+  extention?: {
+    modelInfo?: {
+      compatibility?: { devProductName?: string; nozzleDiameter?: number };
+      plates?: Array<{
+        index: number;
+        name?: string;
+        weight: number;
+        prediction: number;
+        filaments?: Array<{ color?: string; usedG?: string }>;
+      }>;
+    };
+  };
   pictures?: Array<{ url: string; isRealLifePhoto: number }>;
   instanceFilaments?: Array<{ filamentType?: string }>;
 }
@@ -67,6 +82,12 @@ export interface ModeloDetalhe {
   id: number;
   title: string;
   slug: string;
+  coverUrl?: string;
+  tags?: string[];
+  downloadCount?: number;
+  likeCount?: number;
+  collectionCount?: number;
+  createTime?: string;
   summary: string;
   license: string;
   licenseDescriptionInfo?: { title?: string; content?: string };
@@ -79,9 +100,18 @@ export interface ModeloDetalhe {
   designCreator?: { name?: string; handle?: string };
 }
 
+export class ErroMakerWorldHttp extends Error {
+  constructor(
+    readonly status: number,
+    url: string,
+  ) {
+    super(`HTTP ${status} em ${url}`);
+  }
+}
+
 /**
  * GET com retry e backoff. Rate-limit vive no chamador (ver `aguardar`), não aqui —
- * o retry é só pra blip de rede e 5xx/429 transitórios.
+ * o retry é só pra blip de rede e 5xx transitórios. 4xx interrompem a coleta.
  */
 async function buscarJson<T>(url: string, tentativas = 4): Promise<T> {
   let ultimoErro: unknown;
@@ -90,16 +120,15 @@ async function buscarJson<T>(url: string, tentativas = 4): Promise<T> {
     try {
       const resposta = await fetch(url, {
         headers: { 'User-Agent': UA, Accept: 'application/json' },
+        signal: AbortSignal.timeout(30_000),
       });
-
-      if (resposta.status === 429 || resposta.status >= 500) {
-        throw new Error(`HTTP ${resposta.status} em ${url}`);
-      }
       if (!resposta.ok) {
-        throw new Error(`HTTP ${resposta.status} em ${url} (não recuperável)`);
+        throw new ErroMakerWorldHttp(resposta.status, url);
       }
       return (await resposta.json()) as T;
     } catch (erro) {
+      // Interromper 4xx inclui CAPTCHA/403 e rate limit. Repetir não corrige acesso.
+      if (erro instanceof ErroMakerWorldHttp && erro.status < 500) throw erro;
       ultimoErro = erro;
       if (i < tentativas - 1) await aguardar(1500 * 2 ** i);
     }

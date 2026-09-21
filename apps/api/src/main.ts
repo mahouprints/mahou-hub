@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import cookieParser from 'cookie-parser';
@@ -12,7 +13,9 @@ import { AppModule } from './app.module';
 };
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  // Os lotes de modelos contêm URLs e justificativas e ultrapassam os 100 KB padrão.
+  app.useBodyParser('json', { limit: '5mb' });
   app.useLogger(app.get(Logger));
   app.use(cookieParser());
 

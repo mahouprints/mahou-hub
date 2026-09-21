@@ -110,6 +110,43 @@ describe('MakerworldService', () => {
     expect(where.NOT).toEqual({ alertas: { hasSome: ['IP_TERCEIRO'] } });
   });
 
+  it('triagem flexi preserva avaliação visual e riscos já revisados na reimportação', async () => {
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({
+      id: 'm1',
+      notaIa: 85,
+      veredictoIa: 'APROVADO',
+      justificativaIa: 'Foto revisada e articulações verificadas.',
+      alertas: ['IP_TERCEIRO'],
+      temFotoReal: true,
+    });
+    const svc = new MakerworldService(asPrisma(mock), pricingFake());
+    await svc.importarEmLote({
+      modelos: [
+        modeloFake({
+          notaIa: 0,
+          veredictoIa: 'TALVEZ',
+          alertas: ['SEM_AVALIACAO_VISUAL', 'PESO_DO_PERFIL'],
+          temFotoReal: false,
+          tags: ['flexi-60g'],
+        }),
+      ],
+    });
+
+    const { update, create } = mock.modeloMakerWorld.upsert.mock.calls[0]![0];
+    expect(update).toMatchObject({
+      notaIa: 85,
+      veredictoIa: 'APROVADO',
+      justificativaIa: 'Foto revisada e articulações verificadas.',
+      temFotoReal: false,
+      alertas: ['IP_TERCEIRO', 'PESO_DO_PERFIL'],
+      tags: ['flexi-60g'],
+    });
+    expect(create.notaIa).toBe(0);
+    expect(update).not.toHaveProperty('status');
+    expect(update).not.toHaveProperty('observacao');
+  });
+
   it('listar por lucroPorHora ordena pelo campo certo', async () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findMany.mockResolvedValue([]);

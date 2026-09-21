@@ -20,6 +20,7 @@ import { gerarLotes } from './lotes.js';
 import { gerarLotesSegundaOpiniao } from './segunda-opiniao.js';
 import { consolidar } from './consolidar.js';
 import { subirParaHub } from './subir-hub.js';
+import { executarFlexi, subirFlexi } from './flexi.js';
 import type { ModeloAvaliado, ModeloCandidato, ModeloColetado } from './tipos.js';
 
 function numeroDoArgumento(bandeira: string): number | undefined {
@@ -51,6 +52,12 @@ async function principal(): Promise<void> {
   const limite = numeroDoArgumento('--limite');
 
   switch (comando) {
+    case 'flexi':
+      await executarFlexi(process.argv.slice(3));
+      break;
+    case 'flexi-subir':
+      await subirFlexi(process.argv.slice(3));
+      break;
     case 'coletar': {
       // `--rapido` roda só a onda de mais baixados: bom pra validar o pipeline
       // inteiro em minutos antes de largar a varredura completa.
@@ -130,7 +137,9 @@ async function principal(): Promise<void> {
     default:
       console.log(
         'Comandos: coletar [--rapido] | enriquecer | filtrar | imagens | lotes | ' +
-          'segunda-opiniao | consolidar | subir | status',
+          'segunda-opiniao | consolidar | subir | status | ' +
+          'flexi [--ids 123,456] [--amostras dados/amostras] [--max-horas 2] ' +
+          '[--limite 80] [--paginas 3] | flexi-subir [--confirmar]',
       );
       process.exitCode = 1;
   }

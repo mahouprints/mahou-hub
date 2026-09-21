@@ -5,6 +5,9 @@
   "type": "module",
   "description": "Bot de prospecção de modelos 3D no MakerWorld para o catálogo da Mahou Prints. Coleta → filtra licença/tração/viabilidade → gera lotes pra avaliação visual por IA → sobe candidatos pro Mahou Hub.",
   "scripts": {
+    "flexi": "npx -y tsx src/cli.ts flexi",
+    "flexi-subir": "npx -y tsx src/cli.ts flexi-subir",
+    "test:flexi": "npx -y tsx --test src/flexi.test.ts src/client.test.ts",
     "coletar": "npx -y tsx src/cli.ts coletar",
     "enriquecer": "npx -y tsx src/cli.ts enriquecer",
     "filtrar": "npx -y tsx src/cli.ts filtrar",
