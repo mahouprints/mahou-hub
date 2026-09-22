@@ -8,6 +8,7 @@ import { ArrowLeft, CheckSquare, Pencil, Plus, RefreshCcw, Trash2, X } from 'luc
 import type { CategoriaCusto, Custo } from '@mahou-hub/contracts';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
+import { formatarDataCivil } from '@/lib/data-civil';
 import { useTableSelection } from '@/lib/use-table-selection';
 import { useTableSort } from '@/lib/use-table-sort';
 import { useTablePagination } from '@/lib/use-table-pagination';
@@ -243,7 +244,7 @@ export default function CustosPage() {
                   Valor
                 </SortableHead>
                 <SortableHead chave="competencia" estado={sort.estado} onClick={sort.alternar}>
-                  Competência
+                  Data do custo
                 </SortableHead>
                 <TableHead>Origem</TableHead>
                 <TableHead className="w-20 text-right">Ações</TableHead>
@@ -272,7 +273,7 @@ export default function CustosPage() {
                     {centavosParaReais(c.valorCentavos)}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {formatarMes(new Date(c.dataCompetencia))}
+                    {formatarDataCivil(c.dataCompetencia)}
                   </TableCell>
                   <TableCell>
                     {c.geradoAutomatico ? (
@@ -378,8 +379,4 @@ function BotaoExcluirCusto({ custoId, descricao }: { custoId: string; descricao:
       </DialogContent>
     </Dialog>
   );
-}
-
-function formatarMes(d: Date): string {
-  return d.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
