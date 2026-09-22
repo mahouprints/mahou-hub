@@ -44,6 +44,7 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', c
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
+          defaultMonth={value}
           selected={value}
           onSelect={(d) => {
             onChange(d);

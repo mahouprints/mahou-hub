@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { CategoriaCusto, Custo, CustoCreate } from '@mahou-hub/contracts';
-import { dataUtcDoDiaLocal } from '@/lib/data-civil';
+import { dataLocalDeDiaCivil, dataUtcDoDiaLocal } from '@/lib/data-civil';
 import { Textarea } from '@/components/ui/textarea';
 import { apiFetch } from '@/lib/api-client';
 import { parseDecimalParaCentavos } from '@/lib/parsing';
@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { InputDecimal } from '@/components/ui/input-decimal';
 import { Label } from '@/components/ui/label';
-import { MonthPicker } from '@/components/ui/month-picker';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Select,
   SelectContent,
@@ -57,10 +57,8 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
   const [valorReais, setValorReais] = useState(
     custo ? (custo.valorCentavos / 100).toFixed(2).replace('.', ',') : '',
   );
-  const [mes, setMes] = useState(
-    custo
-      ? toMonthInput(new Date(custo.dataCompetencia))
-      : toMonthInput(dataUtcDoDiaLocal(new Date())),
+  const [dataCusto, setDataCusto] = useState<Date | undefined>(
+    custo ? dataLocalDeDiaCivil(custo.dataCompetencia) : new Date(),
   );
   // Recorrente só faz sentido na criação — após gerado, é só editar/deletar.
   const [recorrente, setRecorrente] = useState(false);
@@ -91,8 +89,8 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const valorCentavos = parseDecimalParaCentavos(valorReais);
-    if (!descricao.trim() || !Number.isFinite(valorCentavos) || valorCentavos <= 0 || !mes) {
-      toast.error('Preencha descrição, valor e mês competência');
+    if (!descricao.trim() || !Number.isFinite(valorCentavos) || valorCentavos <= 0 || !dataCusto) {
+      toast.error('Preencha descrição, valor e data do custo');
       return;
     }
     const n = Number(mesesRecorrencia);
@@ -104,7 +102,7 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
       descricao: descricao.trim(),
       categoria,
       valorCentavos,
-      dataCompetencia: monthToDate(mes),
+      dataCompetencia: dataUtcDoDiaLocal(dataCusto),
       recorrente: editando ? false : recorrente,
       mesesRecorrencia: !editando && recorrente ? n : undefined,
       observacao: observacao.trim() || null,
@@ -119,7 +117,7 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
           <DialogDescription>
             {editando
               ? 'Mudanças afetam apenas este registro — cópias geradas anteriormente não são alteradas.'
-              : 'Mês competência agrupa o custo no relatório financeiro.'}
+              : 'A data define em qual dia e mês o custo aparece nos relatórios financeiros.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -157,8 +155,8 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Mês competência</Label>
-            <MonthPicker value={mes} onChange={setMes} placeholder="Selecionar mês" />
+            <Label>Data do custo</Label>
+            <DatePicker value={dataCusto} onChange={setDataCusto} />
           </div>
 
           {!editando && (
@@ -173,8 +171,8 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
                 <span className="text-sm">
                   Recorrente mensal
                   <span className="block text-xs text-muted-foreground">
-                    Gera cópias nos meses seguintes — cada uma pode ser editada ou removida
-                    individualmente.
+                    Repete no mesmo dia dos meses seguintes, ou no último dia quando o mês for mais
+                    curto. Cada cópia pode ser editada ou removida individualmente.
                   </span>
                 </span>
               </label>
@@ -223,16 +221,4 @@ export function CustoDialog({ custo, open, onOpenChange }: Props) {
       </DialogContent>
     </Dialog>
   );
-}
-
-function toMonthInput(d: Date): string {
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-/** Converte 'YYYY-MM' (UI) pro Date do dia 1 do mês em UTC. */
-function monthToDate(mes: string): Date {
-  const partes = mes.split('-').map(Number);
-  const ano = partes[0] ?? 0;
-  const mm = partes[1] ?? 1;
-  return new Date(Date.UTC(ano, mm - 1, 1));
 }

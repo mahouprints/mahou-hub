@@ -78,9 +78,16 @@ function rangeDoMes(mes: string) {
   };
 }
 
-/** Gera array de Date com dia 1 dos N meses subsequentes a `inicio`. */
+/** Preserva o dia original com limite mensal; ex.: 31/jan → 28/fev → 31/mar. */
 function mesesSeguintes(inicio: Date, n: number): Date[] {
   const baseAno = inicio.getUTCFullYear();
   const baseMes = inicio.getUTCMonth();
-  return Array.from({ length: n }, (_, i) => new Date(Date.UTC(baseAno, baseMes + i + 1, 1)));
+  const baseDia = inicio.getUTCDate();
+  return Array.from({ length: n }, (_, i) => {
+    const proximo = new Date(inicio);
+    proximo.setUTCHours(0, 0, 0, 0);
+    proximo.setUTCFullYear(baseAno, baseMes + i + 2, 0);
+    proximo.setUTCDate(Math.min(baseDia, proximo.getUTCDate()));
+    return proximo;
+  });
 }
