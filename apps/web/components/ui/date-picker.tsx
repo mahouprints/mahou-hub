@@ -20,12 +20,19 @@ interface Props {
 /**
  * Seletor de uma data específica via calendário em popover (padrão shadcn).
  * Exibe a data formatada no botão; abre o calendário ao clicar.
+ * O modo modal mantém foco e rolagem no calendário mesmo dentro de um Dialog.
  */
-export function DatePicker({ value, onChange, placeholder = 'Selecionar data', className, disabled }: Props) {
+export function DatePicker({
+  value,
+  onChange,
+  placeholder = 'Selecionar data',
+  className,
+  disabled,
+}: Props) {
   const [aberto, setAberto] = useState(false);
 
   return (
-    <Popover open={aberto} onOpenChange={setAberto}>
+    <Popover modal open={aberto} onOpenChange={setAberto}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -38,10 +45,17 @@ export function DatePicker({ value, onChange, placeholder = 'Selecionar data', c
           )}
         >
           <CalendarIcon />
-          {value ? format(value, "dd 'de' MMMM 'de' yyyy", { locale: ptBR }) : <span>{placeholder}</span>}
+          {value ? (
+            format(value, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+          ) : (
+            <span>{placeholder}</span>
+          )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent
+        className="max-h-[var(--radix-popover-content-available-height)] w-auto overflow-y-auto p-0"
+        align="start"
+      >
         <Calendar
           mode="single"
           defaultMonth={value}
