@@ -1,9 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { calcularProduto, type CalculoEntrada } from '@mahou-hub/pricing';
 import type { ResumoRelatorioFinanceiro, TotaisVendasRelatorio } from '@mahou-hub/contracts';
+import { custosEfetivosDaVariacao } from '../produtos/custos-variacao';
 
 export const VENDA_FINANCEIRA_INCLUDE = {
   pedidoItem: true,
+  variacao: { include: { filamento: true } },
   produto: {
     include: {
       filamento: true,
@@ -30,14 +32,8 @@ export function calcularVendaFinanceira(
   );
   const calculado = calcularProduto({
     ...contexto,
-    pesoG: Number(produto.pesoG),
-    tempoH: Number(produto.tempoH),
+    ...custosEfetivosDaVariacao(produto, venda.variacao),
     impressora: produto.impressora,
-    filamento: produto.filamento,
-    filamentos: produto.filamentos.map((linha) => ({
-      pesoG: Number(linha.pesoG),
-      filamento: linha.filamento,
-    })),
     embalagemCentavos: produto.embalagemCentavos,
     custoInsumosCentavos: insumos,
     precoCentavos: venda.precoUnitarioCentavos,

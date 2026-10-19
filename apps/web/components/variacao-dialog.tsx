@@ -80,6 +80,8 @@ export function VariacaoDialog({ produtoId, produtoNome, variacao, open, onOpenC
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['variacoes', produtoId] });
       qc.invalidateQueries({ queryKey: ['variacoes'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       toast.success(editando ? 'Variação atualizada' : 'Variação criada');
       onOpenChange(false);
     },

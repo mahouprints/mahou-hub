@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  custosMlDaCotacao,
   SKU_MAX,
   type ProdutoVariacaoCreate,
   type ProdutoVariacaoUpdate,
@@ -9,6 +10,11 @@ import {
 } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { gerarSku, siglaDaCor } from './gerar-sku';
+import { PricingService } from '../pricing/pricing.service';
+import {
+  custosEfetivosDaVariacao,
+  pendenciasComposicaoVariacao,
+} from '../produtos/custos-variacao';
 
 /** Acrescenta "-2", "-3"… ao SKU sem estourar o teto de caracteres. */
 function encurtarPara(base: string, n: number): string {
@@ -18,15 +24,61 @@ function encurtarPara(base: string, n: number): string {
 
 @Injectable()
 export class VariacoesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pricing: PricingService,
+  ) {}
 
   /** Lista variações de um produto. Inclui o filamento (cor) quando há override. */
-  listByProduto(produtoId: string, incluirInativos = false) {
-    return this.prisma.produtoVariacao.findMany({
+  async listByProduto(produtoId: string, incluirInativos = false) {
+    const variacoes = await this.prisma.produtoVariacao.findMany({
       where: { produtoId, ...(incluirInativos ? {} : { ativo: true }) },
       include: { filamento: true },
       orderBy: { nome: 'asc' },
     });
+    if (!variacoes.length) return [];
+    const produto = await this.prisma.produto.findUnique({
+      where: { id: produtoId },
+      include: {
+        filamento: true,
+        filamentos: { include: { filamento: true }, orderBy: { ordem: 'asc' } },
+        insumos: { include: { insumo: true } },
+      },
+    });
+    if (!produto) throw new NotFoundException(`Produto ${produtoId} não existe`);
+    const custoInsumosCentavos = produto.insumos.reduce(
+      (total, item) => total + Math.round(Number(item.qtd) * item.insumo.custoUnitarioCentavos),
+      0,
+    );
+    return Promise.all(
+      variacoes.map(async (variacao) => {
+        const efetivo = custosEfetivosDaVariacao(produto, variacao);
+        const pricingPendencias = pendenciasComposicaoVariacao(produto, variacao);
+        // Peso de outra peça não comprova peso/dimensões do pacote cotado.
+        const mercadoLivre =
+          efetivo.pesoG === Number(produto.pesoG)
+            ? custosMlDaCotacao({ ...produto, precoCentavos: efetivo.precoCentavos })
+            : undefined;
+        return {
+          ...variacao,
+          pesoG: variacao.pesoG == null ? null : Number(variacao.pesoG),
+          tempoH: variacao.tempoH == null ? null : Number(variacao.tempoH),
+          precoEfetivoCentavos: efetivo.precoCentavos,
+          pesoEfetivoG: efetivo.pesoG,
+          tempoEfetivoH: efetivo.tempoH,
+          pricingPendencias,
+          pricing: pricingPendencias.length
+            ? null
+            : await this.pricing.calcularResolvido({
+                ...efetivo,
+                impressora: produto.impressora,
+                embalagemCentavos: produto.embalagemCentavos,
+                custoInsumosCentavos,
+                mercadoLivre,
+              }),
+        };
+      }),
+    );
   }
 
   /**

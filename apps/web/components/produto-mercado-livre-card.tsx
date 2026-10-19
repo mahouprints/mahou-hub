@@ -20,6 +20,7 @@ export function ProdutoMercadoLivreCard({
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ['produto', produto.id] });
       await qc.invalidateQueries({ queryKey: ['produtos'] });
+      await qc.invalidateQueries({ queryKey: ['variacoes', produto.id] });
     },
   });
   const custos = custosMlDaCotacao(produto);

@@ -139,7 +139,8 @@ export class PricingService {
     };
   }
 
-  private async calcularResolvido(
+  /** Calcula material já carregado; ex.: uma variação com sua cor e composição efetivas. */
+  async calcularResolvido(
     entrada: Omit<CalculoEntrada, 'parametros' | 'tabelaShopee' | 'tabelaMercadoLivre'>,
   ): Promise<CalculoSaida> {
     const [parametros, tabelaShopee] = await Promise.all([
