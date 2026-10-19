@@ -256,6 +256,8 @@ describe('Gravações Mercado Livre', () => {
       expect(erro.getResponse()).toEqual({
         statusCode: 502,
         mercadoLivreStatus: 400,
+        mercadoLivreOperacao: method.toUpperCase(),
+        mercadoLivreCaminho: '/items/validate',
         message: 'Gravação Mercado Livre: HTTP 400.',
         mercadoLivreCausas: {
           error: 'validation_error',

@@ -1,5 +1,6 @@
 import { HttpException } from '@nestjs/common';
 import { ZodError } from 'zod';
+import { contextoErroPublicacao } from '../mercado-livre-http.service';
 
 /** Falha com mensagem local segura para a CLI; nunca recebe corpo de erro externo. */
 export class PublicacaoErro extends Error {
@@ -25,6 +26,7 @@ export function formatarErroPublicacao(erro: unknown): Record<string, unknown> {
   return {
     ...resultado,
     mercadoLivreStatus: campos.mercadoLivreStatus ?? null,
+    ...contextoErroPublicacao(campos.mercadoLivreOperacao, campos.mercadoLivreCaminho),
     ...(campos.mercadoLivreCausas ? { mercadoLivreCausas: campos.mercadoLivreCausas } : {}),
     ...(campos.publicacaoChave ? { chave: campos.publicacaoChave } : {}),
   };
