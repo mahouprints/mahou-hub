@@ -60,14 +60,23 @@ export class PublicacaoService {
     const existentes = await Promise.all(
       entrada.skus.map(async (sku) => ({ sku, itens: await this.buscarSku(sku) })),
     );
+    const anuncios = await Promise.all(
+      [...new Set(existentes.flatMap((linha) => linha.itens))].map((id) =>
+        this.inspecionarAnuncio(id),
+      ),
+    );
     const fiscais = await Promise.all(
-      entrada.fiscaisSkus.map(async (sku) => ({ sku, cadastro: await this.lerFiscal(sku) })),
+      entrada.fiscaisSkus.map(async (sku) => ({
+        sku,
+        cadastro: await this.inspecionarFiscal(sku),
+      })),
     );
     return {
       conta: { id: conta.id, site_id: conta.site_id, tags: conta.tags },
       produtos,
       categorias,
       existentes,
+      anuncios,
       fiscais,
     };
   }
@@ -357,11 +366,97 @@ export class PublicacaoService {
     }
   }
 
+  private async inspecionarFiscal(sku: string): Promise<unknown> {
+    try {
+      return await this.lerFiscal(sku);
+    } catch (erro) {
+      return this.diagnosticoConsulta(erro);
+    }
+  }
+
+  private async inspecionarAnuncio(id: string): Promise<unknown> {
+    const bruto = objeto(await this.consultaOpcional(`/items/${id}?include_attributes=all`));
+    if (bruto.indisponivel) return { id, ...bruto };
+    if (String(bruto.seller_id) !== this.http.sellerId)
+      return { id, indisponivel: true, motivo: 'Anúncio de outra conta.' };
+    const item = this.camposInspecao(bruto, [
+      'id',
+      'seller_id',
+      'title',
+      'category_id',
+      'status',
+      'sub_status',
+      'price',
+      'available_quantity',
+      'currency_id',
+      'listing_type_id',
+      'attributes',
+      'user_product_id',
+      'family_name',
+      'permalink',
+    ]);
+    const shipping = this.camposInspecao(bruto.shipping, [
+      'mode',
+      'local_pick_up',
+      'free_shipping',
+      'logistic_type',
+      'store_pick_up',
+      'dimensions',
+      'tags',
+    ]);
+    const pictures = (Array.isArray(bruto.pictures) ? bruto.pictures : []).map((foto) =>
+      this.camposInspecao(foto, ['id', 'url', 'secure_url', 'size', 'max_size', 'quality']),
+    );
+    const userProduct =
+      typeof bruto.user_product_id === 'string' && /^MLBU\d+$/.test(bruto.user_product_id)
+        ? this.camposInspecao(
+            await this.consultaOpcional(`/user-products/${bruto.user_product_id}`),
+            [
+              'id',
+              'family_id',
+              'indisponivel',
+              'status',
+              'mercadoLivreOperacao',
+              'mercadoLivreCaminho',
+              'mercadoLivreCausas',
+            ],
+          )
+        : null;
+    const [fiscal, canInvoice, frete] = await Promise.all([
+      this.consultaOpcional(`/items/${id}/fiscal_information/detail`),
+      this.consultaOpcional(`/can_invoice/items/${id}`),
+      this.consultaOpcional(
+        `/users/${this.http.sellerId}/shipping_options/free?item_id=${id}&verbose=true`,
+      ),
+    ]);
+    return { ...item, shipping, pictures, userProduct, fiscal, canInvoice, frete };
+  }
+
+  private camposInspecao(valor: unknown, campos: string[]): Record<string, unknown> {
+    const atual = objeto(valor);
+    return Object.fromEntries(
+      campos.filter((campo) => campo in atual).map((campo) => [campo, atual[campo]]),
+    );
+  }
+
+  private diagnosticoConsulta(erro: unknown): Record<string, unknown> {
+    const resposta = erro instanceof HttpException ? objeto(erro.getResponse()) : {};
+    return {
+      indisponivel: true,
+      status: statusMl(erro) ?? null,
+      ...this.camposInspecao(resposta, [
+        'mercadoLivreOperacao',
+        'mercadoLivreCaminho',
+        'mercadoLivreCausas',
+      ]),
+    };
+  }
+
   private async consultaOpcional(path: string): Promise<unknown> {
     try {
       return await this.http.get(path);
     } catch (erro) {
-      return { indisponivel: true, status: statusMl(erro) ?? null };
+      return this.diagnosticoConsulta(erro);
     }
   }
 }

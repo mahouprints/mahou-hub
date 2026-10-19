@@ -57,8 +57,19 @@ export class MercadoLivreHttpService {
     const resposta = await this.enviar(method, path, token, body, headers);
     // Diagnósticos de anúncios expõem apenas identificadores, nunca mensagens ou o corpo livre.
     if (!resposta.ok) {
+      const contexto = contextoErroPublicacao(method, path, [
+        token,
+        this.config.get<string>('ML_SECRET_KEY'),
+        this.config.get<string>('ML_REFRESH_TOKEN'),
+      ]);
+      const caminho = contexto.mercadoLivreCaminho;
+      const consultaFiscal =
+        caminho &&
+        (/^\/items\/fiscal_information(?:\/|$)/.test(caminho) ||
+          /^\/items\/MLB\d+\/fiscal_information\/detail$/.test(caminho) ||
+          caminho.startsWith('/can_invoice/items/'));
       const falha =
-        method !== 'GET' && /^\/items(?:[/?]|$)/.test(path)
+        (method !== 'GET' && caminho?.startsWith('/items')) || consultaFiscal
           ? await this.causasSanitizadas(resposta, token)
           : undefined;
       const causas = falha?.diagnostico;
@@ -74,6 +85,7 @@ export class MercadoLivreHttpService {
         statusCode: 502,
         message: `${method === 'GET' ? 'Consulta' : 'Gravação'} Mercado Livre: HTTP ${resposta.status}.`,
         mercadoLivreStatus: resposta.status,
+        ...contexto,
         ...(causas ? { mercadoLivreCausas: causas } : {}),
       });
     }
@@ -120,13 +132,17 @@ export class MercadoLivreHttpService {
       this.config.get<string>('ML_REFRESH_TOKEN'),
     ];
     const error = identificadorDiagnostico(falha.error, segredos);
+    const errorCode = identificadorDiagnostico(falha.error_code, segredos);
     const cause = (Array.isArray(falha.cause) ? falha.cause : [])
       .slice(0, 20)
       .map((causa: unknown) => causaSanitizada(causa, segredos))
       .filter((causa) => Object.keys(causa).length > 0);
     return {
       apenasAvisos,
-      diagnostico: error || cause.length ? { ...(error ? { error } : {}), cause } : undefined,
+      diagnostico:
+        error || errorCode || cause.length
+          ? { ...(error ? { error } : {}), ...(errorCode ? { error_code: errorCode } : {}), cause }
+          : undefined,
     };
   }
 
@@ -237,10 +253,34 @@ function identificadorDiagnostico(
 ) {
   const formato = referencia
     ? /^[a-zA-Z_][a-zA-Z0-9_]*(?:\[\d{1,3}\])?(?:\.[a-zA-Z_][a-zA-Z0-9_]*(?:\[\d{1,3}\])?)*$/
-    : /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/;
+    : /^(?:[a-zA-Z][a-zA-Z0-9_]*(?:\.[a-zA-Z][a-zA-Z0-9_]*)*|\d{1,8})$/;
   if (typeof valor !== 'string' || valor.length > 120 || !formato.test(valor)) return undefined;
   if (segredos.some((segredo) => segredo && valor.includes(segredo))) return undefined;
   return valor;
+}
+
+/** Expõe somente rotas conhecidas de publicação, sem parâmetros. Ex.: GET /items/MLB123. */
+export function contextoErroPublicacao(
+  metodo: unknown,
+  caminho: unknown,
+  segredos: Array<string | undefined> = [],
+) {
+  if (!['GET', 'POST', 'PUT'].includes(String(metodo)) || typeof caminho !== 'string') return {};
+  const limpo = caminho.split(/[?#]/, 1)[0]!;
+  const permitido =
+    /^\/items(?:\/validate|\/fiscal_information(?:\/items|\/[A-Z0-9]+(?:-[A-Z0-9]+)*)?|\/MLB\d+(?:\/description|\/fiscal_information\/detail)?)?$/.test(
+      limpo,
+    ) ||
+    /^\/can_invoice\/items\/MLB\d+(?:\/variations\/\d+)?$/.test(limpo) ||
+    /^\/user-products\/MLBU\d+$/.test(limpo) ||
+    /^\/users\/\d+(?:\/items\/search)?$/.test(limpo);
+  if (
+    !permitido ||
+    limpo.length > 160 ||
+    segredos.some((segredo) => segredo && limpo.includes(segredo))
+  )
+    return {};
+  return { mercadoLivreOperacao: String(metodo), mercadoLivreCaminho: limpo };
 }
 
 function causaSanitizada(entrada: unknown, segredos: Array<string | undefined>) {
