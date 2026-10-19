@@ -16,6 +16,7 @@ import {
 } from '../src/modules/produtos/custos-variacao';
 import { objeto } from '../src/modules/mercado-livre/publicacao/publicacao-verificacao';
 import { formatarErroPublicacao } from '../src/modules/mercado-livre/publicacao/publicacao-erro';
+import { PacotesService } from '../src/modules/mercado-livre/publicacao/pacotes.service';
 
 const incluirCatalogo = {
   filamento: true,
@@ -97,6 +98,34 @@ async function executar(): Promise<void> {
     await prisma.$connect();
     const config = new ConfigService();
     const http = new MercadoLivreHttpService(config, prisma);
+    if (['inspecionar_pacotes', 'corrigir_pacotes'].includes(String(objeto(entrada).modo))) {
+      const pacotes = new PacotesService(http, {
+        carregar: async (ids) => {
+          const produtos = await prisma.produto.findMany({
+            where: { id: { in: ids } },
+            select: {
+              id: true,
+              ativo: true,
+              rascunho: true,
+              precoCentavos: true,
+              pesoG: true,
+              mercadoLivre: true,
+              variacoes: { select: { sku: true, ativo: true, precoCentavos: true, pesoG: true } },
+            },
+          });
+          return produtos.map((produto) => ({
+            ...produto,
+            pesoG: Number(produto.pesoG),
+            variacoes: produto.variacoes.map((cor) => ({
+              ...cor,
+              pesoG: cor.pesoG === null ? null : Number(cor.pesoG),
+            })),
+          }));
+        },
+      });
+      process.stdout.write(`${JSON.stringify(await pacotes.executar(entrada))}\n`);
+      return;
+    }
     const journal = new PublicacaoJournal(
       config.get<string>('ML_PUBLICACAO_STORAGE_DIR') ?? '/app/private',
       http.sellerId,
