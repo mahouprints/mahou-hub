@@ -8,11 +8,13 @@ const sku = z
   .max(24);
 const atributo = z
   .object({
-    id: z.string().min(1),
+    id: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
     value_id: z.string().nullable().optional(),
     value_name: z.string().nullable().optional(),
   })
-  .passthrough();
+  .passthrough()
+  .refine((valor) => Boolean(valor.id || valor.name), 'Atributo exige id ou name.');
 const variacao = z
   .object({
     price: z.number().positive(),

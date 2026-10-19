@@ -72,6 +72,17 @@ export class MercadoLivreHttpService {
       throw new BadGatewayException('Consulta Mercado Livre ainda sem conteúdo.');
     if (resposta.status === 204) return undefined as T;
     try {
+      if (method === 'GET' && /^\/user-products\/MLBU\d+(?:\?|$)/.test(path))
+        return JSON.parse(
+          await resposta.text(),
+          (chave: string, valor: unknown, contexto?: { source?: string }) => {
+            if (chave !== 'family_id' || typeof valor !== 'number') return valor;
+            // Node 22 fornece o literal original, antes do arredondamento de inteiros grandes.
+            if (contexto?.source && /^\d+$/.test(contexto.source)) return contexto.source;
+            if (Number.isSafeInteger(valor) && valor >= 0) return String(valor);
+            throw new Error('Identificador de família sem precisão.');
+          },
+        ) as T;
       return (await resposta.json()) as T;
     } catch {
       throw new BadGatewayException('Mercado Livre retornou uma resposta JSON inválida.');
