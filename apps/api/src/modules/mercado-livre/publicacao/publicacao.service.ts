@@ -99,14 +99,18 @@ export class PublicacaoService {
     for (const item of entrada.produtos.flatMap((produto) => produto.itens))
       await this.comContexto(item.chave, () => this.validarItem(item, journal));
     if (entrada.modo === 'validar') return { validado: true, execucaoId: entrada.execucaoId };
+    const familiasConfirmadas = new Set<string>();
     try {
       for (const produto of entrada.produtos) {
         for (const item of produto.itens)
           await this.comContexto(item.chave, () => this.publicarItem(item, journal, entrada.modo));
-        await this.salvarProduto(produto, journal);
+        if (entrada.modelo === 'user_products') await this.conferirFamilia(produto, journal);
+        familiasConfirmadas.add(produto.produtoId);
+        await this.salvarProduto(produto, journal, true);
       }
     } catch (erro) {
-      for (const produto of entrada.produtos) await this.salvarProduto(produto, journal);
+      for (const produto of entrada.produtos)
+        await this.salvarProduto(produto, journal, familiasConfirmadas.has(produto.produtoId));
       throw erro;
     }
     return { execucaoId: entrada.execucaoId, itens: journal.itens };
@@ -150,6 +154,8 @@ export class PublicacaoService {
       journal.itens[item.chave] = salvo;
       await this.journal.salvar(journal);
     }
+    salvo.verificado = false;
+    await this.journal.salvar(journal);
     const remoto = await this.http.get(`/items/${salvo.itemId}?include_attributes=all`);
     Object.assign(salvo, verificarItem(remoto, item, this.http.sellerId));
     await this.journal.salvar(journal);
@@ -236,9 +242,39 @@ export class PublicacaoService {
     salvo.fiscalConfirmado = true;
   }
 
+  private async conferirFamilia(
+    produto: PublicacaoEntrada['produtos'][number],
+    journal: JournalPublicacao,
+  ): Promise<void> {
+    const familias = new Set<string>();
+    const userProducts = new Set<string>();
+    for (const item of produto.itens) {
+      const salvo = journal.itens[item.chave];
+      if (!salvo?.userProductId || !/^MLBU\d+$/.test(salvo.userProductId))
+        throw new PublicacaoErro('Item sem User Product confirmado.');
+      const remoto = objeto(await this.http.get(`/user-products/${salvo.userProductId}`));
+      if (typeof remoto.family_id === 'number' && !Number.isSafeInteger(remoto.family_id))
+        throw new PublicacaoErro(
+          'Família retornada sem precisão numérica; confirmação interrompida.',
+        );
+      const familia = String(remoto.family_id ?? '');
+      if (!/^\d+$/.test(familia))
+        throw new PublicacaoErro('Família do User Product ainda não confirmada.');
+      salvo.familyId = familia;
+      familias.add(familia);
+      userProducts.add(salvo.userProductId);
+      await this.journal.salvar(journal);
+    }
+    if (familias.size !== 1 || userProducts.size !== produto.itens.length)
+      throw new PublicacaoErro(
+        'As sete cores não pertencem a User Products distintos na mesma família.',
+      );
+  }
+
   private async salvarProduto(
     produto: PublicacaoEntrada['produtos'][number],
     journal: JournalPublicacao,
+    familiaConfirmada: boolean,
   ): Promise<void> {
     const itens = produto.itens.flatMap((item) => {
       const salvo = journal.itens[item.chave];
@@ -260,6 +296,7 @@ export class PublicacaoService {
       (item) => journal.itens[item.chave]?.estado === 'INTENCAO',
     );
     const concluido =
+      familiaConfirmada &&
       itens.length === produto.itens.length &&
       itens.every((item) => item.verificado && item.descricaoConfirmada && item.fiscalConfirmado);
     await this.repositorio.registrar(produto.produtoId, {

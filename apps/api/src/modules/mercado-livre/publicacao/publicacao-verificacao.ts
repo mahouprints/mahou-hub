@@ -52,7 +52,7 @@ function atributosConferem(recebidos: unknown, esperados: unknown): boolean {
     return recebidos.some((recebido) => {
       const atual = objeto(recebido);
       return (
-        atual.id === valor.id &&
+        (valor.id ? atual.id === valor.id : atual.name === valor.name) &&
         (valor.value_id ? atual.value_id === valor.value_id : atual.value_name === valor.value_name)
       );
     });

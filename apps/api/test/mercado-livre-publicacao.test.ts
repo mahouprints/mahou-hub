@@ -135,6 +135,7 @@ async function preparar(entrada = plano()) {
         site_id: 'MLB',
         tags: entrada.modelo === 'user_products' ? ['user_product_seller'] : [],
       };
+    if (path.startsWith('/user-products/')) return { family_id: 9000 };
     if (path.includes('/items/search?')) {
       const sku = new URL(`https://example.test${path}`).searchParams.get('seller_sku');
       const results = [...anuncios.entries()]
@@ -171,6 +172,7 @@ async function preparar(entrada = plano()) {
         id,
         seller_id: 42,
         status: 'active',
+        ...(payload.family_name ? { user_product_id: `MLBU${1000 + anuncios.size}` } : {}),
         ...(Array.isArray(payload.variations)
           ? {
               variations: payload.variations.map((cor, indice) => ({
@@ -394,16 +396,38 @@ describe('Publicação Mercado Livre', () => {
     expect(contexto.post.mock.calls.some(([path]) => path.endsWith('/description'))).toBe(false);
   });
 
-  it('oferece 20 unidades na família User Products, nunca 20 por cor', async () => {
-    const entrada = plano('DRAG', 'user_products');
-    const contexto = await preparar(entrada);
-    await contexto.service.executar(entrada);
-    const criacoes = contexto.post.mock.calls.filter(([path]) => path === '/items');
-    expect(criacoes).toHaveLength(7);
-    expect(
-      criacoes.reduce((soma, [, corpo]) => soma + Number(objeto(corpo).available_quantity), 0),
-    ).toBe(20);
-  });
+  it.each([true, false])(
+    'confirma família de 20 unidades antes de marcar anúncio: família igual=%s',
+    async (mesmaFamilia) => {
+      const entrada = plano('DRAG', 'user_products');
+      const contexto = await preparar(entrada);
+      if (!mesmaFamilia) {
+        const original = contexto.get.getMockImplementation()!;
+        contexto.get.mockImplementation(async (path) =>
+          path === '/user-products/MLBU1006' ? { family_id: 9999 } : original(path),
+        );
+        await expect(contexto.service.executar(entrada)).rejects.toThrow('mesma família');
+        expect(contexto.repositorio.registrar).toHaveBeenLastCalledWith(
+          'DRAG',
+          expect.objectContaining({ status: 'incompleto' }),
+        );
+        return;
+      }
+      await contexto.service.executar(entrada);
+      expect(contexto.repositorio.registrar).toHaveBeenLastCalledWith(
+        'DRAG',
+        expect.objectContaining({
+          status: 'concluido',
+          itens: expect.arrayContaining([expect.objectContaining({ familyId: '9000' })]),
+        }),
+      );
+      const criacoes = contexto.post.mock.calls.filter(([path]) => path === '/items');
+      expect(criacoes).toHaveLength(7);
+      expect(
+        criacoes.reduce((soma, [, corpo]) => soma + Number(objeto(corpo).available_quantity), 0),
+      ).toBe(20);
+    },
+  );
 
   it.each(['quantidade', 'preco', 'estoque', 'tag', 'sku'] as const)(
     'bloqueia divergência de %s antes do validador',

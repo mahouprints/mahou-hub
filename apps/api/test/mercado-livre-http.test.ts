@@ -53,6 +53,28 @@ function preparar() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('OAuth Mercado Livre persistido', () => {
+  it('preserva family_id maior que MAX_SAFE_INTEGER sem alterar outros números ou textos', async () => {
+    const { service, fetchMock } = preparar();
+    await service.get('/items/MLB1');
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        '{"family_id":5896969823350698505,"stock":20,"name":"family_id:5896969823350698505"}',
+      ),
+    );
+    fetchMock.mockResolvedValueOnce(new Response('{"family_id":5896969823350698506}'));
+    const primeira = await service.get<{ family_id: string; stock: number; name: string }>(
+      '/user-products/MLBU1',
+    );
+    const segunda = await service.get<{ family_id: string }>('/user-products/MLBU2');
+    expect(primeira).toEqual({
+      family_id: '5896969823350698505',
+      stock: 20,
+      name: 'family_id:5896969823350698505',
+    });
+    expect(segunda.family_id).toBe('5896969823350698506');
+    expect(primeira.family_id).not.toBe(segunda.family_id);
+  });
+
   it('persiste refresh rotativo e usa access token salvo depois de reiniciar o cliente', async () => {
     const { service, tx, prisma, config, fetchMock, tokenAtual } = preparar();
     await service.get('/items/MLB123');
