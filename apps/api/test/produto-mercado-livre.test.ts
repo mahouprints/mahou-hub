@@ -209,6 +209,8 @@ describe('consulta e persistência por SKU', () => {
     mock.produto.findUnique.mockResolvedValue(publicado);
     mock.produto.updateMany.mockResolvedValue({ count: 1 });
     const ml = {
+      put: vi.fn(),
+      post: vi.fn(),
       cotar: vi.fn(async (entrada: typeof contexto & { itemId?: string }) => ({
         ...structuredClone(cotacao),
         contexto: entrada,
@@ -267,8 +269,8 @@ describe('consulta e persistência por SKU', () => {
     { status: 'paused' },
     { moeda: 'USD' },
     { temVariacoes: true },
-    { pesoGramas: 999 },
-    { alturaCm: 99 },
+    { pesoGramas: 0 },
+    { alturaCm: Number.NaN },
   ])('mantém uma cor pendente quando o anúncio diverge: %j', async (mudanca) => {
     const { ml, service } = prepararPublicado();
     const original = ml.anuncio.getMockImplementation()!;
@@ -299,7 +301,52 @@ describe('consulta e persistência por SKU', () => {
       alturaCm: contexto.comprimentoCm,
       comprimentoCm: contexto.alturaCm,
     }));
-    expect((await service.cotar('p1')).porSku?.['PROD-AZ']).toBeDefined();
+    const cotacaoCor = (await service.cotar('p1')).porSku?.['PROD-AZ'];
+    expect(cotacaoCor).toBeDefined();
+    expect(cotacaoCor?.pendencias).toEqual([]);
+  });
+
+  it('guarda pacote do ML separado e usa a cotação oficial por item com divergência explícita', async () => {
+    const { ml, publicado, service } = prepararPublicado();
+    const original = ml.anuncio.getMockImplementation()!;
+    const pacoteMercadoLivre = { alturaCm: 18, larguraCm: 12, comprimentoCm: 5, pesoGramas: 850 };
+    const configuracaoOriginal = structuredClone(publicado.mercadoLivre);
+    ml.anuncio.mockImplementation(async (itemId) => ({
+      ...(await original(itemId)),
+      ...pacoteMercadoLivre,
+    }));
+    const resultado = await service.cotar('p1');
+    const cor = resultado.porSku?.['PROD-AZ'];
+    expect(cor).toMatchObject({
+      pacoteMercadoLivre,
+      contexto: { ...contexto, itemId: 'MLB100' },
+      freteCentavos: 701,
+    });
+    expect(cor?.pendencias).toEqual([
+      'Pacote divergente: Mercado Livre 18 × 12 × 5 cm, 850 g; declarado no ERP 5 × 10 × 15 cm, 50 g. Frete e contribuição estimados pelo anúncio; a embalagem física não está confirmada.',
+    ]);
+    expect(
+      cotacaoMlDaVariacao(
+        { ...publicado, cotacaoMl: resultado },
+        { sku: 'PROD-AZ', precoCentavos: 2490 },
+        agora,
+      ),
+    ).toEqual(cor);
+    expect(
+      cotacaoMlDaVariacao(
+        {
+          ...publicado,
+          cotacaoMl: resultado,
+          mercadoLivre: { ...publicado.mercadoLivre, pesoGramas: 60 },
+        },
+        { sku: 'PROD-AZ', precoCentavos: 2490 },
+        agora,
+      ),
+    ).toBeUndefined();
+    expect(ml.cotar).toHaveBeenCalledWith({ ...contexto, itemId: 'MLB100' });
+    expect(publicado.mercadoLivre).toEqual(configuracaoOriginal);
+    expect(ml.put).not.toHaveBeenCalled();
+    expect(ml.post).not.toHaveBeenCalled();
   });
 
   it('recusa gravação quando a configuração ou uma variação muda durante a consulta', async () => {

@@ -55,6 +55,13 @@ export const MercadoLivreCotacaoInputSchema = MercadoLivreConfiguracaoSchema.omi
   comprimentoCm: dimensao,
 });
 
+export const MercadoLivrePacoteSchema = MercadoLivreCotacaoInputSchema.pick({
+  pesoGramas: true,
+  alturaCm: true,
+  larguraCm: true,
+  comprimentoCm: true,
+});
+
 export const MercadoLivreCotacaoUnitariaSchema = z.object({
   contexto: MercadoLivreCotacaoInputSchema,
   categoriaNome: z.string(),
@@ -64,6 +71,7 @@ export const MercadoLivreCotacaoUnitariaSchema = z.object({
   percentualTarifa: z.number().nonnegative().nullable(),
   cotadoEm: z.string().datetime(),
   pendencias: z.array(z.string()),
+  pacoteMercadoLivre: MercadoLivrePacoteSchema.optional(),
 });
 
 export const MercadoLivreCotacaoSchema = MercadoLivreCotacaoUnitariaSchema.extend({
@@ -75,6 +83,7 @@ export type MercadoLivrePublicacao = z.infer<typeof MercadoLivrePublicacaoSchema
 export type MercadoLivreCotacaoInput = z.infer<typeof MercadoLivreCotacaoInputSchema>;
 export type MercadoLivreCotacao = z.infer<typeof MercadoLivreCotacaoSchema>;
 export type MercadoLivreCotacaoUnitaria = z.infer<typeof MercadoLivreCotacaoUnitariaSchema>;
+export type MercadoLivrePacote = z.infer<typeof MercadoLivrePacoteSchema>;
 
 type ProdutoComCotacao = { mercadoLivre?: unknown; cotacaoMl?: unknown; precoCentavos: number };
 
