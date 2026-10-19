@@ -6,6 +6,7 @@ import type { OportunidadeLogService } from '../../src/modules/oportunidades/opo
 // Estende conforme outros módulos forem ganhar testes — não tente cobrir tudo de uma vez.
 export function makePrismaMock() {
   const txDelegate = {
+    $queryRaw: vi.fn(),
     produtoOportunidade: {
       create: vi.fn(),
       update: vi.fn(),

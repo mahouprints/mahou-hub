@@ -35,8 +35,11 @@ services:
       # Mapeia /var/mahou-storage da VPS no container. Nginx serve direto desse
       # diretório em media.mahouprints.com (mais rápido que passar pela API).
       - ${STORAGE_HOST_DIR:-/var/mahou-storage}:/app/storage
+      # Journal de publicação fora do diretório público de imagens.
+      - mahou_private_data:/app/private
     profiles:
       - prod
 
 volumes:
   mahou_pg_data:
+  mahou_private_data:

@@ -32,19 +32,92 @@ export class MercadoLivreHttpService {
 
   /** Consulta um recurso autenticado do vendedor. Ex.: get('/orders/123'). */
   async get<T>(path: string, headers: Record<string, string> = {}): Promise<T> {
+    return this.requisicao<T>('GET', path, undefined, headers);
+  }
+
+  /** Cria um recurso sem repetição automática. Ex.: post('/items', anuncio). */
+  async post<T>(path: string, body: unknown): Promise<T> {
+    return this.requisicao<T>('POST', path, body);
+  }
+
+  /** Atualiza um recurso sem repetição automática. Ex.: put('/items/MLB123', alteracoes). */
+  async put<T>(path: string, body: unknown): Promise<T> {
+    return this.requisicao<T>('PUT', path, body);
+  }
+
+  private async requisicao<T>(
+    method: 'GET' | 'POST' | 'PUT',
+    path: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+  ): Promise<T> {
     if (!this.estaConfigurado())
       throw new ServiceUnavailableException('Integração ML não configurada.');
     const token = await this.tokenValido();
-    const resposta = await fetch(`${API}${path}`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...headers },
-      signal: AbortSignal.timeout(20_000),
-    });
-    // O corpo de erro pode conter credenciais ou dados do comprador: não propagar.
-    if (!resposta.ok)
-      throw new BadGatewayException(`Consulta Mercado Livre: HTTP ${resposta.status}.`);
-    if (resposta.status === 204)
+    const resposta = await this.enviar(method, path, token, body, headers);
+    // Diagnósticos de anúncios expõem apenas identificadores, nunca mensagens ou o corpo livre.
+    if (!resposta.ok) {
+      const causas =
+        method !== 'GET' && /^\/items(?:[/?]|$)/.test(path)
+          ? await this.causasSanitizadas(resposta, token)
+          : undefined;
+      throw new BadGatewayException({
+        statusCode: 502,
+        message: `${method === 'GET' ? 'Consulta' : 'Gravação'} Mercado Livre: HTTP ${resposta.status}.`,
+        mercadoLivreStatus: resposta.status,
+        ...(causas ? { mercadoLivreCausas: causas } : {}),
+      });
+    }
+    if (resposta.status === 204 && method === 'GET')
       throw new BadGatewayException('Consulta Mercado Livre ainda sem conteúdo.');
-    return (await resposta.json()) as T;
+    if (resposta.status === 204) return undefined as T;
+    try {
+      return (await resposta.json()) as T;
+    } catch {
+      throw new BadGatewayException('Mercado Livre retornou uma resposta JSON inválida.');
+    }
+  }
+
+  private async causasSanitizadas(resposta: Response, token: string) {
+    const conteudo: unknown = await resposta.json().catch(() => null);
+    if (!conteudo || typeof conteudo !== 'object' || Array.isArray(conteudo)) return undefined;
+    const falha = conteudo as Record<string, unknown>;
+    const segredos = [
+      token,
+      this.config.get<string>('ML_SECRET_KEY'),
+      this.config.get<string>('ML_REFRESH_TOKEN'),
+    ];
+    const error = identificadorDiagnostico(falha.error, segredos);
+    const cause = (Array.isArray(falha.cause) ? falha.cause : [])
+      .slice(0, 20)
+      .map((causa: unknown) => causaSanitizada(causa, segredos))
+      .filter((causa) => Object.keys(causa).length > 0);
+    return error || cause.length ? { ...(error ? { error } : {}), cause } : undefined;
+  }
+
+  private async enviar(
+    method: 'GET' | 'POST' | 'PUT',
+    path: string,
+    token: string,
+    body: unknown,
+    headers: Record<string, string>,
+  ) {
+    try {
+      // Uma falha de rede não confirma se o recurso foi criado; nunca repetir a gravação.
+      return await fetch(`${API}${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          ...(method === 'GET' ? {} : { 'Content-Type': 'application/json' }),
+          ...headers,
+        },
+        ...(method === 'GET' ? {} : { body: JSON.stringify(body) }),
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch {
+      throw new BadGatewayException('Não foi possível confirmar a resposta do Mercado Livre.');
+    }
   }
 
   private async tokenValido(): Promise<string> {
@@ -120,4 +193,33 @@ export class MercadoLivreHttpService {
     }
     return novo;
   }
+}
+
+function identificadorDiagnostico(
+  valor: unknown,
+  segredos: Array<string | undefined>,
+  referencia = false,
+) {
+  const formato = referencia
+    ? /^[a-zA-Z_][a-zA-Z0-9_]*(?:\[\d{1,3}\])?(?:\.[a-zA-Z_][a-zA-Z0-9_]*(?:\[\d{1,3}\])?)*$/
+    : /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*$/;
+  if (typeof valor !== 'string' || valor.length > 120 || !formato.test(valor)) return undefined;
+  if (segredos.some((segredo) => segredo && valor.includes(segredo))) return undefined;
+  return valor;
+}
+
+function causaSanitizada(entrada: unknown, segredos: Array<string | undefined>) {
+  if (!entrada || typeof entrada !== 'object' || Array.isArray(entrada)) return {};
+  const causa = entrada as Record<string, unknown>;
+  const code = identificadorDiagnostico(causa.code, segredos);
+  const type = causa.type === 'error' || causa.type === 'warning' ? causa.type : undefined;
+  const references = (Array.isArray(causa.references) ? causa.references : [])
+    .slice(0, 10)
+    .map((valor: unknown) => identificadorDiagnostico(valor, segredos, true))
+    .filter((valor): valor is string => valor !== undefined);
+  return {
+    ...(code ? { code } : {}),
+    ...(type ? { type } : {}),
+    ...(references.length ? { references } : {}),
+  };
 }

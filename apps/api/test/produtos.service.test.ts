@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Prisma } from '@prisma/client';
+import type { MercadoLivreConfiguracao, MercadoLivrePublicacao } from '@mahou-hub/contracts';
 import { ProdutosService } from '../src/modules/produtos/produtos.service';
 import type { ImagensService } from '../src/modules/imagens/imagens.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
@@ -358,5 +359,91 @@ describe('ProdutosService.update — completar rascunho', () => {
       where: { id: 'p1' },
       data: { nome: 'Produto arquivado atualizado' },
     });
+  });
+});
+
+describe('ProdutosService — metadados de publicação ML', () => {
+  const configuracao: MercadoLivreConfiguracao = {
+    categoriaId: 'MLB123',
+    tipoAnuncio: 'gold_special',
+    modoEnvio: 'me2',
+    tipoLogistica: 'drop_off',
+    freteGratis: true,
+    condicao: 'new',
+  };
+  const publicacao: MercadoLivrePublicacao = {
+    versao: 1,
+    execucaoId: 'execucao-confirmada',
+    status: 'concluido',
+    atualizadoEm: '2026-10-19T15:00:00Z',
+    itens: [
+      {
+        chave: 'anuncio',
+        itemId: 'MLB123',
+        skus: ['FIGURA-BRANCA'],
+        descricaoConfirmada: true,
+        fiscalConfirmado: true,
+        verificado: true,
+      },
+    ],
+  };
+
+  function prepararComPublicacao(salva = true) {
+    const { mock, tx } = makePrismaMock();
+    tx.produto.findUnique.mockResolvedValue({
+      ...fakeProduto(),
+      mercadoLivre: { ...configuracao, ...(salva ? { publicacao } : {}) },
+    });
+    return { mock, tx, svc: new ProdutosService(asPrisma(mock), makeImagensMock()) };
+  }
+
+  it('preserva IDs e etapas quando o formulário não envia publicacao', async () => {
+    const { tx, svc } = prepararComPublicacao();
+    await svc.update('p1', { mercadoLivre: { ...configuracao, freteGratis: false } });
+    expect(tx.$queryRaw).toHaveBeenCalledWith(
+      ['SELECT id FROM "Produto" WHERE id = ', ' FOR UPDATE'],
+      'p1',
+    );
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.produto.findUnique.mock.invocationCallOrder[0]!,
+    );
+    expect(tx.produto.update.mock.calls[0]?.[0].data.mercadoLivre).toEqual({
+      ...configuracao,
+      freteGratis: false,
+      publicacao,
+    });
+  });
+
+  it('ignora tentativa de substituir metadados pelo update genérico', async () => {
+    const { tx, svc } = prepararComPublicacao();
+    await svc.update('p1', {
+      mercadoLivre: { ...configuracao, publicacao: { ...publicacao, execucaoId: 'inventado' } },
+    });
+    expect(tx.produto.update.mock.calls[0]?.[0].data.mercadoLivre.publicacao).toEqual(publicacao);
+  });
+
+  it('não cria metadados de publicação por edição genérica', async () => {
+    const { tx, svc } = prepararComPublicacao(false);
+    await svc.update('p1', { mercadoLivre: { ...configuracao, publicacao } });
+    expect(tx.produto.update.mock.calls[0]?.[0].data.mercadoLivre).toEqual(configuracao);
+  });
+
+  it('não remove a configuração que contém IDs confirmados', async () => {
+    const { tx, svc } = prepararComPublicacao();
+    await expect(svc.update('p1', { mercadoLivre: null })).rejects.toThrow('não pode ser removida');
+    expect(tx.produto.update).not.toHaveBeenCalled();
+  });
+
+  it('criação genérica também não aceita IDs de publicação inventados', async () => {
+    const { mock, svc } = prepararComPublicacao(false);
+    await svc.create({
+      ...fakeProduto(),
+      pesoG: 100,
+      tempoH: 2,
+      impressora: 'A1',
+      canalPrincipal: 'ML',
+      mercadoLivre: { ...configuracao, publicacao },
+    });
+    expect(mock.produto.create.mock.calls[0]?.[0].data.mercadoLivre).toEqual(configuracao);
   });
 });
