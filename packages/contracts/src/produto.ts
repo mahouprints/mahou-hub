@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CanalEnum, ImpressoraEnum } from './enums';
 import { ProdutoInsumoInputSchema } from './insumo';
 import { ComposicaoFilamentosSchema, ProdutoFilamentoInputSchema } from './produto-filamento';
+import { MercadoLivreConfiguracaoSchema, MercadoLivreCotacaoSchema } from './mercado-livre';
 
 /**
  * Método planejado pra obter a foto final do produto:
@@ -31,6 +32,8 @@ export const ProdutoSchema = z.object({
   embalagemCentavos: z.number().int().nonnegative(),
   precoCentavos: z.number().int().positive(),
   canalPrincipal: CanalEnum,
+  mercadoLivre: MercadoLivreConfiguracaoSchema.nullable().optional(),
+  cotacaoMl: MercadoLivreCotacaoSchema.nullable().optional(),
   ativo: z.boolean(),
   anunciado: z.boolean(),
   /// Em quais marketplaces o produto está no ar. Vazio = em nenhum.
@@ -50,6 +53,7 @@ export const ProdutoCreateSchema = ProdutoSchema.omit({
   // Onde está anunciado não se escolhe no formulário do produto: vem do fluxo
   // "já anunciei" (PUT /produtos/:id/canais-anunciados), que é onde a informação nasce.
   canaisAnunciados: true,
+  cotacaoMl: true,
 }).extend({
   // No create normal (UI manual), peso e tempo voltam a ser obrigatórios positivos.
   pesoG: z.number().positive(),

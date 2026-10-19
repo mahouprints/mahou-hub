@@ -36,6 +36,7 @@ export class AtendimentoService {
     });
 
     if (jaExiste) {
+      await this.reconciliarCustosMl(jaExiste.id, pedido);
       return this.atualizarStatus(jaExiste.id, jaExiste.status, pedido);
     }
 
@@ -85,6 +86,56 @@ export class AtendimentoService {
         statusAtualizado: null as PedidoStatus | null,
       };
     });
+  }
+
+  /** Reconcilia despesas sem reatender o pedido; consultas parciais não apagam custos conhecidos. */
+  async reconciliarCustosMl(pedidoId: string, pedido: PedidoImportado) {
+    if (pedido.canal !== 'ML') return { itensAtualizados: 0 };
+    const recebidos = pedido.itens.filter(
+      (item) => item.tarifaMlCentavos != null || item.freteMlCentavos != null,
+    );
+    if (recebidos.length === 0) return { itensAtualizados: 0 };
+    const salvos = await this.prisma.pedidoItem.findMany({ where: { pedidoId } });
+    let itensAtualizados = 0;
+    for (const item of recebidos) {
+      const candidatos = salvos.filter(
+        (salvo) =>
+          salvo.skuExterno === item.skuExterno &&
+          (!item.mlItemId || !salvo.mlItemId || salvo.mlItemId === item.mlItemId),
+      );
+      const repetidos = recebidos.filter(
+        (outro) => outro.skuExterno === item.skuExterno && outro.mlItemId === item.mlItemId,
+      );
+      const salvo = candidatos[0];
+      // Não rateia novamente nem adivinha correspondência entre linhas com o mesmo SKU.
+      if (
+        candidatos.length !== 1 ||
+        repetidos.length !== 1 ||
+        !salvo ||
+        salvo.qtd !== item.qtd ||
+        salvo.precoUnitarioCentavos !== item.precoUnitarioCentavos
+      ) {
+        this.logger.warn(
+          `Custos ML pendentes para pedido ${pedidoId}: item sem correspondência única`,
+        );
+        continue;
+      }
+      const atualizadoEm = item.custosMlAtualizadosEm ?? new Date();
+      const atualizado = await this.prisma.pedidoItem.updateMany({
+        where: {
+          id: salvo.id,
+          OR: [{ custosMlAtualizadosEm: null }, { custosMlAtualizadosEm: { lte: atualizadoEm } }],
+        },
+        data: {
+          ...(item.mlItemId ? { mlItemId: item.mlItemId } : {}),
+          ...(item.tarifaMlCentavos != null ? { tarifaMlCentavos: item.tarifaMlCentavos } : {}),
+          ...(item.freteMlCentavos != null ? { freteMlCentavos: item.freteMlCentavos } : {}),
+          custosMlAtualizadosEm: atualizadoEm,
+        },
+      });
+      itensAtualizados += atualizado.count;
+    }
+    return { itensAtualizados };
   }
 
   /**
@@ -322,6 +373,10 @@ export class AtendimentoService {
       nomeExterno: item.nomeExterno,
       qtd: item.qtd,
       precoUnitarioCentavos: item.precoUnitarioCentavos,
+      mlItemId: item.mlItemId,
+      tarifaMlCentavos: item.tarifaMlCentavos,
+      freteMlCentavos: item.freteMlCentavos,
+      custosMlAtualizadosEm: item.custosMlAtualizadosEm,
     };
   }
 
@@ -345,7 +400,9 @@ export class AtendimentoService {
   async vincularItem(itemId: string, variacaoId: string) {
     const item = await this.prisma.pedidoItem.findUnique({
       where: { id: itemId },
-      include: { pedido: { select: { canal: true, externalId: true, prazoEnvio: true } } },
+      include: {
+        pedido: { select: { canal: true, externalId: true, prazoEnvio: true, dataPedido: true } },
+      },
     });
     // NotFoundException e não Error: item inexistente é 404 pro cliente, não 500.
     if (!item) throw new NotFoundException(`Item de pedido ${itemId} não existe`);
@@ -360,21 +417,15 @@ export class AtendimentoService {
       const atendimento = await this.atenderComVariacao(
         tx,
         item.pedidoId,
-        {
-          skuExterno: item.skuExterno,
-          nomeExterno: item.nomeExterno,
-          qtd: item.qtd,
-          precoUnitarioCentavos: item.precoUnitarioCentavos,
-        },
-        // Só `canal`, `externalId` e `prazoEnvio` são lidos daqui (observação do movimento
-        // e prioridade do job). O resto é preenchimento do tipo.
+        this.camposItem(item),
+        // Preserva também a data original: vincular hoje não muda a competência da venda.
         {
           canal: item.pedido.canal as 'SHOPEE' | 'ML',
           externalId: item.pedido.externalId,
           statusExterno: '',
           totalCentavos: 0,
           prazoEnvio: item.pedido.prazoEnvio,
-          dataPedido: new Date(),
+          dataPedido: item.pedido.dataPedido,
           itens: [],
         },
         variacao,

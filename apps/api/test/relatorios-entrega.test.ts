@@ -15,7 +15,7 @@ const webhookUrl = 'https://script.google.com/macros/s/deployment-test/exec';
 const planilhaUrl = 'https://docs.google.com/spreadsheets/d/planilha-test/edit';
 const entrada = { periodo: 'MENSAL' as const, referencia: '2026-08-15' };
 const respostaGoogle = () =>
-  Response.json({ ok: true, planilhaUrl, enviadoEm: agora.toISOString() });
+  Response.json({ ok: true, versaoRelatorio: 2, planilhaUrl, enviadoEm: agora.toISOString() });
 
 function configuracao(overrides: Partial<ConfiguracaoRelatorios> = {}): ConfiguracaoRelatorios {
   return {
@@ -248,10 +248,22 @@ describe('configuração e segredo dos relatórios', () => {
 });
 
 describe('HTTP e assinatura para Google', () => {
+  it('bloqueia receptor antigo antes de enviar dados para uma planilha sem frete', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      Response.json({ ok: false, erro: 'Identificação do relatório inválida.' }),
+    );
+    await expect(enviarAoGoogle(configuracao(), envio())).rejects.toThrow(
+      'Atualize o código e a implantação Google',
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const envelope = JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body));
+    expect(JSON.parse(envelope.conteudo)).toMatchObject({ acao: 'verificarVersao' });
+    expect(JSON.parse(envelope.conteudo)).not.toHaveProperty('relatorio');
+  });
   it('assina exatamente o JSON enviado, incluindo id estável, destinatários e acentos', async () => {
     const relatorio = envio();
     await enviarAoGoogle(configuracao(), relatorio);
-    const [url, opcoes] = vi.mocked(fetch).mock.calls[0]!;
+    const [url, opcoes] = vi.mocked(fetch).mock.calls[1]!;
     const envelope = JSON.parse(String(opcoes?.body)) as { conteudo: string; assinatura: string };
     expect(url).toBe(webhookUrl);
     expect(opcoes).toMatchObject({ method: 'POST', redirect: 'manual' });
@@ -319,7 +331,9 @@ describe('HTTP e assinatura para Google', () => {
       'Invalid',
     ],
   ])('não confirma resposta inválida do destino', async (resposta, mensagem) => {
-    vi.mocked(fetch).mockResolvedValueOnce(resposta());
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(Response.json({ ok: true, versaoRelatorio: 2 }))
+      .mockResolvedValueOnce(resposta());
     await expect(enviarAoGoogle(configuracao(), envio())).rejects.toThrow(mensagem);
   });
 });
@@ -341,12 +355,12 @@ describe('fila persistida de entrega', () => {
     );
   });
 
-  it('claim atômico permite somente uma chamada Google para duas solicitações simultâneas', async () => {
+  it('claim atômico permite somente uma verificação e um envio para duas solicitações simultâneas', async () => {
     const { service, registros, delegate } = prepararFila();
     await Promise.all([service.enviar(entrada), service.enviar(entrada)]);
     await vi.waitFor(() => expect([...registros.values()][0]?.status).toBe('ENVIADO'));
     expect(registros.size).toBe(1);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(delegate.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -455,7 +469,7 @@ describe('fila persistida de entrega', () => {
         where: expect.objectContaining({ id: 'envio1', tentativas: { lt: 5 } }),
       }),
     );
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('interrupção na quinta tentativa vira falha explícita e permite reconciliação manual', async () => {

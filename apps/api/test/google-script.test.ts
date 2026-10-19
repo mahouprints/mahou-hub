@@ -15,6 +15,9 @@ const totais = {
   custosGeraisCentavos: 200,
   impostosCentavos: 600,
   taxasMarketplaceCentavos: 0,
+  fretesCentavos: 0,
+  vendasMlComCustosReais: 0,
+  vendasMlComCustosPendentes: 0,
   gastosTotaisCentavos: 2601,
   lucroLiquidoCentavos: 7400,
   lucroContribuicaoCentavos: 7600,
@@ -261,6 +264,78 @@ function ambiente() {
 }
 
 describe('receptor Google Apps Script gerado', () => {
+  it('identifica snapshot legado e preserva suas tarifas estimadas sem tratá-las como importadas', () => {
+    const a = ambiente();
+    const dados = relatorio();
+    const { fretesCentavos: _frete, ...resumoLegado } = dados.resumo;
+    const vendasLegadas = dados.vendas.map(({ fretesCentavos: _freteVenda, ...venda }) => ({
+      ...venda,
+      canal: 'ML',
+      taxasMarketplaceCentavos: 700,
+    }));
+    expect(
+      a.enviar({ relatorio: { ...dados, resumo: resumoLegado, vendas: vendasLegadas } }).ok,
+    ).toBe(true);
+    const resumo = a.abas.find((aba) => aba.nome === 'Resumo')!;
+    expect(
+      resumo.escritos.some((item) =>
+        item.valores?.some(
+          (linha) => linha[0] === 'Vendas ML com custos pendentes' && linha[1] === 1,
+        ),
+      ),
+    ).toBe(true);
+    const vendas = a.abas.find((aba) => aba.nome === 'Vendas')!;
+    const linha = vendas.escritos.find((item) => item.intervalo.join(',') === '2,1,1,14')!
+      .valores![0]!;
+    expect(linha[9]).toBe(7);
+    expect(linha[10]).toBe('Pendente');
+    expect(linha[12]).toBe('Legado: tarifa estimada; frete pendente');
+  });
+  it('exporta frete na fórmula do resultado e distingue despesa pendente de zero', () => {
+    const a = ambiente();
+    const dados = relatorio();
+    dados.resumo = { ...dados.resumo, fretesCentavos: 651, vendasMlComCustosPendentes: 1 };
+    dados.vendas = dados.vendas.map((venda) => ({
+      ...venda,
+      canal: 'ML',
+      fretesCentavos: 651,
+      custosMl: {
+        tarifaCentavos: null,
+        freteCentavos: 651,
+        tarifaFonte: 'PENDENTE',
+        freteFonte: 'IMPORTADO',
+      },
+    }));
+    expect(a.enviar({ relatorio: dados }).ok).toBe(true);
+    const resumo = a.abas.find((aba) => aba.nome === 'Resumo')!;
+    expect(
+      resumo.escritos.some((item) =>
+        item.valores?.some((linha) => linha[0] === 'Fretes ML importados' && linha[1] === 6.51),
+      ),
+    ).toBe(true);
+    expect(resumo.escritos).toContainEqual({ intervalo: ['B11'], formula: '=SUM(B5:B10)' });
+    expect(
+      resumo.escritos.some((item) =>
+        item.valores?.some((linha) => linha[0] === 'Resultado parcial'),
+      ),
+    ).toBe(true);
+    const vendas = a.abas.find((aba) => aba.nome === 'Vendas')!;
+    const linha = vendas.escritos.find((item) => item.intervalo.join(',') === '2,1,1,14')!
+      .valores![0]!;
+    expect(linha[9]).toBe('Pendente');
+    expect(linha[10]).toBe(6.51);
+    expect(linha[12]).toBe('Parcial: custos ML pendentes');
+  });
+  it('confirma a versão financeira sem criar planilha, bloquear ou enviar email', () => {
+    const a = ambiente();
+    expect(a.enviar({ acao: 'verificarVersao', relatorio: undefined })).toEqual({
+      ok: true,
+      versaoRelatorio: 2,
+    });
+    expect(a.SpreadsheetApp.create).not.toHaveBeenCalled();
+    expect(a.MailApp.sendEmail).not.toHaveBeenCalled();
+    expect(a.bloqueio.tryLock).not.toHaveBeenCalled();
+  });
   it('autoriza a conta sem criar planilha ou enviar mensagem', () => {
     const a = ambiente();
     expect(a.contexto.autorizarIntegracao()).toEqual({
@@ -361,7 +436,7 @@ describe('receptor Google Apps Script gerado', () => {
     const resumo = a.abas.find((aba) => aba.nome === 'Resumo')!;
     const vendas = a.abas.find((aba) => aba.nome === 'Vendas')!;
     const custos = a.abas.find((aba) => aba.nome === 'Custos')!;
-    const linhaVenda = vendas.escritos.find((item) => item.intervalo.join(',') === '2,1,1,12')!
+    const linhaVenda = vendas.escritos.find((item) => item.intervalo.join(',') === '2,1,1,14')!
       .valores![0]!;
     expect(linhaVenda).toEqual([
       '2028-02-29',
@@ -374,16 +449,18 @@ describe('receptor Google Apps Script gerado', () => {
       5.67,
       6,
       0,
+      0,
       76,
+      'Despesas registradas',
       "'  @observação\nlinha 2",
     ]);
     const linhaCusto = custos.escritos.find((item) => item.intervalo.join(',') === '2,1,1,5')!
       .valores![0]!;
     expect(linhaCusto).toEqual(['2028-02-29', "'+Fornecedor", 'SOFTWARE', 2, "'-Anotação"]);
-    expect(resumo.escritos).toContainEqual({ intervalo: ['B10'], formula: '=SUM(B5:B9)' });
+    expect(resumo.escritos).toContainEqual({ intervalo: ['B11'], formula: '=SUM(B5:B10)' });
     expect(vendas.escritos.some((item) => item.formula === '=SUM(F2:F2)')).toBe(true);
     expect(resumo.graficos).toEqual([
-      { tipo: 'COLUMN', title: 'Receita, gastos e lucro', width: 720, height: 320 },
+      { tipo: 'COLUMN', title: 'Receita, gastos conhecidos e resultado', width: 720, height: 320 },
       { tipo: 'PIE', title: 'Custos gerais por categoria', width: 720, height: 320 },
     ]);
     expect(a.planilha.setSpreadsheetLocale).toHaveBeenCalledWith('pt_BR');
@@ -395,8 +472,8 @@ describe('receptor Google Apps Script gerado', () => {
     expect(a.planilha.setSpreadsheetLocale).toHaveBeenCalledWith('pt_BR');
     const resumo = a.abas.find((aba) => aba.nome === 'Resumo')!;
     expect(resumo.escritos).toContainEqual({
-      intervalo: ['B12'],
-      formula: '=IFERROR(B11/B4;0)',
+      intervalo: ['B13'],
+      formula: '=IFERROR(B12/B4;0)',
       formato: '0.00%',
     });
     expect([...resumo.larguras]).toEqual([
@@ -404,7 +481,7 @@ describe('receptor Google Apps Script gerado', () => {
       [2, 130],
       [3, 130],
       [4, 130],
-      [5, 24],
+      [5, 140],
     ]);
     expect(resumo.escritos).toContainEqual({
       intervalo: ['A1:D1'],

@@ -27,6 +27,7 @@ function doPost(evento) {
   try {
     validarConta();
     const pedido = validarEnvelope(evento);
+    if (pedido.acao === 'verificarVersao') return respostaJson({ ok: true, versaoRelatorio: 2 });
     bloqueio = LockService.getScriptLock();
     bloqueado = bloqueio.tryLock(20000);
     if (!bloqueado) throw new Error('Outro relatório está em processamento. Tente novamente.');
@@ -58,7 +59,8 @@ function validarEnvelope(evento) {
   if (!Number.isFinite(instante) || Math.abs(Date.now() - instante) > 10 * 60 * 1000) {
     throw new Error('Solicitação expirada ou com data inválida.');
   }
-  if (typeof pedido.id !== 'string' || !pedido.id || pedido.id.length > 200 || !pedido.relatorio) {
+  if (typeof pedido.id !== 'string' || !pedido.id || pedido.id.length > 200 ||
+      (!pedido.relatorio && pedido.acao !== 'verificarVersao')) {
     throw new Error('Identificação do relatório inválida.');
   }
   validarDestinatarios(pedido.destinatarios);
@@ -174,6 +176,9 @@ function garantirLinhas(aba, quantidade) {
 
 function escreverResumo(aba, relatorio) {
   const resumo = relatorio.resumo;
+  const legado = !Number.isInteger(resumo.fretesCentavos);
+  const pendentes = legado ? relatorio.vendas.filter(function(venda) { return venda.canal === 'ML'; }).length : resumo.vendasMlComCustosPendentes || 0;
+  const parcial = pendentes > 0;
   aba.getRange('A1:D2').breakApart();
   aba.getRange('A1:D1').merge().setValue(literal(relatorio.titulo)).setFontWeight('bold').setWrap(true);
   aba.getRange('A2:D2').merge().setValue(literal(relatorio.inicio + ' a ' + relatorio.fim)).setWrap(true);
@@ -181,32 +186,37 @@ function escreverResumo(aba, relatorio) {
     ['Receita', dinheiro(resumo.faturamentoCentavos)], ['Custos variáveis', dinheiro(resumo.custosVariaveisCentavos)],
     ['Insumos consumidos', dinheiro(resumo.custosInsumosCentavos)], ['Custos gerais', dinheiro(resumo.custosGeraisCentavos)],
     ['Impostos', dinheiro(resumo.impostosCentavos)], ['Taxas marketplace', dinheiro(resumo.taxasMarketplaceCentavos)],
-    ['Gastos totais', dinheiro(resumo.gastosTotaisCentavos)], ['Lucro líquido', dinheiro(resumo.lucroLiquidoCentavos)],
+    ['Fretes ML importados', dinheiro(resumo.fretesCentavos || 0)],
+    ['Gastos conhecidos', dinheiro(resumo.gastosTotaisCentavos)], [parcial ? 'Resultado parcial' : 'Resultado registrado', dinheiro(resumo.lucroLiquidoCentavos)],
     ['Margem', resumo.margem], ['Vendas', resumo.qtdVendas], ['Unidades vendidas', resumo.qtdItensVendidos],
+    ['Vendas ML com despesas importadas', resumo.vendasMlComCustosReais || 0],
+    ['Vendas ML com custos pendentes', pendentes],
+    ['Base do resultado', legado ? 'Snapshot legado: tarifas estimadas preservadas; fretes ML não informados.' : parcial ? 'Parcial: despesas ML ausentes ainda não descontadas. Produção e impostos pelo cadastro atual.' : 'Produção e impostos pelo cadastro atual; demais despesas conforme os lançamentos.'],
   ];
   escreverTabela(aba, 3, ['Indicador', 'Valor'], indicadores);
-  aba.getRange('B4:B11').setNumberFormat('"R$" #,##0.00');
-  aba.getRange('B10').setFormula('=SUM(B5:B9)');
-  aba.getRange('B11').setFormula('=B4-B10');
-  aba.getRange('B12').setFormula('=IFERROR(B11/B4;0)').setNumberFormat('0.00%');
+  aba.getRange('B4:B12').setNumberFormat('"R$" #,##0.00');
+  aba.getRange('B11').setFormula('=SUM(B5:B10)');
+  aba.getRange('B12').setFormula('=B4-B11');
+  aba.getRange('B13').setFormula('=IFERROR(B12/B4;0)').setNumberFormat('0.00%');
   const serie = relatorio.serie.map(function(ponto) {
-    return [literal(ponto.rotulo), dinheiro(ponto.faturamentoCentavos), dinheiro(ponto.gastosTotaisCentavos), dinheiro(ponto.lucroLiquidoCentavos)];
+    return [literal(ponto.rotulo), dinheiro(ponto.faturamentoCentavos), dinheiro(ponto.gastosTotaisCentavos), dinheiro(ponto.lucroLiquidoCentavos), ponto.vendasMlComCustosPendentes || 0];
   });
-  escreverTabela(aba, 17, ['Período', 'Receita', 'Gastos', 'Lucro'], serie);
-  if (serie.length) aba.getRange(18, 2, serie.length, 3).setNumberFormat('"R$" #,##0.00');
+  const linhaSerie = indicadores.length + 6;
+  escreverTabela(aba, linhaSerie, ['Período', 'Receita', 'Gastos conhecidos', 'Resultado registrado', 'Vendas ML pendentes'], serie);
+  if (serie.length) aba.getRange(linhaSerie + 1, 2, serie.length, 3).setNumberFormat('"R$" #,##0.00');
   const categorias = relatorio.porCategoria.map(function(item) { return [literal(item.categoria), dinheiro(item.valorCentavos)]; });
-  const linhaCategoria = 20 + serie.length;
+  const linhaCategoria = linhaSerie + 3 + serie.length;
   escreverTabela(aba, linhaCategoria, ['Categoria de custo geral', 'Valor'], categorias);
   if (categorias.length) aba.getRange(linhaCategoria + 1, 2, categorias.length, 1).setNumberFormat('"R$" #,##0.00');
-  if (serie.length) inserirGrafico(aba, Charts.ChartType.COLUMN, aba.getRange(17, 1, serie.length + 1, 4), 2, 'Receita, gastos e lucro');
+  if (serie.length) inserirGrafico(aba, Charts.ChartType.COLUMN, aba.getRange(linhaSerie, 1, serie.length + 1, 4), 2, 'Receita, gastos conhecidos e resultado');
   if (categorias.some(function(item) { return item[1] > 0; })) inserirGrafico(aba, Charts.ChartType.PIE, aba.getRange(linhaCategoria, 1, categorias.length + 1, 2), 20, 'Custos gerais por categoria');
   const linhaCanal = linhaCategoria + categorias.length + 3;
-  const canais = relatorio.porCanal.map(function(item) { return [literal(item.canal), dinheiro(item.faturamentoCentavos), dinheiro(item.lucroContribuicaoCentavos)]; });
-  escreverTabela(aba, linhaCanal, ['Canal', 'Receita', 'Lucro antes dos custos gerais'], canais);
-  if (canais.length) aba.getRange(linhaCanal + 1, 2, canais.length, 2).setNumberFormat('"R$" #,##0.00');
+  const canais = relatorio.porCanal.map(function(item) { return [literal(item.canal), dinheiro(item.faturamentoCentavos), dinheiro(item.fretesCentavos || 0), dinheiro(item.lucroContribuicaoCentavos), item.vendasMlComCustosPendentes || 0]; });
+  escreverTabela(aba, linhaCanal, ['Canal', 'Receita', 'Fretes ML', 'Resultado antes dos custos gerais', 'Vendas ML pendentes'], canais);
+  if (canais.length) aba.getRange(linhaCanal + 1, 2, canais.length, 3).setNumberFormat('"R$" #,##0.00');
   aba.setColumnWidth(1, 200);
   [2, 3, 4].forEach(function(coluna) { aba.setColumnWidth(coluna, 130); });
-  aba.setColumnWidth(5, 24);
+  aba.setColumnWidth(5, 140);
 }
 
 function inserirGrafico(aba, tipo, intervalo, linha, titulo) {
@@ -217,17 +227,22 @@ function inserirGrafico(aba, tipo, intervalo, linha, titulo) {
 
 function escreverVendas(aba, vendas) {
   const registros = vendas.map(function(venda) {
+    const custos = venda.custosMl;
+    const legado = !Number.isInteger(venda.fretesCentavos);
+    const tarifaPendente = venda.canal === 'ML' && (!custos || custos.tarifaFonte !== 'IMPORTADA');
+    const fretePendente = venda.canal === 'ML' && (!custos || custos.freteFonte !== 'IMPORTADO');
     return [literal(venda.dataVenda), literal(venda.produtoNome), literal(venda.canal), venda.qtd,
       dinheiro(venda.precoUnitarioCentavos), dinheiro(venda.faturamentoCentavos), dinheiro(venda.custosVariaveisCentavos),
-      dinheiro(venda.custosInsumosCentavos), dinheiro(venda.impostosCentavos), dinheiro(venda.taxasMarketplaceCentavos),
-      dinheiro(venda.lucroContribuicaoCentavos), literal(venda.observacao)];
+      dinheiro(venda.custosInsumosCentavos), dinheiro(venda.impostosCentavos), tarifaPendente && !legado ? 'Pendente' : dinheiro(venda.taxasMarketplaceCentavos),
+      fretePendente ? 'Pendente' : dinheiro(venda.fretesCentavos || 0), dinheiro(venda.lucroContribuicaoCentavos),
+      legado && venda.canal === 'ML' ? 'Legado: tarifa estimada; frete pendente' : tarifaPendente || fretePendente ? 'Parcial: custos ML pendentes' : 'Despesas registradas', literal(venda.observacao)];
   });
   garantirLinhas(aba, registros.length + 3);
   aba.getRange(2, 1, Math.max(registros.length, 1), 1).setNumberFormat('@');
-  escreverTabela(aba, 1, ['Data', 'Produto', 'Canal', 'Quantidade', 'Preço unitário', 'Receita', 'Custos variáveis', 'Insumos', 'Impostos', 'Taxas', 'Lucro antes dos custos gerais', 'Observações'], registros);
-  if (registros.length) aba.getRange(2, 5, registros.length, 7).setNumberFormat('"R$" #,##0.00');
-  escreverTotais(aba, registros.length, [4, 6, 7, 8, 9, 10, 11]);
-  aba.setColumnWidth(12, 360);
+  escreverTabela(aba, 1, ['Data', 'Produto', 'Canal', 'Quantidade', 'Preço unitário', 'Receita', 'Custos variáveis', 'Insumos', 'Impostos', 'Taxas', 'Frete ML', 'Resultado antes dos custos gerais', 'Conciliação', 'Observações'], registros);
+  if (registros.length) aba.getRange(2, 5, registros.length, 8).setNumberFormat('"R$" #,##0.00');
+  escreverTotais(aba, registros.length, [4, 6, 7, 8, 9, 10, 11, 12]);
+  aba.setColumnWidth(14, 360);
 }
 
 function escreverCustos(aba, custos) {

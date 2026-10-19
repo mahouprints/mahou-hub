@@ -15,16 +15,38 @@ const RespostaGoogleSchema = z.object({
 /** Publica somente na implantação Google configurada; não segue redirecionamento arbitrário. */
 export async function enviarAoGoogle(config: ConfiguracaoRelatorios, envio: EnvioRelatorio) {
   const url = WebhookGoogleSchema.parse(config.webhookUrl);
-  const conteudo = JSON.stringify({
+  const identificacao = {
     id: envio.id,
     criadoEm: new Date().toISOString(),
-    relatorio: envio.relatorio,
     destinatarios: envio.destinatarios,
-  });
-  const assinatura = createHmac('sha256', decifrarSegredo(config.segredoCifrado))
-    .update(conteudo)
-    .digest('hex');
-  const resposta = await requisitarGoogle(url, JSON.stringify({ conteudo, assinatura }));
+  };
+  const segredo = decifrarSegredo(config.segredoCifrado);
+  const assinar = (dados: object) => {
+    const conteudo = JSON.stringify(dados);
+    const assinatura = createHmac('sha256', segredo).update(conteudo).digest('hex');
+    return JSON.stringify({ conteudo, assinatura });
+  };
+  // O receptor antigo rejeita um envelope sem relatorio antes de criar planilha/email.
+  // Não envie o novo relatório para fórmulas antigas que omitiriam os fretes.
+  const verificacao = await requisitarGoogle(
+    url,
+    assinar({ ...identificacao, acao: 'verificarVersao' }),
+  );
+  const versao = (await verificacao.json()) as {
+    ok?: boolean;
+    versaoRelatorio?: number;
+    erro?: string;
+  };
+  if (!versao.ok || versao.versaoRelatorio !== 2) {
+    throw new Error(
+      'Atualize o código e a implantação Google em Configurar envios para incluir fretes e custos pendentes.' +
+        (versao.erro ? ` ${versao.erro.slice(0, 200)}` : ''),
+    );
+  }
+  const resposta = await requisitarGoogle(
+    url,
+    assinar({ ...identificacao, relatorio: envio.relatorio }),
+  );
   const corpo = (await resposta.json()) as { ok?: boolean; erro?: string };
   if (!corpo.ok) throw new Error(corpo.erro?.slice(0, 400) || 'Google não confirmou o envio');
   return RespostaGoogleSchema.parse(corpo);

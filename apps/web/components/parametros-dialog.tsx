@@ -212,11 +212,14 @@ export function ParametrosDialog({ open, onOpenChange, parametros }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Comissão ML categoria (%)</Label>
+            <Label>Comissão ML antiga (%)</Label>
             <InputDecimal
               value={form.comissaoMlPct}
               onChange={(s) => setForm({ ...form, comissaoMlPct: s })}
             />
+            <p className="text-xs text-muted-foreground">
+              Mantida como referência. Os cálculos ML usam a cotação de cada produto e os custos importados de cada pedido.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

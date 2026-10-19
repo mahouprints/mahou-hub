@@ -3,11 +3,15 @@ import { Canal, Prisma } from '@prisma/client';
 import {
   calcularProduto,
   type CalculoSaida,
-  type FaixaMercadoLivre as FaixaMlPricing,
   type FaixaShopee as FaixaShopeePricing,
   type ParametrosGlobais,
 } from '@mahou-hub/pricing';
-import { ProdutoCreateSchema, type ProdutoCreate, type ProdutoUpdate } from '@mahou-hub/contracts';
+import {
+  custosMlDaCotacao,
+  ProdutoCreateSchema,
+  type ProdutoCreate,
+  type ProdutoUpdate,
+} from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ImagensService } from '../imagens/imagens.service';
 import {
@@ -172,10 +176,11 @@ export class ProdutosService {
   }
 
   async create(data: ProdutoCreate) {
-    const { insumos, filamentos, ...resto } = data;
+    const { insumos, filamentos, mercadoLivre, ...resto } = data;
     return this.prisma.produto.create({
       data: {
         ...resto,
+        ...(mercadoLivre !== undefined ? { mercadoLivre: mercadoLivre ?? Prisma.DbNull } : {}),
         ...dadosComposicao(filamentos),
         filamentos: filamentos ? { create: linhasComposicao(filamentos) } : undefined,
         insumos: insumos?.length
@@ -194,7 +199,7 @@ export class ProdutosService {
    * Se `insumos` não vier, lista atual é preservada.
    */
   async update(id: string, data: ProdutoUpdate) {
-    const { insumos, filamentos: entradaFilamentos, ...resto } = data;
+    const { insumos, filamentos: entradaFilamentos, mercadoLivre, ...resto } = data;
     return this.prisma.$transaction(async (tx) => {
       const atual = await tx.produto.findUnique({ where: { id }, include: { filamentos: true } });
       if (!atual) throw new NotFoundException(`Produto ${id} não existe`);
@@ -216,7 +221,11 @@ export class ProdutosService {
       });
       const atualizado = await tx.produto.update({
         where: { id },
-        data: { ...alteracoes, ...(rascunho === false ? { rascunho } : {}) },
+        data: {
+          ...alteracoes,
+          ...(mercadoLivre !== undefined ? { mercadoLivre: mercadoLivre ?? Prisma.DbNull } : {}),
+          ...(rascunho === false ? { rascunho } : {}),
+        },
       });
       if (filamentos !== undefined) {
         await tx.produtoFilamento.deleteMany({ where: { produtoId: id } });
@@ -353,10 +362,9 @@ export class ProdutosService {
    * a forma do payload é a mesma nos dois endpoints.
    */
   private async enriquecerComPricing(produtos: ProdutoComIncludes[]) {
-    const [parametros, tabelaShopee, tabelaMl] = await Promise.all([
+    const [parametros, tabelaShopee] = await Promise.all([
       this.carregarParametros(),
       this.carregarTabelaShopee(),
-      this.carregarTabelaMl(),
     ]);
     return produtos.map((p) => {
       const custoInsumos = somarCustoInsumos(p.insumos);
@@ -389,9 +397,9 @@ export class ProdutosService {
           embalagemCentavos: p.embalagemCentavos,
           custoInsumosCentavos: custoInsumos,
           precoCentavos: p.precoCentavos,
+          mercadoLivre: custosMlDaCotacao(p),
           parametros,
           tabelaShopee,
-          tabelaMercadoLivre: tabelaMl,
         }),
       };
     });
@@ -425,19 +433,6 @@ export class ProdutosService {
       fixaCnpjCentavos: r.fixaCnpjCentavos,
       fixaCpfBaixoCentavos: r.fixaCpfBaixoCentavos,
       fixaCpfAltoCentavos: r.fixaCpfAltoCentavos,
-    }));
-  }
-
-  private async carregarTabelaMl(): Promise<FaixaMlPricing[]> {
-    const rows = await this.prisma.taxaMercadoLivre.findMany({
-      orderBy: { limInferiorCentavos: 'asc' },
-    });
-    return rows.map((r) => ({
-      faixa: r.faixa as 'A' | 'B' | 'C' | 'D' | 'E',
-      limInferiorCentavos: r.limInferiorCentavos,
-      custoFixoCentavos: r.custoFixoCentavos,
-      pctAlternativo: Number(r.pctAlternativo),
-      comissaoCategoriaPct: Number(r.comissaoCategoriaPct),
     }));
   }
 }

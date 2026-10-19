@@ -53,11 +53,11 @@ type Economia = {
   canal: Marketplace;
   precoCentavos: number;
   custoCentavos: number;
-  taxaMarketplaceCentavos: number;
+  taxaMarketplaceCentavos: number | null;
   impostoCentavos: number;
-  liquidoCentavos: number;
-  margemPct: number;
-  lucroPorHoraCentavos: number;
+  liquidoCentavos: number | null;
+  margemPct: number | null;
+  lucroPorHoraCentavos: number | null;
 };
 
 type PlanoAds = {
@@ -100,7 +100,7 @@ type Detalhe = {
   temFotoReal: boolean;
   anuncios: Anuncio[];
   economia: Economia;
-  planoAds: PlanoAds;
+  planoAds: PlanoAds | null;
 };
 
 export default function DetalheModelo({ params }: { params: Promise<{ id: string }> }) {
@@ -283,7 +283,12 @@ function CardEconomia({ modelo }: { modelo: Detalhe }) {
   const linhas = [
     ['Preço sugerido', centavosParaReais(e.precoCentavos)],
     ['Custo de produção', `− ${centavosParaReais(e.custoCentavos)}`],
-    ['Taxa Shopee', `− ${centavosParaReais(e.taxaMarketplaceCentavos)}`],
+    [
+      'Taxa Shopee',
+      e.taxaMarketplaceCentavos === null
+        ? 'Pendente'
+        : `− ${centavosParaReais(e.taxaMarketplaceCentavos)}`,
+    ],
     ['Imposto', `− ${centavosParaReais(e.impostoCentavos)}`],
   ] as const;
 
@@ -302,14 +307,23 @@ function CardEconomia({ modelo }: { modelo: Detalhe }) {
           ))}
           <div className="mt-1 flex justify-between gap-4 border-t pt-2 font-medium">
             <dt>Líquido por venda</dt>
-            <dd className="tabular-nums">{centavosParaReais(e.liquidoCentavos)}</dd>
+            <dd className="tabular-nums">
+              {e.liquidoCentavos === null ? 'Pendente' : centavosParaReais(e.liquidoCentavos)}
+            </dd>
           </div>
         </dl>
 
         <div className="grid grid-cols-2 gap-3 border-t pt-3 sm:grid-cols-4">
-          <Metrica rotulo="Margem" valor={pct(e.margemPct)} />
+          <Metrica rotulo="Margem" valor={e.margemPct === null ? 'Pendente' : pct(e.margemPct)} />
           {/* Com uma impressora só, é esta a métrica que decide a fila — não a margem. */}
-          <Metrica rotulo="Lucro por hora" valor={centavosParaReais(e.lucroPorHoraCentavos)} />
+          <Metrica
+            rotulo="Lucro por hora"
+            valor={
+              e.lucroPorHoraCentavos === null
+                ? 'Pendente'
+                : centavosParaReais(e.lucroPorHoraCentavos)
+            }
+          />
           <Metrica rotulo="Tempo" valor={`${modelo.tempoHoras} h`} />
           <Metrica
             rotulo={modelo.alertas.includes('PURGA_NAO_INFORMADA') ? 'Peso publicado' : 'Peso'}
@@ -325,7 +339,19 @@ function CardEconomia({ modelo }: { modelo: Detalhe }) {
   );
 }
 
-function CardPlanoAds({ plano }: { plano: PlanoAds }) {
+function CardPlanoAds({ plano }: { plano: PlanoAds | null }) {
+  if (plano === null) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Plano de anúncio pendente</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Complete os custos do canal para calcular o plano de anúncios.
+        </CardContent>
+      </Card>
+    );
+  }
   if (plano.inviavel) {
     return (
       <Card className="border-destructive/50">

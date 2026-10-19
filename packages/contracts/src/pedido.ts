@@ -26,6 +26,10 @@ export const PedidoItemImportSchema = z.object({
   nomeExterno: z.string().default(''),
   qtd: z.number().int().positive(),
   precoUnitarioCentavos: z.number().int().nonnegative(),
+  mlItemId: z.string().nullable().optional(),
+  tarifaMlCentavos: z.number().int().nonnegative().nullable().optional(),
+  freteMlCentavos: z.number().int().nonnegative().nullable().optional(),
+  custosMlAtualizadosEm: z.coerce.date().nullable().optional(),
 });
 export type PedidoItemImport = z.infer<typeof PedidoItemImportSchema>;
 

@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { VendaCreate, VendaUpdate } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { custosMlDaVenda } from '../financeiro/financeiro-calculo';
 
 @Injectable()
 export class VendasService {
@@ -10,13 +11,14 @@ export class VendasService {
    * Lista vendas, opcionalmente filtradas por mês competência (YYYY-MM).
    * Sempre incluindo produto+filamento pra UI exibir nome legível.
    */
-  list(mes?: string) {
+  async list(mes?: string) {
     const where = mes ? { dataVenda: rangeDoMes(mes) } : {};
-    return this.prisma.venda.findMany({
+    const vendas = await this.prisma.venda.findMany({
       where,
       orderBy: { dataVenda: 'desc' },
-      include: { produto: { include: { filamento: true } } },
+      include: { produto: { include: { filamento: true } }, pedidoItem: true },
     });
+    return vendas.map((venda) => ({ ...venda, custosMl: custosMlDaVenda(venda) }));
   }
 
   /**
@@ -37,7 +39,13 @@ export class VendasService {
 
     const linhas = new Map<
       string,
-      { produto: string; cor: string | null; sku: string | null; unidades: number; receitaCentavos: number }
+      {
+        produto: string;
+        cor: string | null;
+        sku: string | null;
+        unidades: number;
+        receitaCentavos: number;
+      }
     >();
 
     for (const v of vendas) {
@@ -60,17 +68,37 @@ export class VendasService {
   async get(id: string) {
     const v = await this.prisma.venda.findUnique({
       where: { id },
-      include: { produto: { include: { filamento: true } } },
+      include: { produto: { include: { filamento: true } }, pedidoItem: true },
     });
     if (!v) throw new NotFoundException(`Venda ${id} não existe`);
-    return v;
+    return { ...v, custosMl: custosMlDaVenda(v) };
   }
 
   create(data: VendaCreate) {
     return this.prisma.venda.create({ data });
   }
 
-  update(id: string, data: VendaUpdate) {
+  async update(id: string, data: VendaUpdate) {
+    const venda = await this.prisma.venda.findUnique({
+      where: { id },
+      select: {
+        pedidoItemId: true,
+        produtoId: true,
+        qtd: true,
+        precoUnitarioCentavos: true,
+        canal: true,
+      },
+    });
+    if (!venda) throw new NotFoundException(`Venda ${id} não existe`);
+    const camposDoPedido = ['produtoId', 'qtd', 'precoUnitarioCentavos', 'canal'] as const;
+    if (
+      venda.pedidoItemId &&
+      camposDoPedido.some((campo) => data[campo] !== undefined && data[campo] !== venda[campo])
+    ) {
+      throw new BadRequestException(
+        'Produto, quantidade, preço e canal de uma venda importada devem ser corrigidos no pedido de origem.',
+      );
+    }
     return this.prisma.venda.update({ where: { id }, data });
   }
 

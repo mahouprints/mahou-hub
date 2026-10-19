@@ -35,6 +35,24 @@ export default function FinanceiroPage() {
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
       {data && <KpiGrid resumo={data} />}
+      {data && (
+        <div className="space-y-2 text-sm text-muted-foreground">
+          {data.vendasMlComCustosPendentes > 0 && (
+            <p role="status" className="rounded-md border border-amber-500/40 p-3 text-amber-300">
+              Resultado parcial: {data.vendasMlComCustosPendentes} vendas do Mercado Livre ainda têm
+              tarifa ou frete pendente. Despesas não informadas ainda não foram descontadas.
+            </p>
+          )}
+          <p>
+            Taxas dos canais: {centavosParaReais(data.taxasMarketplaceCentavos)} · Fretes ML
+            importados: {centavosParaReais(data.fretesCentavos)}
+          </p>
+          <p className="text-xs">
+            Produção e impostos calculados pelo cadastro atual. Demais despesas dependem dos
+            lançamentos de custos gerais.
+          </p>
+        </div>
+      )}
       {data && <CanaisCard resumo={data} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -60,8 +78,14 @@ export default function FinanceiroPage() {
 
 function KpiGrid({ resumo }: { resumo: ResumoFinanceiro }) {
   const positivo = resumo.lucroLiquidoCentavos >= 0;
-  const margemVariant: 'success' | 'warning' | 'danger' =
-    resumo.margem >= 0.2 ? 'success' : resumo.margem >= 0.1 ? 'warning' : 'danger';
+  const parcial = resumo.vendasMlComCustosPendentes > 0;
+  const margemVariant: 'success' | 'warning' | 'danger' = parcial
+    ? 'warning'
+    : resumo.margem >= 0.2
+      ? 'success'
+      : resumo.margem >= 0.1
+        ? 'warning'
+        : 'danger';
 
   // 4 cards: separamos "Custos gerais" (lançamentos manuais) de "Custos com
   // insumos" (consumo derivado das vendas). Margem vira sublinha do Lucro.
@@ -87,17 +111,17 @@ function KpiGrid({ resumo }: { resumo: ResumoFinanceiro }) {
       />
       <KpiCard
         icon={positivo ? TrendingUp : TrendingDown}
-        rotulo="Lucro líquido"
+        rotulo={parcial ? 'Resultado parcial' : 'Resultado após custos registrados'}
         valor={centavosParaReais(resumo.lucroLiquidoCentavos)}
         sublinhaNode={
           <span className="inline-flex items-center gap-1.5">
-            margem{' '}
+            {parcial ? 'margem parcial' : 'margem'}{' '}
             <Badge variant={margemVariant} className="font-normal">
               {pct(resumo.margem)}
             </Badge>
           </span>
         }
-        destaque={positivo ? 'success' : 'danger'}
+        destaque={parcial ? 'warning' : positivo ? 'success' : 'danger'}
       />
     </div>
   );

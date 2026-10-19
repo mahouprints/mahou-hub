@@ -173,6 +173,10 @@ model Produto {
   embalagemCentavos Int
   precoCentavos     Int
   canalPrincipal    Canal
+  /// Categoria e condições planejadas no Mercado Livre, validadas na borda.
+  mercadoLivre      Json?
+  /// Cotação oficial, com data e contexto; não é custo realizado de venda.
+  cotacaoMl         Json?
   ativo             Boolean               @default(true)
   /// Indica se o produto já foi publicado em ALGUM marketplace.
   /// Fluxo externo de geração de imagem só processa produtos com anunciado=false, então
@@ -915,6 +919,11 @@ model PedidoItem {
   nomeExterno           String
   qtd                   Int
   precoUnitarioCentavos Int
+  mlItemId               String?
+  /// Totais da linha, não valores unitários; null significa custo ainda desconhecido.
+  tarifaMlCentavos       Int?
+  freteMlCentavos        Int?
+  custosMlAtualizadosEm  DateTime?
 
   variacaoId String?
   variacao   ProdutoVariacao? @relation(fields: [variacaoId], references: [id], onDelete: SetNull)
@@ -951,6 +960,15 @@ enum PedidoItemAtendimento {
   BAIXADO_ESTOQUE
   /// Não havia peça pronta; job criado na fila de produção.
   EM_PRODUCAO
+}
+
+/// Mantém a renovação OAuth existente entre reinícios; nunca exposto pela API.
+model MercadoLivreToken {
+  sellerId     String   @id
+  accessToken  String
+  refreshToken String
+  expiraEm     DateTime
+  atualizadoEm DateTime @updatedAt
 }
 
 model ConfiguracaoRelatorios {

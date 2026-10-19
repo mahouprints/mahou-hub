@@ -8,6 +8,9 @@ export const ResumoFinanceiroSchema = z.object({
   custosGeraisCentavos: z.number().int(), // soma dos Custo lançados manualmente no mês
   impostosCentavos: z.number().int(),
   taxasMarketplaceCentavos: z.number().int(),
+  fretesCentavos: z.number().int(),
+  vendasMlComCustosReais: z.number().int().nonnegative(),
+  vendasMlComCustosPendentes: z.number().int().nonnegative(),
   lucroLiquidoCentavos: z.number().int(),
   margem: z.number(), // 0..1
   porCanal: z.object({

@@ -6,6 +6,9 @@ import {
 } from '../src/modules/pedidos/atendimento.service';
 import type { PrismaService } from '../src/prisma/prisma.service';
 import type { ProducaoService } from '../src/modules/producao/producao.service';
+import { PedidosSyncService } from '../src/modules/pedidos/pedidos-sync.service';
+import type { MercadoLivreClient } from '../src/modules/pedidos/mercadolivre.client';
+import type { ShopeeOrdersClient } from '../src/modules/pedidos/shopee-orders.client';
 
 function makeProducaoMock() {
   return { mudarStatus: vi.fn().mockResolvedValue({}) } as unknown as ProducaoService & {
@@ -31,6 +34,7 @@ function makeMock(overrides: Record<string, unknown> = {}) {
       delete: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     produtoVariacao: { findUnique: vi.fn().mockResolvedValue(null), update: vi.fn() },
     movimentoEstoque: { create: vi.fn().mockResolvedValue({}) },
@@ -226,6 +230,122 @@ describe('AtendimentoService', () => {
   });
 });
 
+describe('AtendimentoService — despesas reais do ML', () => {
+  const data = new Date('2026-10-19T12:00:00Z');
+  const item = {
+    skuExterno: 'RAT-BR',
+    nomeExterno: 'Ratinho',
+    qtd: 2,
+    precoUnitarioCentavos: 2490,
+    mlItemId: 'MLB123',
+    tarifaMlCentavos: 1200,
+    freteMlCentavos: 650,
+    custosMlAtualizadosEm: data,
+  };
+
+  it('reconsulta individual só reconcilia despesas, sem mudar status, venda ou estoque', async () => {
+    const { mock, tx } = makeMock();
+    mock.pedidoItem.findMany.mockResolvedValue([{ ...item, id: 'it1' }]);
+    const atendimento = new AtendimentoService(
+      mock as unknown as PrismaService,
+      makeProducaoMock(),
+    );
+    const ml = {
+      buscarPedido: vi
+        .fn()
+        .mockResolvedValue(pedidoFake({ canal: 'ML', statusExterno: 'shipped', itens: [item] })),
+    };
+    const sync = new PedidosSyncService(
+      atendimento,
+      {} as ShopeeOrdersClient,
+      ml as unknown as MercadoLivreClient,
+    );
+    expect(await sync.reconciliarCustosMl('ped1', '123')).toEqual({ itensAtualizados: 1 });
+    expect(ml.buscarPedido).toHaveBeenCalledWith('123');
+    expect(tx.pedidoMarketplace.update).not.toHaveBeenCalled();
+    expect(tx.venda.create).not.toHaveBeenCalled();
+    expect(tx.produtoVariacao.update).not.toHaveBeenCalled();
+    expect(tx.jobProducao.create).not.toHaveBeenCalled();
+  });
+
+  it('reimporta totais da linha de forma idempotente sem criar venda ou baixar estoque', async () => {
+    const { mock, tx } = makeMock();
+    mock.pedidoMarketplace.findUnique.mockResolvedValue({ id: 'ped1', status: 'ATENDIDO' });
+    mock.pedidoItem.findMany.mockResolvedValue([{ ...item, id: 'it1' }]);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
+    const pedido = pedidoFake({ canal: 'ML', statusExterno: 'paid', itens: [item] });
+
+    await svc.importar(pedido);
+    await svc.importar(pedido);
+
+    expect(tx.pedidoItem.updateMany).toHaveBeenCalledTimes(2);
+    for (const [args] of tx.pedidoItem.updateMany.mock.calls) {
+      expect(args.data).toEqual({
+        mlItemId: 'MLB123',
+        tarifaMlCentavos: 1200,
+        freteMlCentavos: 650,
+        custosMlAtualizadosEm: data,
+      });
+      expect(args.where.OR).toContainEqual({ custosMlAtualizadosEm: { lte: data } });
+    }
+    expect(tx.pedidoItem.create).not.toHaveBeenCalled();
+    expect(tx.produtoVariacao.update).not.toHaveBeenCalled();
+    expect(tx.venda.create).not.toHaveBeenCalled();
+    expect(tx.jobProducao.create).not.toHaveBeenCalled();
+  });
+
+  it('preserva frete conhecido quando a consulta é parcial e aceita tarifa zero', async () => {
+    const { mock, tx } = makeMock();
+    mock.pedidoMarketplace.findUnique.mockResolvedValue({ id: 'ped1', status: 'ATENDIDO' });
+    mock.pedidoItem.findMany.mockResolvedValue([{ ...item, id: 'it1' }]);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
+    await svc.importar(
+      pedidoFake({
+        canal: 'ML',
+        statusExterno: 'paid',
+        itens: [{ ...item, tarifaMlCentavos: 0, freteMlCentavos: null }],
+      }),
+    );
+    expect(tx.pedidoItem.updateMany.mock.calls[0]?.[0].data).toMatchObject({ tarifaMlCentavos: 0 });
+    expect(tx.pedidoItem.updateMany.mock.calls[0]?.[0].data).not.toHaveProperty('freteMlCentavos');
+  });
+
+  it('não inventa correspondência para SKU duplicado ou quantidade divergente', async () => {
+    const { mock, tx } = makeMock();
+    mock.pedidoMarketplace.findUnique.mockResolvedValue({ id: 'ped1', status: 'ATENDIDO' });
+    mock.pedidoItem.findMany.mockResolvedValue([{ ...item, id: 'it1', qtd: 1 }]);
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
+    await svc.importar(pedidoFake({ canal: 'ML', statusExterno: 'paid', itens: [item] }));
+    mock.pedidoItem.findMany.mockResolvedValue([
+      { ...item, id: 'it1' },
+      { ...item, id: 'it2' },
+    ]);
+    await svc.importar(pedidoFake({ canal: 'ML', statusExterno: 'paid', itens: [item] }));
+    expect(tx.pedidoItem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('preserva despesas e competência original ao vincular item órfão', async () => {
+    const { mock, tx } = makeMock();
+    const dataPedido = new Date('2026-09-30T12:00:00Z');
+    mock.pedidoItem.findUnique.mockResolvedValue({
+      ...item,
+      id: 'it-orfao',
+      pedidoId: 'ped1',
+      pedido: { canal: 'ML', externalId: '123', prazoEnvio: null, dataPedido },
+    });
+    tx.produtoVariacao.findUnique.mockResolvedValue({
+      id: 'v1',
+      produtoId: 'p1',
+      estoqueAtual: 3,
+      nome: 'Branco',
+    });
+    const svc = new AtendimentoService(mock as unknown as PrismaService, makeProducaoMock());
+    await svc.vincularItem('it-orfao', 'v1');
+    expect(tx.pedidoItem.create.mock.calls[0]?.[0].data).toMatchObject(item);
+    expect(tx.venda.create.mock.calls[0]?.[0].data.dataVenda).toEqual(dataPedido);
+  });
+});
+
 describe('AtendimentoService — status vindo do marketplace', () => {
   function mockComPedidoExistente(statusAtual = 'ATENDIDO') {
     const { mock, tx } = makeMock();
@@ -326,7 +446,12 @@ describe('AtendimentoService.vincularItem — o botão "vincular a uma variaçã
     nomeExterno: 'Polvo azul',
     qtd: 2,
     precoUnitarioCentavos: 3990,
-    pedido: { canal: 'SHOPEE', externalId: '2506AB123', prazoEnvio: null },
+    pedido: {
+      canal: 'SHOPEE',
+      externalId: '2506AB123',
+      prazoEnvio: null,
+      dataPedido: new Date('2026-09-01Z'),
+    },
   };
 
   function mockComOrfao(variacao: Record<string, unknown> | null) {

@@ -18,6 +18,13 @@ export const CalcularInputSchema = z.object({
   embalagemCentavos: z.number().int().nonnegative(),
   custoInsumosCentavos: z.number().int().nonnegative().optional(),
   precoCentavos: z.number().int().positive(),
+  // Simulação explícita; os valores não são persistidos nem atribuídos a uma cotação da API.
+  mercadoLivre: z
+    .object({
+      tarifaCentavos: z.number().int().nonnegative(),
+      freteCentavos: z.number().int().nonnegative().nullable(),
+    })
+    .optional(),
 });
 
 export const CalcularOutputSchema = z.object({
@@ -26,18 +33,20 @@ export const CalcularOutputSchema = z.object({
   custoTotalProducaoCentavos: z.number().int(),
   impostoCentavos: z.number().int(),
   taxaShopeeCentavos: z.number().int(),
-  taxaMlCentavos: z.number().int(),
+  taxaMlCentavos: z.number().int().nullable(),
+  freteMlCentavos: z.number().int().nullable(),
+  custosMlStatus: z.enum(['PENDENTE', 'COTADO']),
   taxaTikTokCentavos: z.number().int(),
   liquidoShopeeCentavos: z.number().int(),
-  liquidoMlCentavos: z.number().int(),
+  liquidoMlCentavos: z.number().int().nullable(),
   liquidoSiteCentavos: z.number().int(),
   liquidoTikTokCentavos: z.number().int(),
   margemShopee: z.number(),
-  margemMl: z.number(),
+  margemMl: z.number().nullable(),
   margemSite: z.number(),
   margemTikTok: z.number(),
   lucroPorHoraShopeeCentavos: z.number().int(),
-  lucroPorHoraMlCentavos: z.number().int(),
+  lucroPorHoraMlCentavos: z.number().int().nullable(),
   lucroPorHoraSiteCentavos: z.number().int(),
   lucroPorHoraTikTokCentavos: z.number().int(),
 });

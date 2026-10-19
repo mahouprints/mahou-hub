@@ -59,6 +59,7 @@ const ENTRADA_BASE: CalculoEntrada = {
   parametros: PARAMETROS,
   tabelaShopee: TABELA_SHOPEE,
   tabelaMercadoLivre: TABELA_ML,
+  mercadoLivre: { tarifaCentavos: 1175, freteCentavos: 0 },
 };
 
 describe('calcularProduto', () => {
@@ -88,12 +89,74 @@ describe('calcularProduto', () => {
 
   it('calcula lucro/hora dividindo líquido por tempo', () => {
     const r = calcularProduto(ENTRADA_BASE);
-    expect(r.lucroPorHoraMlCentavos).toBe(Math.round(r.liquidoMlCentavos / 2));
+    expect(r.lucroPorHoraMlCentavos).toBe(Math.round(r.liquidoMlCentavos! / 2));
   });
 
-  it('margem zero quando preço cobre exatamente custos+taxas', () => {
-    const r = calcularProduto({ ...ENTRADA_BASE, precoCentavos: 1000 });
-    expect(typeof r.margemMl).toBe('number');
+  it('margem zero quando preço cobre exatamente custos, tarifa e frete', () => {
+    const r = calcularProduto({ ...ENTRADA_BASE, precoCentavos: 1691 });
+    expect(r.margemMl).toBe(0);
+  });
+
+  it('não usa a tabela global como fallback quando não há custos ML', () => {
+    const r = calcularProduto({ ...ENTRADA_BASE, mercadoLivre: undefined });
+    expect(r).toMatchObject({
+      taxaMlCentavos: null,
+      freteMlCentavos: null,
+      custosMlStatus: 'PENDENTE',
+      liquidoMlCentavos: null,
+      margemMl: null,
+      lucroPorHoraMlCentavos: null,
+      liquidoShopeeCentavos: 2194,
+      liquidoSiteCentavos: 2984,
+      liquidoTikTokCentavos: 2284,
+    });
+  });
+
+  it('preserva tarifa conhecida, mas mantém a margem pendente sem frete', () => {
+    const r = calcularProduto({
+      ...ENTRADA_BASE,
+      mercadoLivre: { tarifaCentavos: 411, freteCentavos: null },
+    });
+    expect(r).toMatchObject({
+      taxaMlCentavos: 411,
+      freteMlCentavos: null,
+      custosMlStatus: 'PENDENTE',
+      liquidoMlCentavos: null,
+      margemMl: null,
+      lucroPorHoraMlCentavos: null,
+    });
+  });
+
+  it('aceita tarifa e frete explicitamente zerados', () => {
+    const r = calcularProduto({
+      ...ENTRADA_BASE,
+      mercadoLivre: { tarifaCentavos: 0, freteCentavos: 0 },
+    });
+    expect(r.custosMlStatus).toBe('COTADO');
+    expect(r.liquidoMlCentavos).toBe(r.liquidoSiteCentavos);
+  });
+
+  it('desconta tarifa e frete reais do ratinho sem duplicar custo fixo', () => {
+    const r = calcularProduto({
+      ...ENTRADA_BASE,
+      pesoG: 30,
+      filamento: { ...FILAMENTO_PLA, custoKgCentavos: 6683, potenciaA1W: 150 },
+      embalagemCentavos: 0,
+      precoCentavos: 2490,
+      parametros: { ...PARAMETROS, impostoAtivo: true, impostoPct: 6 },
+      mercadoLivre: { tarifaCentavos: 411, freteCentavos: 1385 },
+    });
+    expect(r).toMatchObject({
+      custoFilamentoCentavos: 200,
+      custoEnergiaCentavos: 18,
+      impostoCentavos: 149,
+      taxaMlCentavos: 411,
+      freteMlCentavos: 1385,
+      custosMlStatus: 'COTADO',
+      liquidoMlCentavos: 327,
+      lucroPorHoraMlCentavos: 164,
+    });
+    expect(r.margemMl).toBeCloseTo(327 / 2490);
   });
 });
 

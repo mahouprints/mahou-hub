@@ -216,6 +216,20 @@ export default function RelatoriosPage() {
               <Badge variant="secondary">Sem lançamentos no período</Badge>
             )}
           </div>
+          {relatorio.data.resumo.vendasMlComCustosPendentes > 0 && (
+            <p
+              role="status"
+              className="rounded-md border border-amber-500/40 p-3 text-sm text-amber-300"
+            >
+              Resultado parcial: {relatorio.data.resumo.vendasMlComCustosPendentes} vendas do
+              Mercado Livre ainda têm tarifa ou frete pendente. As despesas ausentes não foram
+              descontadas.
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Produção e impostos usam o cadastro atual. Fretes ML importados:{' '}
+            {centavosParaReais(relatorio.data.resumo.fretesCentavos)}.
+          </p>
           <IndicadoresRelatorio relatorio={relatorio.data} />
           <RelatoriosGraficos relatorio={relatorio.data} />
           <RelatoriosTabelas relatorio={relatorio.data} />
@@ -260,6 +274,7 @@ export default function RelatoriosPage() {
 
 function IndicadoresRelatorio({ relatorio }: { relatorio: RelatorioFinanceiro }) {
   const resumo = relatorio.resumo;
+  const parcial = resumo.vendasMlComCustosPendentes > 0;
   const indicadores = [
     {
       rotulo: 'Faturamento',
@@ -267,22 +282,22 @@ function IndicadoresRelatorio({ relatorio }: { relatorio: RelatorioFinanceiro })
       apoio: `${resumo.qtdVendas} vendas · ${resumo.qtdItensVendidos} unidades`,
     },
     {
-      rotulo: 'Gastos totais',
+      rotulo: parcial ? 'Gastos conhecidos' : 'Gastos totais',
       valor: centavosParaReais(resumo.gastosTotaisCentavos),
-      apoio: 'Produção, insumos, impostos, taxas e custos gerais',
+      apoio: 'Produção, insumos, impostos, taxas, fretes e custos gerais',
     },
     {
-      rotulo: 'Lucro líquido',
+      rotulo: parcial ? 'Resultado parcial' : 'Resultado registrado',
       valor: centavosParaReais(resumo.lucroLiquidoCentavos),
-      apoio: 'Após todos os gastos do período',
+      apoio: 'Após os custos cadastrados e despesas conhecidas do período',
     },
     {
-      rotulo: 'Margem líquida',
+      rotulo: parcial ? 'Margem parcial' : 'Margem do período',
       valor: pct(resumo.margem),
       apoio:
         resumo.faturamentoCentavos === 0
           ? 'Sem faturamento no período'
-          : 'Lucro líquido sobre o faturamento',
+          : 'Resultado registrado sobre o faturamento',
     },
   ];
   return (

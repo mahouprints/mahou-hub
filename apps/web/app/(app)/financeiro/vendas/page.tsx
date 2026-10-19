@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckSquare, Pencil, Plus, Trash2, X } from 'lucide-react';
-import type { Venda } from '@mahou-hub/contracts';
+import { ArrowLeft, CheckSquare, Pencil, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import type { Venda, VendaRelatorio } from '@mahou-hub/contracts';
 import { formatarDataCivil } from '@/lib/data-civil';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais } from '@/lib/format';
@@ -50,6 +50,8 @@ import { SelectionToolbar } from '@/components/selection-toolbar';
 
 type VendaListada = Venda & {
   produto: { nome: string; filamento: { nome: string } };
+  custosMl?: VendaRelatorio['custosMl'];
+  pedidoItem?: { pedidoId: string } | null;
 };
 
 const CANAL_LABEL = {
@@ -103,6 +105,23 @@ export default function VendasPage() {
       qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
       sel.acoes.limpar();
       toast.success(`${resp.count} ${resp.count === 1 ? 'venda excluída' : 'vendas excluídas'}`);
+    },
+  });
+
+  const reconciliar = useMutation({
+    mutationFn: (pedidoId: string) =>
+      apiFetch<{ itensPendentes: number }>(`/pedidos/${pedidoId}/reconciliar-custos`, {
+        method: 'POST',
+      }),
+    onSuccess: (resultado) => {
+      qc.invalidateQueries({ queryKey: ['vendas'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      qc.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
+      toast.success(
+        resultado.itensPendentes > 0
+          ? `Consulta concluída; ${resultado.itensPendentes} itens ainda com custos pendentes.`
+          : 'Tarifas e frete atualizados.',
+      );
     },
   });
 
@@ -239,6 +258,7 @@ export default function VendasPage() {
                 <SortableHead chave="canal" estado={sort.estado} onClick={sort.alternar}>
                   Canal
                 </SortableHead>
+                <TableHead>Custos ML importados</TableHead>
                 <SortableHead chave="data" estado={sort.estado} onClick={sort.alternar}>
                   Data
                 </SortableHead>
@@ -273,6 +293,37 @@ export default function VendasPage() {
                   <TableCell>
                     <Badge variant="default">{CANAL_LABEL[v.canal]}</Badge>
                   </TableCell>
+                  <TableCell className="whitespace-nowrap text-xs">
+                    {v.canal === 'ML' ? (
+                      <>
+                        <span className="block">
+                          Tarifa:{' '}
+                          {v.custosMl?.tarifaCentavos != null
+                            ? centavosParaReais(v.custosMl.tarifaCentavos)
+                            : 'Pendente'}
+                        </span>
+                        <span className="block">
+                          Frete:{' '}
+                          {v.custosMl?.freteCentavos != null
+                            ? centavosParaReais(v.custosMl.freteCentavos)
+                            : 'Pendente'}
+                        </span>
+                        {v.pedidoItem && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-1 h-7 px-1 text-xs"
+                            disabled={reconciliar.isPending}
+                            onClick={() => reconciliar.mutate(v.pedidoItem!.pedidoId)}
+                          >
+                            <RefreshCw className="size-3" /> Reconsultar custos
+                          </Button>
+                        )}
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {formatarDataCivil(v.dataVenda)}
                   </TableCell>
@@ -294,7 +345,7 @@ export default function VendasPage() {
               {filtradas.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={sel.modoSelecao ? 8 : 7}
+                    colSpan={sel.modoSelecao ? 9 : 8}
                     className="text-center text-sm text-muted-foreground"
                   >
                     {data.length === 0

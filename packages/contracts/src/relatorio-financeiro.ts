@@ -39,6 +39,9 @@ export const TotaisVendasRelatorioSchema = z.object({
   custosInsumosCentavos: z.number().int(),
   impostosCentavos: z.number().int(),
   taxasMarketplaceCentavos: z.number().int(),
+  fretesCentavos: z.number().int(),
+  vendasMlComCustosReais: z.number().int().nonnegative(),
+  vendasMlComCustosPendentes: z.number().int().nonnegative(),
   lucroContribuicaoCentavos: z.number().int(),
   qtdVendas: z.number().int().nonnegative(),
   qtdItensVendidos: z.number().int().nonnegative(),
@@ -56,6 +59,15 @@ export const VendaRelatorioSchema = TotaisVendasRelatorioSchema.omit({
   precoUnitarioCentavos: z.number().int().positive(),
   dataVenda: DataRelatorioSchema,
   observacao: z.string().nullable(),
+  custosMl: z
+    .object({
+      tarifaCentavos: z.number().int().nullable(),
+      freteCentavos: z.number().int().nullable(),
+      tarifaFonte: z.enum(['IMPORTADA', 'PENDENTE']),
+      freteFonte: z.enum(['IMPORTADO', 'PENDENTE']),
+      atualizadosEm: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 export const CustoRelatorioSchema = z.object({

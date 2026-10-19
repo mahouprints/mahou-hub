@@ -175,6 +175,155 @@ describe('calendário do relatório financeiro', () => {
 });
 
 describe('FinanceiroService.relatorio', () => {
+  it('usa tarifa e frete totais importados sem multiplicar novamente pela quantidade', async () => {
+    const { mock, service } = prepararFinanceiro();
+    mock.venda.findMany.mockResolvedValue([
+      {
+        ...venda('ml1', 'ML', 2, '2026-09-01'),
+        pedidoItem: {
+          qtd: 2,
+          precoUnitarioCentavos: 5000,
+          tarifaMlCentavos: 900,
+          freteMlCentavos: 651,
+          custosMlAtualizadosEm: new Date('2026-09-02Z'),
+        },
+      },
+    ]);
+    const relatorio = await service.relatorio({ periodo: 'MENSAL', referencia: '2026-09-01' });
+    expect(relatorio.resumo).toMatchObject({
+      taxasMarketplaceCentavos: 900,
+      fretesCentavos: 651,
+      lucroLiquidoCentavos: 4463,
+      vendasMlComCustosReais: 1,
+      vendasMlComCustosPendentes: 0,
+    });
+    expect(relatorio.vendas[0]?.custosMl).toEqual({
+      tarifaCentavos: 900,
+      freteCentavos: 651,
+      tarifaFonte: 'IMPORTADA',
+      freteFonte: 'IMPORTADO',
+      atualizadosEm: '2026-09-02T00:00:00.000Z',
+    });
+  });
+
+  it('soma as parcelas de frete compartilhado uma vez e concilia todos os agrupamentos', async () => {
+    const { mock, service } = prepararFinanceiro();
+    mock.venda.findMany.mockResolvedValue([
+      {
+        ...venda('ml1', 'ML', 2, '2026-09-01'),
+        pedidoItem: {
+          qtd: 2,
+          precoUnitarioCentavos: 5000,
+          tarifaMlCentavos: 900,
+          freteMlCentavos: 651,
+          custosMlAtualizadosEm: null,
+        },
+      },
+      {
+        ...venda('ml2', 'ML', 1, '2026-09-01', 'p2'),
+        pedidoItem: {
+          qtd: 1,
+          precoUnitarioCentavos: 5000,
+          tarifaMlCentavos: 450,
+          freteMlCentavos: 326,
+          custosMlAtualizadosEm: null,
+        },
+      },
+    ]);
+    const relatorio = await service.relatorio({ periodo: 'MENSAL', referencia: '2026-09-01' });
+    expect(relatorio.resumo).toMatchObject({
+      taxasMarketplaceCentavos: 1350,
+      fretesCentavos: 977,
+      lucroLiquidoCentavos: 6694,
+      vendasMlComCustosReais: 2,
+      vendasMlComCustosPendentes: 0,
+    });
+    for (const linhas of [relatorio.porCanal, relatorio.porProduto, relatorio.serie]) {
+      expect(linhas.reduce((total, linha) => total + linha.fretesCentavos, 0)).toBe(977);
+      expect(linhas.reduce((total, linha) => total + linha.vendasMlComCustosReais, 0)).toBe(2);
+    }
+  });
+
+  it('distingue tarifa e frete zero de custos ausentes e sinaliza resultado parcial', async () => {
+    const { mock, service } = prepararFinanceiro();
+    mock.venda.findMany.mockResolvedValue([
+      {
+        ...venda('zero', 'ML', 1, '2026-09-01'),
+        pedidoItem: {
+          qtd: 1,
+          precoUnitarioCentavos: 5000,
+          tarifaMlCentavos: 0,
+          freteMlCentavos: 0,
+          custosMlAtualizadosEm: null,
+        },
+      },
+      { ...venda('pendente', 'ML', 1, '2026-09-01'), pedidoItem: null },
+      {
+        ...venda('parcial', 'ML', 1, '2026-09-01'),
+        pedidoItem: {
+          qtd: 1,
+          precoUnitarioCentavos: 5000,
+          tarifaMlCentavos: null,
+          freteMlCentavos: 500,
+          custosMlAtualizadosEm: null,
+        },
+      },
+    ]);
+    const relatorio = await service.relatorio({ periodo: 'MENSAL', referencia: '2026-09-01' });
+    expect(relatorio.resumo).toMatchObject({
+      taxasMarketplaceCentavos: 0,
+      fretesCentavos: 500,
+      vendasMlComCustosReais: 1,
+      vendasMlComCustosPendentes: 2,
+    });
+    expect(relatorio.vendas[0]?.custosMl).toMatchObject({
+      tarifaFonte: 'IMPORTADA',
+      freteFonte: 'IMPORTADO',
+    });
+    expect(relatorio.vendas[1]?.custosMl).toMatchObject({
+      tarifaFonte: 'PENDENTE',
+      freteFonte: 'PENDENTE',
+      freteCentavos: null,
+    });
+    expect(relatorio.vendas[2]?.custosMl).toMatchObject({
+      tarifaFonte: 'PENDENTE',
+      freteFonte: 'IMPORTADO',
+    });
+  });
+
+  it.each([{ qtd: 3 }, { precoUnitarioCentavos: 4500 }])(
+    'marca pendentes despesas de uma venda alterada antes da proteção: %j',
+    async (alteracao) => {
+      const { mock, service } = prepararFinanceiro();
+      mock.venda.findMany.mockResolvedValue([
+        {
+          ...venda('ml-antiga', 'ML', 2, '2026-09-01'),
+          ...alteracao,
+          pedidoItem: {
+            qtd: 2,
+            precoUnitarioCentavos: 5000,
+            tarifaMlCentavos: 900,
+            freteMlCentavos: 651,
+            custosMlAtualizadosEm: new Date('2026-09-02Z'),
+          },
+        },
+      ]);
+      const relatorio = await service.relatorio({ periodo: 'MENSAL', referencia: '2026-09-01' });
+      expect(relatorio.resumo).toMatchObject({
+        taxasMarketplaceCentavos: 0,
+        fretesCentavos: 0,
+        vendasMlComCustosReais: 0,
+        vendasMlComCustosPendentes: 1,
+      });
+      expect(relatorio.vendas[0]?.custosMl).toMatchObject({
+        tarifaCentavos: null,
+        freteCentavos: null,
+        tarifaFonte: 'PENDENTE',
+        freteFonte: 'PENDENTE',
+      });
+    },
+  );
+
   it('relatório diário filtra o dia selecionado e concilia venda e custo da data', async () => {
     const { mock, service } = prepararFinanceiro();
     mock.venda.findMany.mockResolvedValue([venda('vd', 'SITE', 4, '2028-02-29')]);
@@ -214,10 +363,11 @@ describe('FinanceiroService.relatorio', () => {
       custosVariaveisCentavos: 14300,
       custosInsumosCentavos: 2630,
       impostosCentavos: 3000,
-      taxasMarketplaceCentavos: 5200,
+      taxasMarketplaceCentavos: 3400,
       custosGeraisCentavos: 1500,
-      gastosTotaisCentavos: 26630,
-      lucroLiquidoCentavos: 23370,
+      gastosTotaisCentavos: 24830,
+      lucroLiquidoCentavos: 25170,
+      vendasMlComCustosPendentes: 1,
       qtdVendas: 4,
       qtdItensVendidos: 10,
       porCanal: { SHOPEE: 10000, ML: 15000, SITE: 20000, TIKTOK: 5000 },
@@ -242,7 +392,7 @@ describe('FinanceiroService.relatorio', () => {
       );
     }
     expect(relatorio.vendas.map((v) => v.lucroContribuicaoCentavos)).toEqual([
-      3614, 7221, 12028, 2007,
+      3614, 9021, 12028, 2007,
     ]);
     expect(relatorio.vendas[0]?.dataVenda).toBe('2026-09-01');
     expect(relatorio.vendas[0]?.observacao).toBe('Observação v1\nSegundo parágrafo');
@@ -255,7 +405,7 @@ describe('FinanceiroService.relatorio', () => {
       1500,
     );
     expect(relatorio.serie.reduce((total, linha) => total + linha.lucroLiquidoCentavos, 0)).toBe(
-      23370,
+      25170,
     );
     expect(relatorio.serie).toHaveLength(30);
     expect(relatorio.serie[1]).toMatchObject({

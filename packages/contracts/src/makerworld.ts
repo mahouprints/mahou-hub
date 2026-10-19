@@ -14,12 +14,7 @@ export type ModeloMakerWorldStatus = z.infer<typeof ModeloMakerWorldStatusSchema
 // Veredicto de licença. Só LIVRE/ATRIBUICAO/SEM_DERIVADAS podem virar produto —
 // o bot já filtra antes de enviar, mas o enum aceita PROIBIDA pra permitir
 // reclassificação se o MakerWorld mudar a licença de um modelo já importado.
-export const LicencaVeredictoSchema = z.enum([
-  'LIVRE',
-  'ATRIBUICAO',
-  'SEM_DERIVADAS',
-  'PROIBIDA',
-]);
+export const LicencaVeredictoSchema = z.enum(['LIVRE', 'ATRIBUICAO', 'SEM_DERIVADAS', 'PROIBIDA']);
 export type LicencaVeredicto = z.infer<typeof LicencaVeredictoSchema>;
 
 export const VeredictoIaSchema = z.enum(['APROVADO', 'TALVEZ', 'REPROVADO']);
@@ -175,10 +170,11 @@ export const EconomiaModeloSchema = z.object({
   canal: AnuncioMarketplaceSchema,
   precoCentavos: z.number().int(),
   custoCentavos: z.number().int(),
-  taxaMarketplaceCentavos: z.number().int(),
+  taxaMarketplaceCentavos: z.number().int().nullable(),
   impostoCentavos: z.number().int(),
-  liquidoCentavos: z.number().int(),
-  margemPct: z.number(),
-  lucroPorHoraCentavos: z.number().int(),
+  liquidoCentavos: z.number().int().nullable(),
+  margemPct: z.number().nullable(),
+  lucroPorHoraCentavos: z.number().int().nullable(),
+  custosMlStatus: z.enum(['PENDENTE', 'COTADO']).optional(),
 });
 export type EconomiaModelo = z.infer<typeof EconomiaModeloSchema>;
