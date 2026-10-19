@@ -24,11 +24,12 @@ COPY --from=build --chown=app:app /app/packages/contracts/package.json ./node_mo
 
 RUN npm install -g prisma@5.22.0 tsx@4.19.1 \
  && prisma generate --schema=./prisma/schema.prisma \
- && mkdir -p /app/storage \
+ && mkdir -p /app/storage /app/private \
  && chown -R app:app /app
 
 USER app
 ENV NODE_ENV=production
 ENV STORAGE_DIR=/app/storage
+ENV ML_PUBLICACAO_STORAGE_DIR=/app/private
 EXPOSE 3000
 CMD ["node", "dist/src/main.js"]

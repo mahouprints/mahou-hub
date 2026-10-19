@@ -1,0 +1,58 @@
+name: Publicar no Mercado Livre
+
+on:
+  workflow_dispatch:
+    inputs:
+      solicitacao:
+        description: 'JSON da inspeção, validação ou publicação; nunca inclua credenciais'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mahou-api-producao
+  cancel-in-progress: false
+
+jobs:
+  executar:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Configurar SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Conferir versão implantada e executar solicitação
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          SOLICITACAO_JSON: ${{ inputs.solicitacao }}
+        run: |
+          set -euo pipefail
+          REVISAO=$(ssh "$VPS_USER@$VPS_HOST" 'docker inspect --format='"'"'{{ index .Config.Labels "org.opencontainers.image.revision" }}'"'"' mahou-hub-api')
+          if [ "$REVISAO" != "$GITHUB_SHA" ]; then
+            echo 'A API ainda não executa o commit deste workflow. Aguarde a implantação.'
+            exit 1
+          fi
+          printf '%s' "$SOLICITACAO_JSON" | ssh "$VPS_USER@$VPS_HOST" \
+            'cd /opt/mahou-hub/infra && docker compose --env-file .env.prod --profile prod exec -T api node dist/scripts/mercado-livre-publicar.js' 2>&1 \
+            | tee resultado.json
+
+      - name: Guardar resultado sem credenciais
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultado-mercado-livre
+          path: resultado.json
+          if-no-files-found: ignore
+          retention-days: 7

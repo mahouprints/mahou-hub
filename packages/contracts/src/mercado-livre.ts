@@ -3,6 +3,27 @@ import { z } from 'zod';
 const categoriaId = z.string().regex(/^MLB\d+$/, 'Informe uma categoria MLB válida.');
 const dimensao = z.number().positive().max(1000);
 
+export const MercadoLivrePublicacaoSchema = z.object({
+  versao: z.literal(1),
+  execucaoId: z.string().min(1),
+  status: z.enum(['incompleto', 'concluido', 'indeterminado']),
+  itens: z.array(
+    z.object({
+      chave: z.string().min(1),
+      itemId: z.string().regex(/^MLB\d+$/),
+      skus: z.array(z.string().min(1)),
+      variationIds: z.record(z.string()).optional(),
+      userProductId: z.string().optional(),
+      familyId: z.string().optional(),
+      permalink: z.string().url().optional(),
+      descricaoConfirmada: z.boolean(),
+      fiscalConfirmado: z.boolean(),
+      verificado: z.boolean(),
+    }),
+  ),
+  atualizadoEm: z.string().datetime(),
+});
+
 export const MercadoLivreConfiguracaoSchema = z.object({
   itemId: z
     .string()
@@ -21,9 +42,12 @@ export const MercadoLivreConfiguracaoSchema = z.object({
   alturaCm: dimensao.nullable().optional(),
   larguraCm: dimensao.nullable().optional(),
   comprimentoCm: dimensao.nullable().optional(),
+  publicacao: MercadoLivrePublicacaoSchema.optional(),
 });
 
-export const MercadoLivreCotacaoInputSchema = MercadoLivreConfiguracaoSchema.extend({
+export const MercadoLivreCotacaoInputSchema = MercadoLivreConfiguracaoSchema.omit({
+  publicacao: true,
+}).extend({
   precoCentavos: z.number().int().positive(),
   pesoGramas: z.number().int().positive().max(500000),
   alturaCm: dimensao,
@@ -43,6 +67,7 @@ export const MercadoLivreCotacaoSchema = z.object({
 });
 
 export type MercadoLivreConfiguracao = z.infer<typeof MercadoLivreConfiguracaoSchema>;
+export type MercadoLivrePublicacao = z.infer<typeof MercadoLivrePublicacaoSchema>;
 export type MercadoLivreCotacaoInput = z.infer<typeof MercadoLivreCotacaoInputSchema>;
 export type MercadoLivreCotacao = z.infer<typeof MercadoLivreCotacaoSchema>;
 

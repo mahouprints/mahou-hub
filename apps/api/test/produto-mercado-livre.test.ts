@@ -40,6 +40,23 @@ describe('validade da cotação ML', () => {
     });
   });
 
+  it('metadados de publicação não alteram o contexto da cotação', () => {
+    const mercadoLivre = {
+      ...contexto,
+      publicacao: {
+        versao: 1,
+        execucaoId: 'execucao-1',
+        status: 'concluido',
+        itens: [],
+        atualizadoEm: new Date(agora).toISOString(),
+      },
+    };
+    expect(custosMlDaCotacao({ ...produto, mercadoLivre }, agora)).toEqual({
+      tarifaCentavos: 411,
+      freteCentavos: 1385,
+    });
+  });
+
   it.each([
     { precoCentavos: 2500 },
     { mercadoLivre: { ...contexto, categoriaId: 'MLB456' } },

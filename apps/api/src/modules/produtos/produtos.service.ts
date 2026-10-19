@@ -180,7 +180,7 @@ export class ProdutosService {
     return this.prisma.produto.create({
       data: {
         ...resto,
-        ...(mercadoLivre !== undefined ? { mercadoLivre: mercadoLivre ?? Prisma.DbNull } : {}),
+        ...this.configuracaoMercadoLivre(mercadoLivre),
         ...dadosComposicao(filamentos),
         filamentos: filamentos ? { create: linhasComposicao(filamentos) } : undefined,
         insumos: insumos?.length
@@ -201,6 +201,9 @@ export class ProdutosService {
   async update(id: string, data: ProdutoUpdate) {
     const { insumos, filamentos: entradaFilamentos, mercadoLivre, ...resto } = data;
     return this.prisma.$transaction(async (tx) => {
+      // Serializa com a publicação para o formulário não sobrescrever IDs recém-confirmados.
+      if (mercadoLivre !== undefined)
+        await tx.$queryRaw`SELECT id FROM "Produto" WHERE id = ${id} FOR UPDATE`;
       const atual = await tx.produto.findUnique({ where: { id }, include: { filamentos: true } });
       if (!atual) throw new NotFoundException(`Produto ${id} não existe`);
       const filamentos = composicaoParaAtualizar(atual, {
@@ -223,7 +226,7 @@ export class ProdutosService {
         where: { id },
         data: {
           ...alteracoes,
-          ...(mercadoLivre !== undefined ? { mercadoLivre: mercadoLivre ?? Prisma.DbNull } : {}),
+          ...this.configuracaoMercadoLivre(mercadoLivre, atual.mercadoLivre),
           ...(rascunho === false ? { rascunho } : {}),
         },
       });
@@ -264,6 +267,24 @@ export class ProdutosService {
       );
     }
     return undefined;
+  }
+
+  private configuracaoMercadoLivre(
+    entrada: ProdutoUpdate['mercadoLivre'],
+    atual?: Prisma.JsonValue,
+  ) {
+    if (entrada === undefined) return {};
+    const publicacao =
+      atual && typeof atual === 'object' && !Array.isArray(atual) ? atual.publicacao : undefined;
+    if (entrada === null && publicacao !== undefined)
+      throw new BadRequestException('A configuração de uma publicação ML não pode ser removida.');
+    if (entrada === null) return { mercadoLivre: Prisma.DbNull };
+    const configuracao = { ...entrada };
+    // Apenas o fluxo de publicação grava IDs confirmados; formulários não os criam nem apagam.
+    delete configuracao.publicacao;
+    return {
+      mercadoLivre: { ...configuracao, ...(publicacao !== undefined ? { publicacao } : {}) },
+    };
   }
 
   async desativar(id: string) {
