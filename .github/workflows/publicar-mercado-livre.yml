@@ -7,6 +7,10 @@ on:
         description: 'JSON da inspeção, validação ou publicação; nunca inclua credenciais'
         required: true
         type: string
+      certificado_resultado:
+        description: 'Certificado público PEM para criptografar o resultado privado'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -21,6 +25,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - name: Validar destinatário do resultado
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          evento = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          Path('destinatario.pem').write_text(evento['inputs']['certificado_resultado'])
+          PY
+          openssl x509 -in destinatario.pem -noout -checkend 0
+
       - name: Configurar SSH
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -36,7 +50,6 @@ jobs:
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          SOLICITACAO_JSON: ${{ inputs.solicitacao }}
         run: |
           set -euo pipefail
           REVISAO=$(ssh "$VPS_USER@$VPS_HOST" 'docker inspect --format='"'"'{{ index .Config.Labels "org.opencontainers.image.revision" }}'"'"' mahou-hub-api')
@@ -44,15 +57,25 @@ jobs:
             echo 'A API ainda não executa o commit deste workflow. Aguarde a implantação.'
             exit 1
           fi
-          printf '%s' "$SOLICITACAO_JSON" | ssh "$VPS_USER@$VPS_HOST" \
-            'cd /opt/mahou-hub/infra && docker compose --env-file .env.prod --profile prod exec -T api node dist/scripts/mercado-livre-publicar.js' 2>&1 \
-            | tee resultado.json
+          # O repositório é público: nem a solicitação nem o resultado vão para o log.
+          python3 -c 'import json,os; print(json.load(open(os.environ["GITHUB_EVENT_PATH"]))["inputs"]["solicitacao"])' \
+            | ssh "$VPS_USER@$VPS_HOST" \
+              'cd /opt/mahou-hub/infra && docker compose --env-file .env.prod --profile prod exec -T api node dist/scripts/mercado-livre-publicar.js' \
+              > resultado.json 2>&1
+
+      - name: Criptografar resultado
+        if: always()
+        run: |
+          if [ -f resultado.json ] && [ -f destinatario.pem ]; then
+            openssl cms -encrypt -binary -aes-256-cbc -in resultado.json \
+              -out resultado.cms -outform DER destinatario.pem
+          fi
 
       - name: Guardar resultado sem credenciais
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: resultado-mercado-livre
-          path: resultado.json
+          path: resultado.cms
           if-no-files-found: ignore
           retention-days: 7
