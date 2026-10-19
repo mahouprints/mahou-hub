@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CalcularOutputSchema } from './pricing';
+import { MercadoLivreCotacaoUnitariaSchema } from './mercado-livre';
 
 /**
  * Teto de caracteres do SKU. Shopee e Mercado Livre aceitam bem mais (100), mas quem
@@ -46,6 +47,7 @@ export const ProdutoVariacaoComPricingSchema = ProdutoVariacaoSchema.extend({
   tempoEfetivoH: z.number().nonnegative(),
   pricing: CalcularOutputSchema.nullable(),
   pricingPendencias: z.array(z.string()),
+  cotacaoMl: MercadoLivreCotacaoUnitariaSchema.nullable().optional(),
 });
 
 export const ProdutoVariacaoCreateSchema = z.object({

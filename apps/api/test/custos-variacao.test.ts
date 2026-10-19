@@ -104,6 +104,57 @@ function preparar() {
 }
 
 describe('pricing por variação', () => {
+  it('calcula margens distintas pelo anúncio da cor e deixa a cor sem cotação pendente', async () => {
+    const { mock, variacoes } = preparar();
+    const base = produto();
+    const publicacao = {
+      versao: 1,
+      execucaoId: 'cores',
+      status: 'concluido',
+      atualizadoEm: new Date().toISOString(),
+      itens: ['AZ', 'BR', 'VM'].map((cor, indice) => ({
+        chave: cor,
+        itemId: `MLB${100 + indice}`,
+        skus: [`ART-${cor}`],
+        descricaoConfirmada: true,
+        fiscalConfirmado: true,
+        verificado: true,
+      })),
+    };
+    mock.produto.findUnique.mockResolvedValue({
+      ...base,
+      mercadoLivre: { ...base.mercadoLivre, publicacao },
+      cotacaoMl: {
+        ...base.cotacaoMl,
+        porSku: {
+          'ART-AZ': {
+            ...base.cotacaoMl,
+            contexto: { ...base.cotacaoMl.contexto, itemId: 'MLB100' },
+            freteCentavos: 100,
+          },
+          'ART-BR': {
+            ...base.cotacaoMl,
+            contexto: { ...base.cotacaoMl.contexto, itemId: 'MLB101' },
+            freteCentavos: 300,
+          },
+        },
+      },
+    });
+    mock.produtoVariacao.findMany.mockResolvedValue(
+      ['AZ', 'BR', 'VM'].map((cor) => variacao({ sku: `ART-${cor}` })),
+    );
+    const linhas = await variacoes.listByProduto('p1');
+    expect(linhas[0]?.pricing).toMatchObject({ liquidoMlCentavos: 493, freteMlCentavos: 100 });
+    expect(linhas[1]?.pricing).toMatchObject({ liquidoMlCentavos: 293, freteMlCentavos: 300 });
+    expect(linhas[0]?.cotacaoMl?.contexto.itemId).toBe('MLB100');
+    expect(linhas[1]?.cotacaoMl?.contexto.itemId).toBe('MLB101');
+    expect(linhas[2]?.cotacaoMl).toBeNull();
+    expect(linhas[2]?.pricing).toMatchObject({
+      liquidoMlCentavos: null,
+      custosMlStatus: 'PENDENTE',
+    });
+  });
+
   it('troca a composição branca pela cor vendida e usa sua potência, sem duplicar embalagem', async () => {
     const { variacoes } = preparar();
     const [linha] = await variacoes.listByProduto('p1');

@@ -362,6 +362,27 @@ describe('ProdutosService.update — completar rascunho', () => {
   });
 });
 
+describe('ProdutosService — validade da cotação ao editar peso', () => {
+  it.each([{ pesoG: 110 }, { filamentos: [{ filamentoId: 'f1', pesoG: 110 }] }])(
+    'invalida a cotação inteira quando o peso final muda: %j',
+    async (alteracao) => {
+      const { mock, tx } = makePrismaMock();
+      tx.produto.findUnique.mockResolvedValue({ ...fakeProduto(), cotacaoMl: { porSku: {} } });
+      const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
+      await svc.update('p1', alteracao);
+      expect(tx.produto.update.mock.calls[0]?.[0].data.cotacaoMl).toBe(Prisma.DbNull);
+    },
+  );
+
+  it('preserva a cotação quando o peso enviado permanece igual', async () => {
+    const { mock, tx } = makePrismaMock();
+    tx.produto.findUnique.mockResolvedValue({ ...fakeProduto(), cotacaoMl: { porSku: {} } });
+    const svc = new ProdutosService(asPrisma(mock), makeImagensMock());
+    await svc.update('p1', { pesoG: 100 });
+    expect(tx.produto.update.mock.calls[0]?.[0].data).not.toHaveProperty('cotacaoMl');
+  });
+});
+
 describe('ProdutosService — metadados de publicação ML', () => {
   const configuracao: MercadoLivreConfiguracao = {
     categoriaId: 'MLB123',

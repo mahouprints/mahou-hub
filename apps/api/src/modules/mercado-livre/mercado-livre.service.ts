@@ -29,6 +29,10 @@ interface AnuncioMl {
   price: number;
   listing_type_id: string;
   condition: string;
+  status?: string;
+  currency_id?: string;
+  attributes?: { id?: string; value_name?: string }[];
+  variations?: unknown[];
   shipping?: {
     mode?: string;
     logistic_type?: string;
@@ -78,7 +82,9 @@ export class MercadoLivreService {
 
   /** Importa contexto somente de anúncio da própria loja. Ex.: anuncio('MLB123456'). */
   async anuncio(itemId: string) {
-    const anuncio = await this.http.get<AnuncioMl>(`/items/${encodeURIComponent(itemId)}`);
+    const anuncio = await this.http.get<AnuncioMl>(
+      `/items/${encodeURIComponent(itemId)}?include_attributes=all`,
+    );
     if (String(anuncio.seller_id) !== this.http.sellerId) {
       throw new BadRequestException('O anúncio recebido deve pertencer à conta ML configurada.');
     }
@@ -92,7 +98,11 @@ export class MercadoLivreService {
       tipoLogistica: anuncio.shipping?.logistic_type ?? null,
       freteGratis: anuncio.shipping?.free_shipping ?? null,
       condicao: anuncio.condition,
-      ...this.dimensoesAnuncio(anuncio.shipping?.dimensions),
+      status: anuncio.status,
+      moeda: anuncio.currency_id,
+      sku: anuncio.attributes?.find((atributo) => atributo.id === 'SELLER_SKU')?.value_name,
+      temVariacoes: Boolean(anuncio.variations?.length),
+      ...this.dimensoesAnuncio(anuncio.shipping?.dimensions, anuncio.attributes),
     };
   }
 
@@ -149,7 +159,11 @@ export class MercadoLivreService {
 
   private async consultarFrete(contexto: MercadoLivreCotacaoInput): Promise<number | null> {
     const query = new URLSearchParams({
-      dimensions: `${contexto.alturaCm}x${contexto.larguraCm}x${contexto.comprimentoCm},${contexto.pesoGramas}`,
+      ...(contexto.itemId
+        ? { item_id: contexto.itemId }
+        : {
+            dimensions: `${contexto.alturaCm}x${contexto.larguraCm}x${contexto.comprimentoCm},${contexto.pesoGramas}`,
+          }),
       verbose: 'true',
       item_price: (contexto.precoCentavos / 100).toFixed(2),
       listing_type_id: contexto.tipoAnuncio,
@@ -159,24 +173,40 @@ export class MercadoLivreService {
       free_shipping: String(contexto.freteGratis),
     });
     try {
-      const resposta = await this.http.get<{ coverage?: { all_country?: { list_cost?: number } } }>(
-        `/users/${this.http.sellerId}/shipping_options/free?${query}`,
-      );
-      // list_cost é a cobrança do vendedor já descontada; discount.rate não é outra dedução.
-      return centavos(resposta.coverage?.all_country?.list_cost);
+      const resposta = await this.http.get<{
+        coverage?: { all_country?: { list_cost?: number; currency_id?: string } };
+      }>(`/users/${this.http.sellerId}/shipping_options/free?${query}`);
+      // list_cost estima o custo do vendedor já descontado; discount.rate não é outra dedução.
+      const custo = resposta.coverage?.all_country;
+      if (custo?.currency_id && custo.currency_id !== 'BRL') return null;
+      return centavos(custo?.list_cost);
     } catch {
       return null;
     }
   }
 
-  private dimensoesAnuncio(dimensoes?: string | null) {
+  private dimensoesAnuncio(dimensoes?: string | null, atributos: AnuncioMl['attributes'] = []) {
     const partes = dimensoes?.match(/^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?),(\d+)$/);
-    if (!partes) return {};
+    if (!partes) return this.medidasDosAtributos(atributos);
     return {
       alturaCm: Number(partes[1]),
       larguraCm: Number(partes[2]),
       comprimentoCm: Number(partes[3]),
       pesoGramas: Number(partes[4]),
+    };
+  }
+
+  private medidasDosAtributos(atributos: NonNullable<AnuncioMl['attributes']>) {
+    const medida = (id: string, unidade: string): number | undefined => {
+      const texto = atributos.find((atributo) => atributo.id === id)?.value_name;
+      const partes = texto?.match(/^(\d+(?:\.\d+)?)\s+(cm|g)$/);
+      return partes?.[2] === unidade && Number(partes[1]) > 0 ? Number(partes[1]) : undefined;
+    };
+    return {
+      alturaCm: medida('SELLER_PACKAGE_HEIGHT', 'cm'),
+      larguraCm: medida('SELLER_PACKAGE_WIDTH', 'cm'),
+      comprimentoCm: medida('SELLER_PACKAGE_LENGTH', 'cm'),
+      pesoGramas: medida('SELLER_PACKAGE_WEIGHT', 'g'),
     };
   }
 }

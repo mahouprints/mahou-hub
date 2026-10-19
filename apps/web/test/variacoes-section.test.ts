@@ -58,6 +58,30 @@ const pricing: CalcularOutput = {
   lucroPorHoraTikTokCentavos: 1136,
 };
 
+const cotacaoMl = {
+  contexto: {
+    itemId: 'MLB123',
+    categoriaId: 'MLB1839',
+    tipoAnuncio: 'gold_special' as const,
+    modoEnvio: 'me2' as const,
+    tipoLogistica: 'xd_drop_off',
+    freteGratis: true,
+    condicao: 'new' as const,
+    precoCentavos: 2290,
+    pesoGramas: 23,
+    alturaCm: 2,
+    larguraCm: 15,
+    comprimentoCm: 20,
+  },
+  categoriaNome: 'Figuras de Ação',
+  tarifaCentavos: 263,
+  freteCentavos: 1295,
+  tarifaFixaCentavos: 0,
+  percentualTarifa: 11.5,
+  cotadoEm: '2026-10-19T15:00:00.000Z',
+  pendencias: [],
+};
+
 function variacao(mudancas: Partial<ProdutoVariacaoComPricing> = {}): ProdutoVariacaoComPricing {
   return {
     id: 'branco',
@@ -77,6 +101,7 @@ function variacao(mudancas: Partial<ProdutoVariacaoComPricing> = {}): ProdutoVar
     tempoEfetivoH: 0.87,
     pricing,
     pricingPendencias: [],
+    cotacaoMl,
     ...mudancas,
   };
 }
@@ -125,6 +150,7 @@ describe('custos por cor na tabela de variações', () => {
       variacao({
         precoCentavos: 2990,
         precoEfetivoCentavos: 2990,
+        cotacaoMl: null,
         pricing: {
           ...pricing,
           custosMlStatus: 'PENDENTE',
@@ -140,6 +166,67 @@ describe('custos por cor na tabela de variações', () => {
     expect(html).toContain('R$ 29,90');
     expect(html).toContain('Cotação pendente');
     expect(html).not.toContain('20,1%');
+  });
+
+  it('mostra tarifa, envio e data da cotação de cada cor como estimativas', () => {
+    consulta.variacoes = [
+      variacao(),
+      variacao({
+        id: 'azul',
+        nome: 'Azul',
+        sku: 'DRAGAO-AZ',
+        cotacaoMl: {
+          ...cotacaoMl,
+          contexto: { ...cotacaoMl.contexto, itemId: 'MLB456' },
+          tarifaCentavos: 270,
+          freteCentavos: 900,
+          cotadoEm: '2026-10-19T16:00:00.000Z',
+        },
+      }),
+    ];
+    const html = renderizar();
+    const branca = html.split('</tr>').find((linha) => linha.includes('DRAGAO-BR'))!;
+    const azul = html.split('</tr>').find((linha) => linha.includes('DRAGAO-AZ'))!;
+    expect(branca).toContain('Tarifa: R$ 2,63');
+    expect(branca).toContain('Envio: R$ 12,95');
+    expect(branca).toContain('2026-10-19T15:00:00.000Z');
+    expect(azul).toContain('Tarifa: R$ 2,70');
+    expect(azul).toContain('Envio: R$ 9,00');
+    expect(azul).toContain('2026-10-19T16:00:00.000Z');
+    expect(azul).not.toContain('R$ 12,95');
+    expect(html).toContain('Tarifa e envio ML estimados');
+    expect(html).toContain('Contribuição ML estimada');
+  });
+
+  it('distingue frete estimado zero de indisponível e mostra o motivo', () => {
+    consulta.variacoes = [
+      variacao({ cotacaoMl: { ...cotacaoMl, freteCentavos: 0 } }),
+      variacao({
+        id: 'azul',
+        nome: 'Azul',
+        sku: 'DRAGAO-AZ',
+        cotacaoMl: {
+          ...cotacaoMl,
+          freteCentavos: null,
+          pendencias: ['Frete indisponível para esta cor.'],
+        },
+        pricing: {
+          ...pricing,
+          custosMlStatus: 'PENDENTE',
+          freteMlCentavos: null,
+          liquidoMlCentavos: null,
+          margemMl: null,
+        },
+      }),
+    ];
+    const html = renderizar();
+    const branca = html.split('</tr>').find((linha) => linha.includes('DRAGAO-BR'))!;
+    const azul = html.split('</tr>').find((linha) => linha.includes('DRAGAO-AZ'))!;
+    expect(branca).toContain('Envio: R$ 0,00');
+    expect(azul).toContain('Envio: pendente');
+    expect(azul).toContain('Frete indisponível para esta cor.');
+    expect(azul).toContain('Cotação pendente');
+    expect(azul).not.toContain('20,1%');
   });
 
   it('distingue contribuição zero de cotação pendente', () => {

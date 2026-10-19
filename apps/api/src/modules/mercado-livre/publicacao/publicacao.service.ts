@@ -20,6 +20,7 @@ import {
   verificarItem,
 } from './publicacao-verificacao';
 import { PublicacaoErro } from './publicacao-erro';
+import { reconciliarPacotePublicacao } from './publicacao-pacote';
 
 export interface RepositorioPublicacao {
   carregar(produtoIds: string[]): Promise<CatalogoPublicacao[]>;
@@ -170,7 +171,12 @@ export class PublicacaoService {
     }
     salvo.verificado = false;
     await this.journal.salvar(journal);
-    const remoto = await this.http.get(`/items/${salvo.itemId}?include_attributes=all`);
+    const remoto = await reconciliarPacotePublicacao(
+      this.http,
+      salvo.itemId!,
+      item,
+      await this.http.get(`/items/${salvo.itemId}?include_attributes=all`),
+    );
     Object.assign(salvo, verificarItem(remoto, item, this.http.sellerId));
     await this.journal.salvar(journal);
     await this.concluirDescricao(item, salvo);

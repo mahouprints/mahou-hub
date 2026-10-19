@@ -227,6 +227,12 @@ export class ProdutosService {
         data: {
           ...alteracoes,
           ...this.configuracaoMercadoLivre(mercadoLivre, atual.mercadoLivre),
+          // Outra gramatura exige nova conferência do pacote, inclusive cotações por cor.
+          ...(atual.cotacaoMl != null &&
+          alteracoes.pesoG !== undefined &&
+          Number(alteracoes.pesoG) !== Number(atual.pesoG)
+            ? { cotacaoMl: Prisma.DbNull }
+            : {}),
           ...(rascunho === false ? { rascunho } : {}),
         },
       });

@@ -25,13 +25,20 @@ export function ProdutoMercadoLivreCard({
   });
   const custos = custosMlDaCotacao(produto);
   const config = produto.mercadoLivre;
+  const cotacaoPorCor = Boolean(config?.publicacao?.itens.length);
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Mercado Livre: categoria e custos previstos</CardTitle>
+        <CardTitle>
+          {cotacaoPorCor
+            ? 'Mercado Livre: custos previstos por cor'
+            : 'Mercado Livre: categoria e custos previstos'}
+        </CardTitle>
         <CardDescription>
-          Tarifa e frete consultados para as condições deste produto. Os custos efetivos ficam nos
-          pedidos e no financeiro.
+          {cotacaoPorCor
+            ? 'Tarifa e frete estimados para cada SKU publicado. '
+            : 'Tarifa e frete consultados para as condições deste produto. '}
+          Os custos efetivos ficam nos pedidos e no financeiro.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -47,7 +54,13 @@ export function ProdutoMercadoLivreCard({
               Logística: {config.tipoLogistica}. Frete grátis ao comprador:{' '}
               {config.freteGratis ? 'sim' : 'não'}.
             </p>
-            {custos ? (
+            {cotacaoPorCor ? (
+              <p className="text-sm text-muted-foreground">
+                Confira a tarifa, o envio e a data da consulta de cada cor na tabela de variações. A
+                cotação vale por 24 horas para o mesmo anúncio, preço e pacote; o custo final pode
+                variar.
+              </p>
+            ) : custos ? (
               <p>
                 Tarifa prevista: <strong>{centavosParaReais(custos.tarifaCentavos)}</strong>. Envio
                 previsto:{' '}
@@ -64,7 +77,7 @@ export function ProdutoMercadoLivreCard({
                 atuais.
               </p>
             )}
-            {produto.cotacaoMl && (
+            {!cotacaoPorCor && produto.cotacaoMl && (
               <p className="text-xs text-muted-foreground">
                 Consulta: {new Date(produto.cotacaoMl.cotadoEm).toLocaleString('pt-BR')}. Validade
                 de 24 horas para as mesmas condições; o custo final pode variar.
@@ -92,7 +105,11 @@ export function ProdutoMercadoLivreCard({
             <Link href={`/produtos/${produto.id}/editar`}>Definir condições</Link>
           </Button>
           <Button disabled={!config || cotar.isPending} onClick={() => cotar.mutate()}>
-            {cotar.isPending ? 'Consultando…' : 'Consultar tarifa e envio'}
+            {cotar.isPending
+              ? 'Consultando…'
+              : cotacaoPorCor
+                ? 'Consultar tarifas e envios por cor'
+                : 'Consultar tarifa e envio'}
           </Button>
         </div>
       </CardContent>
