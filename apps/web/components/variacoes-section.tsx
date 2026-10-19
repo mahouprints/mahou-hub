@@ -78,7 +78,8 @@ export function VariacoesSection({
               <TableHead>Filamento</TableHead>
               <TableHead className="text-right">Preço</TableHead>
               <TableHead className="text-right">Produção</TableHead>
-              <TableHead className="text-right">Contribuição ML</TableHead>
+              <TableHead className="text-right">Tarifa e envio ML estimados</TableHead>
+              <TableHead className="text-right">Contribuição ML estimada</TableHead>
               <TableHead className="text-right">Prontos</TableHead>
               <TableHead className="text-right">Mínimo</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -117,6 +118,32 @@ export function VariacoesSection({
                         {pendencia}
                       </p>
                     ))}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {v.cotacaoMl ? (
+                      <>
+                        <p>Tarifa: {centavosParaReais(v.cotacaoMl.tarifaCentavos)}</p>
+                        <p>
+                          Envio:{' '}
+                          {v.cotacaoMl.freteCentavos === null
+                            ? 'pendente'
+                            : centavosParaReais(v.cotacaoMl.freteCentavos)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Consulta:{' '}
+                          <time dateTime={v.cotacaoMl.cotadoEm}>
+                            {new Date(v.cotacaoMl.cotadoEm).toLocaleString('pt-BR')}
+                          </time>
+                        </p>
+                        {v.cotacaoMl.pendencias.map((pendencia) => (
+                          <p key={pendencia} className="text-xs text-amber-600 dark:text-amber-500">
+                            {pendencia}
+                          </p>
+                        ))}
+                      </>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-500">Cotação pendente</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {contribuicaoMl !== null && margemMl !== null ? (
@@ -174,9 +201,9 @@ export function VariacoesSection({
 
       {lista.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          Valores por unidade e filamento da variação. A contribuição do Mercado Livre usa a cotação
-          válida para o preço e o pacote; se mudarem, fica pendente. Custos efetivos são apurados
-          nos pedidos.
+          Valores estimados por unidade e filamento da variação, conforme a cotação válida para o
+          SKU, o preço e o pacote. Se as condições mudarem ou a cotação vencer, a margem fica
+          pendente. O envio final pode variar; custos efetivos são apurados nos pedidos.
         </p>
       )}
 

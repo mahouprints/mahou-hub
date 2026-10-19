@@ -1,6 +1,10 @@
 import 'reflect-metadata';
 import { describe, expect, it, vi } from 'vitest';
-import { custosMlDaCotacao, type MercadoLivreCotacao } from '@mahou-hub/contracts';
+import {
+  cotacaoMlDaVariacao,
+  custosMlDaCotacao,
+  type MercadoLivreCotacao,
+} from '@mahou-hub/contracts';
 import { ProdutoMercadoLivreService } from '../src/modules/produtos/produto-mercado-livre.service';
 import type { MercadoLivreService } from '../src/modules/mercado-livre/mercado-livre.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
@@ -81,6 +85,227 @@ describe('validade da cotação ML', () => {
         custosMlDaCotacao({ ...produto, cotacaoMl: { ...cotacao, freteCentavos } }, agora),
       ).toEqual({ tarifaCentavos: 411, freteCentavos });
     }
+  });
+});
+
+const publicacao = {
+  versao: 1,
+  execucaoId: 'cores',
+  status: 'concluido',
+  atualizadoEm: new Date(agora).toISOString(),
+  itens: ['AZ', 'BR'].map((cor, indice) => ({
+    chave: cor,
+    itemId: `MLB${100 + indice}`,
+    skus: [`PROD-${cor}`],
+    descricaoConfirmada: true,
+    fiscalConfirmado: true,
+    verificado: true,
+  })),
+};
+
+function produtoPublicado() {
+  return {
+    ...produto,
+    pesoG: 40,
+    mercadoLivre: { ...contexto, publicacao: structuredClone(publicacao) },
+    variacoes: ['AZ', 'BR'].map((cor) => ({
+      id: `v-${cor}`,
+      sku: `PROD-${cor}`,
+      precoCentavos: null,
+      pesoG: null,
+      atualizadoEm: new Date(agora),
+    })),
+    cotacaoMl: {
+      ...cotacao,
+      porSku: {
+        'PROD-AZ': { ...cotacao, contexto: { ...contexto, itemId: 'MLB100' }, freteCentavos: 701 },
+        'PROD-BR': { ...cotacao, contexto: { ...contexto, itemId: 'MLB101' }, freteCentavos: 1102 },
+      },
+    },
+  };
+}
+
+describe('cotação vinculada ao SKU publicado', () => {
+  it('seleciona exclusivamente a cotação da cor e não apresenta margem genérica do produto', () => {
+    const publicado = produtoPublicado();
+    expect(
+      cotacaoMlDaVariacao(publicado, { sku: 'PROD-AZ', precoCentavos: 2490 }, agora)?.freteCentavos,
+    ).toBe(701);
+    expect(
+      cotacaoMlDaVariacao(publicado, { sku: 'PROD-BR', precoCentavos: 2490 }, agora)?.freteCentavos,
+    ).toBe(1102);
+    expect(custosMlDaCotacao(publicado, agora)).toBeUndefined();
+  });
+
+  it('preserva a estimativa anterior para produto ainda não publicado', () => {
+    expect(cotacaoMlDaVariacao(produto, { sku: 'PROD-AZ', precoCentavos: 2490 }, agora)).toEqual(
+      cotacao,
+    );
+  });
+
+  it('não empresta anúncio importado sem vínculo de SKU a qualquer cor', () => {
+    const mercadoLivre = { ...contexto, itemId: 'MLB777' };
+    const importado = {
+      ...produto,
+      mercadoLivre,
+      cotacaoMl: { ...cotacao, contexto: mercadoLivre },
+    };
+    expect(
+      cotacaoMlDaVariacao(importado, { sku: 'PROD-AZ', precoCentavos: 2490 }, agora),
+    ).toBeUndefined();
+    expect(custosMlDaCotacao(importado, agora)).toEqual({
+      tarifaCentavos: 411,
+      freteCentavos: 1385,
+    });
+  });
+
+  it.each([
+    { sku: 'NAO-COTADO', precoCentavos: 2490 },
+    { sku: 'PROD-AZ', precoCentavos: 2590 },
+  ])('não herda cotação de outra cor ou preço: %j', (variacao) => {
+    expect(cotacaoMlDaVariacao(produtoPublicado(), variacao, agora)).toBeUndefined();
+  });
+
+  it('rejeita cotação vencida, futura, vínculo trocado ou quantidade legada de variações', () => {
+    const publicado = produtoPublicado();
+    const variacao = { sku: 'PROD-AZ', precoCentavos: 2490 };
+    expect(cotacaoMlDaVariacao(publicado, variacao, agora + 86400001)).toBeUndefined();
+    expect(cotacaoMlDaVariacao(publicado, variacao, agora - 1)).toBeUndefined();
+    publicado.mercadoLivre.publicacao.itens[0]!.itemId = 'MLB999';
+    expect(cotacaoMlDaVariacao(publicado, variacao, agora)).toBeUndefined();
+    publicado.mercadoLivre.publicacao.itens[0]!.itemId = 'MLB100';
+    Object.assign(publicado.mercadoLivre.publicacao.itens[0]!, {
+      variationIds: { 'PROD-AZ': '12' },
+    });
+    expect(cotacaoMlDaVariacao(publicado, variacao, agora)).toBeUndefined();
+  });
+
+  it('rejeita cotação inválida ou ausente mesmo havendo estimativa raiz válida', () => {
+    const publicado = produtoPublicado();
+    const variacao = { sku: 'PROD-AZ', precoCentavos: 2490 };
+    expect(
+      cotacaoMlDaVariacao({ ...publicado, cotacaoMl: cotacao }, variacao, agora),
+    ).toBeUndefined();
+    expect(
+      cotacaoMlDaVariacao(
+        {
+          ...publicado,
+          cotacaoMl: {
+            ...publicado.cotacaoMl,
+            porSku: { 'PROD-AZ': { ...cotacao, tarifaCentavos: -1 } },
+          },
+        },
+        variacao,
+        agora,
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe('consulta e persistência por SKU', () => {
+  function prepararPublicado() {
+    const { mock } = makePrismaMock();
+    const publicado = produtoPublicado();
+    mock.produto.findUnique.mockResolvedValue(publicado);
+    mock.produto.updateMany.mockResolvedValue({ count: 1 });
+    const ml = {
+      cotar: vi.fn(async (entrada: typeof contexto & { itemId?: string }) => ({
+        ...structuredClone(cotacao),
+        contexto: entrada,
+        freteCentavos:
+          entrada.itemId === 'MLB100' ? 701 : entrada.itemId === 'MLB101' ? 1102 : 1385,
+      })),
+      anuncio: vi.fn(async (itemId: string) => ({
+        ...contexto,
+        tipoAnuncio: String(contexto.tipoAnuncio),
+        itemId,
+        status: 'active',
+        moeda: 'BRL',
+        temVariacoes: false,
+        sku: itemId === 'MLB100' ? 'PROD-AZ' : 'PROD-BR',
+      })),
+    };
+    return {
+      mock,
+      ml,
+      publicado,
+      service: new ProdutoMercadoLivreService(asPrisma(mock), ml as unknown as MercadoLivreService),
+    };
+  }
+
+  it('consulta cada item próprio e salva resultados independentes com guarda de preço, vínculo e variações', async () => {
+    const { mock, ml, publicado, service } = prepararPublicado();
+    const resultado = await service.cotar('p1');
+    expect(ml.anuncio.mock.calls).toEqual([['MLB100'], ['MLB101']]);
+    expect(resultado.porSku?.['PROD-AZ']?.freteCentavos).toBe(701);
+    expect(resultado.porSku?.['PROD-BR']?.freteCentavos).toBe(1102);
+    expect(mock.produto.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'p1',
+          precoCentavos: 2490,
+          pesoG: 40,
+          mercadoLivre: { equals: publicado.mercadoLivre },
+          variacoes: { every: { OR: [{ ativo: false }, ...publicado.variacoes] } },
+          AND: publicado.variacoes.map((variacao) => ({
+            variacoes: { some: { id: variacao.id, ativo: true } },
+          })),
+        }),
+        data: { cotacaoMl: resultado },
+      }),
+    );
+  });
+
+  it.each([
+    { itemId: 'MLB999' },
+    { sku: 'OUTRA-COR' },
+    { precoCentavos: 2990 },
+    { categoriaId: 'MLB456' },
+    { tipoLogistica: 'fulfillment' },
+    { tipoAnuncio: 'gold_pro' },
+    { freteGratis: true },
+    { status: 'paused' },
+    { moeda: 'USD' },
+    { temVariacoes: true },
+    { pesoGramas: 999 },
+    { alturaCm: 99 },
+  ])('mantém uma cor pendente quando o anúncio diverge: %j', async (mudanca) => {
+    const { ml, service } = prepararPublicado();
+    const original = ml.anuncio.getMockImplementation()!;
+    ml.anuncio.mockImplementation(async (itemId) => ({
+      ...(await original(itemId)),
+      ...(itemId === 'MLB100' ? mudanca : {}),
+    }));
+    const resultado = await service.cotar('p1');
+    expect(resultado.porSku?.['PROD-AZ']).toBeUndefined();
+    expect(resultado.porSku?.['PROD-BR']?.freteCentavos).toBe(1102);
+    expect(resultado.pendencias.some((pendencia) => pendencia.startsWith('PROD-AZ:'))).toBe(true);
+    expect(ml.cotar.mock.calls.some(([entrada]) => entrada.itemId === 'MLB100')).toBe(false);
+  });
+
+  it('isola indisponibilidade/erro de propriedade e não reutiliza cotação antiga', async () => {
+    const { ml, service } = prepararPublicado();
+    ml.anuncio.mockRejectedValueOnce(new Error('Anúncio de outro vendedor'));
+    const resultado = await service.cotar('p1');
+    expect(resultado.porSku?.['PROD-AZ']).toBeUndefined();
+    expect(resultado.porSku?.['PROD-BR']).toBeDefined();
+  });
+
+  it('aceita rotação das três dimensões mantendo peso exato', async () => {
+    const { ml, service } = prepararPublicado();
+    const original = ml.anuncio.getMockImplementation()!;
+    ml.anuncio.mockImplementation(async (itemId) => ({
+      ...(await original(itemId)),
+      alturaCm: contexto.comprimentoCm,
+      comprimentoCm: contexto.alturaCm,
+    }));
+    expect((await service.cotar('p1')).porSku?.['PROD-AZ']).toBeDefined();
+  });
+
+  it('recusa gravação quando a configuração ou uma variação muda durante a consulta', async () => {
+    const { mock, service } = prepararPublicado();
+    mock.produto.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.cotar('p1')).rejects.toThrow('mudaram durante a consulta');
   });
 });
 

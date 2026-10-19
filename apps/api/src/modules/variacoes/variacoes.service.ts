@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
-  custosMlDaCotacao,
+  cotacaoMlDaVariacao,
   SKU_MAX,
   type ProdutoVariacaoCreate,
   type ProdutoVariacaoUpdate,
@@ -55,9 +55,12 @@ export class VariacoesService {
         const efetivo = custosEfetivosDaVariacao(produto, variacao);
         const pricingPendencias = pendenciasComposicaoVariacao(produto, variacao);
         // Peso de outra peça não comprova peso/dimensões do pacote cotado.
-        const mercadoLivre =
+        const cotacaoMl =
           efetivo.pesoG === Number(produto.pesoG)
-            ? custosMlDaCotacao({ ...produto, precoCentavos: efetivo.precoCentavos })
+            ? cotacaoMlDaVariacao(produto, {
+                sku: variacao.sku,
+                precoCentavos: efetivo.precoCentavos,
+              })
             : undefined;
         return {
           ...variacao,
@@ -67,6 +70,7 @@ export class VariacoesService {
           pesoEfetivoG: efetivo.pesoG,
           tempoEfetivoH: efetivo.tempoH,
           pricingPendencias,
+          cotacaoMl: cotacaoMl ?? null,
           pricing: pricingPendencias.length
             ? null
             : await this.pricing.calcularResolvido({
@@ -74,7 +78,7 @@ export class VariacoesService {
                 impressora: produto.impressora,
                 embalagemCentavos: produto.embalagemCentavos,
                 custoInsumosCentavos,
-                mercadoLivre,
+                mercadoLivre: cotacaoMl,
               }),
         };
       }),

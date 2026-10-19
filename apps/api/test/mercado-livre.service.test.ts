@@ -83,6 +83,31 @@ describe('MercadoLivreService', () => {
     expect(get).toHaveBeenCalledWith(expect.stringContaining('category_id=MLB456&price=79.90'));
   });
 
+  it('consulta o item publicado com free_shipping explícito, sem substituir por dimensões simuladas', async () => {
+    const { service, get } = preparar();
+    await service.cotar({ ...contexto, itemId: 'MLB789', freteGratis: true });
+    const caminho = get.mock.calls.find(([path]) => path.includes('shipping_options'))![0];
+    const query = new URL(`https://example.test${caminho}`).searchParams;
+    expect(query.get('item_id')).toBe('MLB789');
+    expect(query.get('free_shipping')).toBe('true');
+    expect(query.has('dimensions')).toBe(false);
+    expect(query.get('item_price')).toBe('24.90');
+  });
+
+  it('não considera como reais um frete retornado em moeda diferente', async () => {
+    const { service, get } = preparar();
+    const original = get.getMockImplementation()!;
+    get.mockImplementation((path) =>
+      path.includes('shipping_options')
+        ? Promise.resolve({ coverage: { all_country: { list_cost: 20, currency_id: 'ARS' } } })
+        : original(path),
+    );
+    expect(await service.cotar(contexto)).toMatchObject({
+      freteCentavos: null,
+      pendencias: [expect.any(String)],
+    });
+  });
+
   it('rejeita categoria intermediária antes de calcular', async () => {
     const { service, get } = preparar();
     get.mockResolvedValueOnce({ ...categoria, children_categories: [{ id: 'MLB456' }] });
@@ -161,5 +186,30 @@ describe('MercadoLivreService', () => {
       comprimentoCm: 12,
       pesoGramas: 50,
     });
+  });
+
+  it('lê medidas SELLER_PACKAGE quando o ML não informa shipping.dimensions', async () => {
+    const { service, get } = preparar();
+    get.mockResolvedValueOnce({
+      id: 'MLB123',
+      seller_id: 42,
+      price: 24.9,
+      shipping: { dimensions: null },
+      attributes: [
+        { id: 'SELLER_SKU', value_name: 'PROD-AZ' },
+        { id: 'SELLER_PACKAGE_HEIGHT', value_name: '18 cm' },
+        { id: 'SELLER_PACKAGE_WIDTH', value_name: '12 cm' },
+        { id: 'SELLER_PACKAGE_LENGTH', value_name: '5 cm' },
+        { id: 'SELLER_PACKAGE_WEIGHT', value_name: '850 g' },
+      ],
+    });
+    expect(await service.anuncio('MLB123')).toMatchObject({
+      alturaCm: 18,
+      larguraCm: 12,
+      comprimentoCm: 5,
+      pesoGramas: 850,
+      sku: 'PROD-AZ',
+    });
+    expect(get).toHaveBeenCalledWith('/items/MLB123?include_attributes=all');
   });
 });
