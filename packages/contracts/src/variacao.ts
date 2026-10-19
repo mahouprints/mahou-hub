@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CalcularOutputSchema } from './pricing';
 
 /**
  * Teto de caracteres do SKU. Shopee e Mercado Livre aceitam bem mais (100), mas quem
@@ -37,6 +38,16 @@ export const ProdutoVariacaoSchema = z.object({
   ativo: z.boolean(),
 });
 
+/** Custos da cor já resolvidos pelo backend; não substituem os overrides do cadastro. */
+export const ProdutoVariacaoComPricingSchema = ProdutoVariacaoSchema.extend({
+  filamento: z.object({ nome: z.string() }).nullable(),
+  precoEfetivoCentavos: z.number().int().nonnegative(),
+  pesoEfetivoG: z.number().nonnegative(),
+  tempoEfetivoH: z.number().nonnegative(),
+  pricing: CalcularOutputSchema.nullable(),
+  pricingPendencias: z.array(z.string()),
+});
+
 export const ProdutoVariacaoCreateSchema = z.object({
   produtoId: z.string(),
   nome: z.string().min(1),
@@ -73,6 +84,7 @@ export const VariacoesEmLoteResultadoSchema = z.object({
 });
 
 export type ProdutoVariacao = z.infer<typeof ProdutoVariacaoSchema>;
+export type ProdutoVariacaoComPricing = z.infer<typeof ProdutoVariacaoComPricingSchema>;
 export type ProdutoVariacaoCreate = z.infer<typeof ProdutoVariacaoCreateSchema>;
 export type ProdutoVariacaoUpdate = z.infer<typeof ProdutoVariacaoUpdateSchema>;
 export type VariacoesEmLote = z.infer<typeof VariacoesEmLoteSchema>;

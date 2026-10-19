@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { VariacoesService } from '../src/modules/variacoes/variacoes.service';
+import { PricingService } from '../src/modules/pricing/pricing.service';
 import { asPrisma, makePrismaMock } from './helpers/prisma-mock';
 
 function montar(
   opts: { siglaCor?: string | null; skusOcupados?: string[]; nomeFilamento?: string } = {},
 ) {
   const { mock } = makePrismaMock();
+  mock.produtoVariacao.findMany.mockResolvedValue([]);
   mock.produto.findUnique.mockResolvedValue({ id: 'p1', nome: 'Suporte de Móbile de Berço' });
   // `in` e não `??`: o teste da sigla ausente passa null de propósito.
   mock.filamento.findUnique.mockResolvedValue({
@@ -22,7 +24,7 @@ function montar(
   mock.produtoVariacao.create.mockImplementation((args: { data: unknown }) =>
     Promise.resolve(args.data),
   );
-  return { svc: new VariacoesService(asPrisma(mock)), mock };
+  return { svc: new VariacoesService(asPrisma(mock), new PricingService(asPrisma(mock))), mock };
 }
 
 describe('VariacoesService', () => {
@@ -167,7 +169,10 @@ describe('VariacoesService', () => {
       mock.produtoVariacao.create.mockImplementation((args: { data: unknown }) =>
         Promise.resolve(args.data),
       );
-      return { svc: new VariacoesService(asPrisma(mock)), mock };
+      return {
+        svc: new VariacoesService(asPrisma(mock), new PricingService(asPrisma(mock))),
+        mock,
+      };
     }
 
     it('cria a combinação produto × cor', async () => {

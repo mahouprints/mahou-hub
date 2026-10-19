@@ -217,6 +217,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
       }
       await qc.invalidateQueries({ queryKey: ['produtos'] });
       await qc.invalidateQueries({ queryKey: ['produto', produtoId] });
+      await qc.invalidateQueries({ queryKey: ['variacoes', produtoId] });
       await qc.invalidateQueries({ queryKey: ['financeiro-resumo'] });
       router.push(`/produtos/${produtoId}`);
     } catch (e) {
