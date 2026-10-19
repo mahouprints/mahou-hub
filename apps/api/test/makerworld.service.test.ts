@@ -234,6 +234,26 @@ describe('MakerworldService', () => {
     expect(r.economia).toBe(economia);
   });
 
+  it('não calcula ROAS enquanto o líquido estiver pendente', async () => {
+    const { mock } = makePrismaMock();
+    mock.modeloMakerWorld.findUnique.mockResolvedValue({
+      id: 'm1',
+      precoSugeridoCentavos: 2490,
+      custoEstimadoCentavos: 377,
+      tempoHoras: '2.28',
+    });
+    const pricing = pricingFake({
+      economiaDeCustoPronto: vi.fn().mockResolvedValue({
+        precoCentavos: 2490,
+        liquidoCentavos: null,
+      }),
+    });
+    const svc = new MakerworldService(asPrisma(mock), pricing);
+
+    expect((await svc.buscarDetalhe('m1')).planoAds).toBeNull();
+    expect(pricing.planoAds).not.toHaveBeenCalled();
+  });
+
   it('buscarDetalhe lança NotFound sem chamar o pricing', async () => {
     const { mock } = makePrismaMock();
     mock.modeloMakerWorld.findUnique.mockResolvedValue(null);

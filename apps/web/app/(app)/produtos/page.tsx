@@ -248,9 +248,13 @@ export default function ProdutosPage() {
                     {centavosParaReais(produto.custoInsumosCentavos)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={margemPrincipal(produto) >= 0 ? 'secondary' : 'danger'}>
-                      {pct(margemPrincipal(produto))}
-                    </Badge>
+                    {margemPrincipal(produto) === null ? (
+                      <Badge variant="outline">Cotação pendente</Badge>
+                    ) : (
+                      <Badge variant={margemPrincipal(produto)! >= 0 ? 'secondary' : 'danger'}>
+                        {pct(margemPrincipal(produto)!)}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Button

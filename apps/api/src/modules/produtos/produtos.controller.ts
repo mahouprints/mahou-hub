@@ -29,6 +29,7 @@ import {
 import { ZodValidationPipe } from '../../common/zod-validation.pipe';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { ProdutosService } from './produtos.service';
+import { ProdutoMercadoLivreService } from './produto-mercado-livre.service';
 
 const BulkAnunciarSchema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(500),
@@ -68,7 +69,18 @@ const ListQuerySchema = z.object({
 @UseGuards(JwtAuthGuard)
 @Controller('produtos')
 export class ProdutosController {
-  constructor(private readonly service: ProdutosService) {}
+  constructor(
+    private readonly service: ProdutosService,
+    private readonly ml: ProdutoMercadoLivreService,
+  ) {}
+
+  @Post(':id/mercado-livre/cotar')
+  @ApiOperation({
+    summary: 'Consulta tarifa e frete do produto no Mercado Livre, sem publicar anúncio',
+  })
+  cotarMercadoLivre(@Param('id') id: string) {
+    return this.ml.cotar(id);
+  }
 
   @Get()
   @ApiOperation({

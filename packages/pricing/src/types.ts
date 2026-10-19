@@ -62,7 +62,10 @@ export interface CalculoEntrada {
   precoCentavos: number;
   parametros: ParametrosGlobais;
   tabelaShopee: FaixaShopee[];
-  tabelaMercadoLivre: FaixaMercadoLivre[];
+  /** Legado: a tabela global não é usada para estimar custos do Mercado Livre. */
+  tabelaMercadoLivre?: FaixaMercadoLivre[];
+  /** Tarifa total já inclui custo fixo; frete null significa custo ainda desconhecido. */
+  mercadoLivre?: { tarifaCentavos: number; freteCentavos: number | null };
 }
 
 export interface CalculoSaida {
@@ -71,18 +74,20 @@ export interface CalculoSaida {
   custoTotalProducaoCentavos: number;
   impostoCentavos: number;
   taxaShopeeCentavos: number;
-  taxaMlCentavos: number;
+  taxaMlCentavos: number | null;
+  freteMlCentavos: number | null;
+  custosMlStatus: 'PENDENTE' | 'COTADO';
   taxaTikTokCentavos: number;
   liquidoShopeeCentavos: number;
-  liquidoMlCentavos: number;
+  liquidoMlCentavos: number | null;
   liquidoSiteCentavos: number;
   liquidoTikTokCentavos: number;
   margemShopee: number;
-  margemMl: number;
+  margemMl: number | null;
   margemSite: number;
   margemTikTok: number;
   lucroPorHoraShopeeCentavos: number;
-  lucroPorHoraMlCentavos: number;
+  lucroPorHoraMlCentavos: number | null;
   lucroPorHoraSiteCentavos: number;
   lucroPorHoraTikTokCentavos: number;
 }

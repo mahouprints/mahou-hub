@@ -96,7 +96,7 @@ export default function ConfiguracoesPage() {
               <Linha rotulo="Vendedor Shopee" valor={parametros.data.vendedorShopee} />
               <Linha rotulo="Em campanha" valor={parametros.data.emCampanhaShopee ? 'Sim' : 'Não'} />
               <Linha rotulo="Adicional campanha" valor={`${parametros.data.adicionalCampanhaPct}%`} />
-              <Linha rotulo="Comissão ML" valor={`${parametros.data.comissaoMlPct}%`} />
+              <Linha rotulo="Custos ML" valor="Cotação por produto / despesas por pedido" />
               <Linha
                 rotulo="Imposto"
                 valor={parametros.data.impostoAtivo ? `${parametros.data.impostoPct}%` : 'Inativo'}
@@ -219,16 +219,19 @@ export default function ConfiguracoesPage() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>Taxas Mercado Livre</CardTitle>
+          <CardTitle>Taxas Mercado Livre — tabela antiga</CardTitle>
           <Button size="sm" onClick={() => setMlDialog({ open: true, item: null })}>
             <Plus className="h-4 w-4" /> Nova faixa
           </Button>
         </CardHeader>
         <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Esta tabela não participa mais dos cálculos. Defina a categoria e consulte tarifa e envio na página de cada produto. Vendas usam as despesas importadas do pedido.
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Faixa</TableHead>
+              <TableHead>Faixa</TableHead>
                 <TableHead>Limite inferior</TableHead>
                 <TableHead className="text-right">Custo fixo</TableHead>
                 <TableHead className="text-right">% alternativo</TableHead>

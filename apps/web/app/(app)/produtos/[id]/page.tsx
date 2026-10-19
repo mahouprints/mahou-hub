@@ -25,6 +25,7 @@ import type {
 } from '@mahou-hub/contracts';
 import type { ProdutoComComposicao, FilamentoFormulario } from '@/lib/produto-filamentos';
 import { ProdutoFilamentosDetalhe } from '@/components/produto-filamentos-detalhe';
+import { ProdutoMercadoLivreCard } from '@/components/produto-mercado-livre-card';
 import { apiFetch } from '@/lib/api-client';
 import { centavosParaReais, isUrl, pct } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -202,6 +203,8 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
         </CardContent>
       </Card>
 
+      <ProdutoMercadoLivreCard produto={produto} />
+
       <Card>
         <CardHeader>
           <CardTitle>Pricing</CardTitle>
@@ -234,18 +237,24 @@ export default function ProdutoDetalhePage({ params }: { params: Promise<{ id: s
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <PlanoAdsPaineis
-            plano={planoAds}
-            nivelConfianca={Number(parametros?.adsNivelConfianca ?? 95)}
-            carregando={planoCarregando || !pricing}
-          />
+          {pricing && liquidoPrincipalCentavos === null ? (
+            <p className="text-sm text-muted-foreground">
+              Consulte tarifa e frete do Mercado Livre para calcular o plano de anúncios.
+            </p>
+          ) : (
+            <PlanoAdsPaineis
+              plano={planoAds}
+              nivelConfianca={Number(parametros?.adsNivelConfianca ?? 95)}
+              carregando={planoCarregando || !pricing}
+            />
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
 
-function canalLiquido(p: CalcularOutput, canal: Canal): number {
+function canalLiquido(p: CalcularOutput, canal: Canal): number | null {
   return canal === 'SHOPEE'
     ? p.liquidoShopeeCentavos
     : canal === 'ML'
@@ -420,6 +429,7 @@ function PricingBreakdown({
       margem: pricing.margemMl,
       lucroHCentavos: pricing.lucroPorHoraMlCentavos,
       taxaCentavos: pricing.taxaMlCentavos,
+      freteCentavos: pricing.freteMlCentavos,
     },
     {
       key: 'SITE',
@@ -445,7 +455,9 @@ function PricingBreakdown({
         </Badge>
         <p className="text-sm text-muted-foreground">
           Margem do canal principal ({CANAL_LABEL[canal]}):{' '}
-          <span className="font-semibold text-foreground">{pct(margemPrincipal)}</span>
+          <span className="font-semibold text-foreground">
+            {margemPrincipal === null ? 'Pendente' : pct(margemPrincipal)}
+          </span>
         </p>
       </div>
 
@@ -526,10 +538,11 @@ function PricingBreakdown({
 
 interface CanalInfo {
   key: Canal;
-  liquidoCentavos: number;
-  margem: number;
+  liquidoCentavos: number | null;
+  margem: number | null;
   lucroHCentavos: number | null;
-  taxaCentavos: number;
+  taxaCentavos: number | null;
+  freteCentavos?: number | null;
 }
 
 function CanalCard({
@@ -565,39 +578,48 @@ function CanalCard({
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Líquido</div>
           <div className="text-xl font-semibold tabular-nums">
-            {centavosParaReais(info.liquidoCentavos)}
+            {info.liquidoCentavos === null ? 'Pendente' : centavosParaReais(info.liquidoCentavos)}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
             <div className="text-xs text-muted-foreground">Margem</div>
             <Badge variant={v.variant} className="font-normal">
-              {pct(info.margem)}
+              {info.margem === null ? 'Pendente' : pct(info.margem)}
             </Badge>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">Lucro/h</div>
             <div className="tabular-nums">
-              {info.lucroHCentavos != null ? centavosParaReais(info.lucroHCentavos) : '—'}
+              {info.lucroHCentavos != null ? centavosParaReais(info.lucroHCentavos) : 'Pendente'}
             </div>
           </div>
         </div>
         <div className="border-t border-border pt-2 text-xs text-muted-foreground">
           Taxa do canal:{' '}
           <span className="tabular-nums text-foreground">
-            {info.taxaCentavos > 0 ? centavosParaReais(info.taxaCentavos) : '—'}
+            {info.taxaCentavos === null ? 'Pendente' : centavosParaReais(info.taxaCentavos)}
           </span>
         </div>
+        {info.key === 'ML' && (
+          <div className="text-xs text-muted-foreground">
+            Frete do vendedor:{' '}
+            <span className="tabular-nums text-foreground">
+              {info.freteCentavos == null ? 'Pendente' : centavosParaReais(info.freteCentavos)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function vereditoDe(
-  margem: number,
+  margem: number | null,
   verde: number,
   amarelo: number,
-): { variant: 'success' | 'warning' | 'danger'; label: string } {
+): { variant: 'success' | 'warning' | 'danger' | 'outline'; label: string } {
+  if (margem === null) return { variant: 'outline', label: 'Cotação pendente' };
   if (margem >= verde) return { variant: 'success', label: 'Vale a pena' };
   if (margem >= amarelo) return { variant: 'warning', label: 'Atenção' };
   return { variant: 'danger', label: 'Não compensa' };

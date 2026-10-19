@@ -1,6 +1,6 @@
 import type { CalculoEntrada, CalculoSaida } from './types';
 import { custoEnergiaCentavos, custoFilamentoCentavos, custoFilamentosCentavos } from './custos';
-import { taxaMercadoLivreCentavos, taxaShopeeCentavos, taxaTikTokCentavos } from './taxas';
+import { taxaShopeeCentavos, taxaTikTokCentavos } from './taxas';
 import { arredondarCentavos } from './money';
 
 /**
@@ -10,7 +10,8 @@ import { arredondarCentavos } from './money';
  * @example
  *   calcularProduto({
  *     pesoG: 50, tempoH: 2, impressora: 'A1', filamento, embalagemCentavos: 150,
- *     precoCentavos: 3500, parametros, tabelaShopee, tabelaMercadoLivre,
+ *     precoCentavos: 3500, parametros, tabelaShopee,
+ *     mercadoLivre: { tarifaCentavos: 525, freteCentavos: 650 },
  *   })
  */
 export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
@@ -42,11 +43,15 @@ export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
     : 0;
 
   const taxaShopee = taxaShopeeCentavos(precoCentavos, parametros, entrada.tabelaShopee);
-  const taxaMl = taxaMercadoLivreCentavos(precoCentavos, parametros, entrada.tabelaMercadoLivre);
+  const taxaMl = entrada.mercadoLivre?.tarifaCentavos ?? null;
+  const freteMl = entrada.mercadoLivre?.freteCentavos ?? null;
   const taxaTikTok = taxaTikTokCentavos(precoCentavos, parametros);
 
   const liquidoShopee = precoCentavos - custoTotalProducao - imposto - taxaShopee;
-  const liquidoMl = precoCentavos - custoTotalProducao - imposto - taxaMl;
+  const liquidoMl =
+    taxaMl === null || freteMl === null
+      ? null
+      : precoCentavos - custoTotalProducao - imposto - taxaMl - freteMl;
   const liquidoSite = precoCentavos - custoTotalProducao - imposto;
   const liquidoTikTok = precoCentavos - custoTotalProducao - imposto - taxaTikTok;
 
@@ -57,17 +62,20 @@ export function calcularProduto(entrada: CalculoEntrada): CalculoSaida {
     impostoCentavos: imposto,
     taxaShopeeCentavos: taxaShopee,
     taxaMlCentavos: taxaMl,
+    freteMlCentavos: freteMl,
+    custosMlStatus: liquidoMl === null ? 'PENDENTE' : 'COTADO',
     taxaTikTokCentavos: taxaTikTok,
     liquidoShopeeCentavos: liquidoShopee,
     liquidoMlCentavos: liquidoMl,
     liquidoSiteCentavos: liquidoSite,
     liquidoTikTokCentavos: liquidoTikTok,
     margemShopee: precoCentavos === 0 ? 0 : liquidoShopee / precoCentavos,
-    margemMl: precoCentavos === 0 ? 0 : liquidoMl / precoCentavos,
+    margemMl: liquidoMl === null ? null : precoCentavos === 0 ? 0 : liquidoMl / precoCentavos,
     margemSite: precoCentavos === 0 ? 0 : liquidoSite / precoCentavos,
     margemTikTok: precoCentavos === 0 ? 0 : liquidoTikTok / precoCentavos,
     lucroPorHoraShopeeCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoShopee / tempoH),
-    lucroPorHoraMlCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoMl / tempoH),
+    lucroPorHoraMlCentavos:
+      liquidoMl === null ? null : tempoH === 0 ? 0 : arredondarCentavos(liquidoMl / tempoH),
     lucroPorHoraSiteCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoSite / tempoH),
     lucroPorHoraTikTokCentavos: tempoH === 0 ? 0 : arredondarCentavos(liquidoTikTok / tempoH),
   };

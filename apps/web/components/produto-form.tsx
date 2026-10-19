@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { CalcularOutput, Filamento, Insumo, Parametro } from '@mahou-hub/contracts';
+import {
+  custosMlDaCotacao,
+  MercadoLivreConfiguracaoSchema,
+  type MercadoLivreConfiguracao,
+} from '@mahou-hub/contracts';
+import { ProdutoMercadoLivreForm } from '@/components/produto-mercado-livre-form';
 import { apiFetch, apiUrl, fetchComRetry } from '@/lib/api-client';
 import { parseDecimalBr, parseDecimalParaCentavos } from '@/lib/parsing';
 import { Button } from '@/components/ui/button';
@@ -47,6 +53,9 @@ export function ProdutoForm({ produto, inicial }: Props) {
   const router = useRouter();
   const qc = useQueryClient();
   const editando = !!produto;
+  const [mercadoLivre, setMercadoLivre] = useState<MercadoLivreConfiguracao | null>(
+    produto?.mercadoLivre ?? null,
+  );
 
   const [form, setForm] = useState<FormState>(() => {
     if (produto) {
@@ -152,6 +161,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
           embalagemCentavos: Number.isFinite(embalagem) ? embalagem : 0,
           custoInsumosCentavos,
           precoCentavos: preco,
+          mercadoLivre: custosMlDaCotacao({ ...produto, mercadoLivre, precoCentavos: preco }),
         },
       })
         .then(setPreview)
@@ -163,7 +173,7 @@ export function ProdutoForm({ produto, inicial }: Props) {
       clearTimeout(t);
       controller.abort();
     };
-  }, [form, custoInsumosCentavos]);
+  }, [form, custoInsumosCentavos, mercadoLivre, produto]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -171,7 +181,10 @@ export function ProdutoForm({ produto, inicial }: Props) {
     setErroFormulario(null);
     setSalvando(true);
     try {
-      const payload = converterProdutoForm(form, produto);
+      const payload = {
+        ...converterProdutoForm(form, produto),
+        mercadoLivre: MercadoLivreConfiguracaoSchema.nullable().parse(mercadoLivre),
+      };
       let produtoId = produto?.id;
       if (produto) {
         await apiFetch(`/produtos/${produto.id}`, { method: 'PATCH', json: payload });
@@ -387,6 +400,12 @@ export function ProdutoForm({ produto, inicial }: Props) {
                 />
               </div>
             </div>
+
+            <ProdutoMercadoLivreForm
+              titulo={form.nome}
+              value={mercadoLivre}
+              onChange={setMercadoLivre}
+            />
 
             {erroFormulario && (
               <p role="alert" className="text-sm text-destructive">

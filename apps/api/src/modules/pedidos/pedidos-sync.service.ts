@@ -14,6 +14,12 @@ export class PedidosSyncService {
     private readonly ml: MercadoLivreClient,
   ) {}
 
+  /** Atualiza somente despesas de um pedido já importado, sem tocar atendimento ou estoque. */
+  async reconciliarCustosMl(pedidoId: string, externalId: string) {
+    const pedido = await this.ml.buscarPedido(externalId);
+    return this.atendimento.reconciliarCustosMl(pedidoId, pedido);
+  }
+
   /**
    * Puxa pedidos novos dos marketplaces configurados.
    *

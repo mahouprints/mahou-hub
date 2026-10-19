@@ -174,10 +174,13 @@ export class MakerworldService {
       canal: 'SHOPEE',
       tempoHoras: Number(modelo.tempoHoras),
     });
-    const planoAds = await this.pricing.planoAds({
-      precoCentavos: economia.precoCentavos,
-      margemContribuicaoCentavos: economia.liquidoCentavos,
-    });
+    const planoAds =
+      economia.liquidoCentavos === null
+        ? null
+        : await this.pricing.planoAds({
+            precoCentavos: economia.precoCentavos,
+            margemContribuicaoCentavos: economia.liquidoCentavos,
+          });
 
     return { ...modelo, economia, planoAds };
   }

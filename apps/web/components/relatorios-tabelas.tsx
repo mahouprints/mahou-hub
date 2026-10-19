@@ -48,22 +48,39 @@ const COLUNAS_RESULTADO = [
   'Insumos',
   'Impostos',
   'Taxas',
-  'Lucro de contribuição',
+  'Fretes ML',
+  'Contribuição registrada',
 ];
 
 function DiaRelatorio({ valor }: { valor: string }) {
   return <time dateTime={valor}>{valor.split('-').reverse().join('/')}</time>;
 }
 
-function ValorMonetario({ valor, destaque = false }: { valor: number; destaque?: boolean }) {
+function ValorMonetario({
+  valor,
+  destaque = false,
+  parcial = false,
+  pendente = false,
+}: {
+  valor: number;
+  destaque?: boolean;
+  parcial?: boolean;
+  pendente?: boolean;
+}) {
   return (
     <TableCell
       className={cn(
         'whitespace-nowrap text-right tabular-nums',
-        destaque && (valor >= 0 ? 'font-medium text-emerald-400' : 'font-medium text-rose-400'),
+        destaque &&
+          (parcial
+            ? 'font-medium text-amber-300'
+            : valor >= 0
+              ? 'font-medium text-emerald-400'
+              : 'font-medium text-rose-400'),
       )}
     >
-      {centavosParaReais(valor)}
+      {pendente ? 'Pendente' : centavosParaReais(valor)}
+      {parcial && <span className="block text-xs">parcial</span>}
     </TableCell>
   );
 }
@@ -78,7 +95,12 @@ function CelulasResultado({ totais }: { totais: TotaisVendasRelatorio }) {
       <ValorMonetario valor={totais.custosInsumosCentavos} />
       <ValorMonetario valor={totais.impostosCentavos} />
       <ValorMonetario valor={totais.taxasMarketplaceCentavos} />
-      <ValorMonetario valor={totais.lucroContribuicaoCentavos} destaque />
+      <ValorMonetario valor={totais.fretesCentavos} />
+      <ValorMonetario
+        valor={totais.lucroContribuicaoCentavos}
+        destaque
+        parcial={totais.vendasMlComCustosPendentes > 0}
+      />
     </>
   );
 }
@@ -145,7 +167,7 @@ function ProdutosRelatorio({ relatorio }: Props) {
   return (
     <SecaoTabela
       titulo="Resultado por produto"
-      descricao="Lucro de contribuição: receita menos produção, insumos, impostos e taxas. Custos gerais não são rateados."
+      descricao="Receita menos produção, insumos, impostos, taxas e fretes conhecidos. Resultados com despesas ML pendentes são parciais. Custos gerais não são rateados."
       quantidade={relatorio.porProduto.length}
     >
       <Table>
@@ -153,7 +175,7 @@ function ProdutosRelatorio({ relatorio }: Props) {
         <CabecalhoResultado primeiraColuna="Produto" />
         <TableBody>
           {relatorio.porProduto.length === 0 && (
-            <TabelaVazia colunas={9} mensagem="Nenhum produto vendido neste período." />
+            <TabelaVazia colunas={10} mensagem="Nenhum produto vendido neste período." />
           )}
           {relatorio.porProduto.map((produto) => (
             <TableRow key={produto.produtoId}>
@@ -179,7 +201,7 @@ function CanaisRelatorio({ relatorio }: Props) {
         <CabecalhoResultado primeiraColuna="Canal" />
         <TableBody>
           {relatorio.porCanal.length === 0 && (
-            <TabelaVazia colunas={9} mensagem="Nenhuma venda por canal neste período." />
+            <TabelaVazia colunas={10} mensagem="Nenhuma venda por canal neste período." />
           )}
           {relatorio.porCanal.map((canal) => (
             <TableRow key={canal.canal}>
@@ -210,8 +232,19 @@ function LinhaVenda({ venda }: { venda: VendaRelatorio }) {
       <ValorMonetario valor={venda.custosVariaveisCentavos} />
       <ValorMonetario valor={venda.custosInsumosCentavos} />
       <ValorMonetario valor={venda.impostosCentavos} />
-      <ValorMonetario valor={venda.taxasMarketplaceCentavos} />
-      <ValorMonetario valor={venda.lucroContribuicaoCentavos} destaque />
+      <ValorMonetario
+        valor={venda.taxasMarketplaceCentavos}
+        pendente={venda.canal === 'ML' && venda.custosMl?.tarifaFonte !== 'IMPORTADA'}
+      />
+      <ValorMonetario
+        valor={venda.fretesCentavos}
+        pendente={venda.canal === 'ML' && venda.custosMl?.freteFonte !== 'IMPORTADO'}
+      />
+      <ValorMonetario
+        valor={venda.lucroContribuicaoCentavos}
+        destaque
+        parcial={venda.vendasMlComCustosPendentes > 0}
+      />
     </TableRow>
   );
 }
@@ -225,7 +258,8 @@ function VendasRelatorio({ relatorio }: Props) {
     'Insumos',
     'Impostos',
     'Taxas',
-    'Lucro de contribuição',
+    'Fretes ML',
+    'Contribuição registrada',
   ];
   return (
     <SecaoTabela
@@ -249,7 +283,7 @@ function VendasRelatorio({ relatorio }: Props) {
         </TableHeader>
         <TableBody>
           {relatorio.vendas.length === 0 && (
-            <TabelaVazia colunas={11} mensagem="Nenhuma venda registrada neste período." />
+            <TabelaVazia colunas={12} mensagem="Nenhuma venda registrada neste período." />
           )}
           {relatorio.vendas.map((venda) => (
             <LinhaVenda key={venda.id} venda={venda} />

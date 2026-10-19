@@ -10,7 +10,7 @@ type Metrica = 'faturamentoCentavos' | 'gastosTotaisCentavos' | 'lucroLiquidoCen
 const SERIES: { chave: Metrica; nome: string; cor: string; tracejado?: string }[] = [
   { chave: 'faturamentoCentavos', nome: 'Receita', cor: '#c4b5fd' },
   { chave: 'gastosTotaisCentavos', nome: 'Gastos', cor: '#fbbf24', tracejado: '7 4' },
-  { chave: 'lucroLiquidoCentavos', nome: 'Lucro líquido', cor: '#34d399', tracejado: '2 4' },
+  { chave: 'lucroLiquidoCentavos', nome: 'Resultado registrado', cor: '#94a3b8', tracejado: '2 4' },
 ];
 const AREA = { esquerda: 122, direita: 750, topo: 24, base: 254 };
 
@@ -89,7 +89,7 @@ function LinhasFinanceiras({
               stroke="#191224"
               strokeWidth="1.5"
             >
-              <title>{`${ponto.rotulo} · ${nome}: ${centavosParaReais(ponto[chave])}`}</title>
+              <title>{`${ponto.rotulo} · ${nome}: ${centavosParaReais(ponto[chave])}${ponto.vendasMlComCustosPendentes > 0 ? ' · parcial' : ''}`}</title>
             </circle>
           ))}
         </g>
@@ -153,6 +153,7 @@ function ValoresEvolucao({ serie }: { serie: PontoSerieFinanceira[] }) {
               <tr key={ponto.inicio} className="border-t border-border">
                 <th scope="row" className="p-2 text-left font-normal">
                   {ponto.rotulo}
+                  {ponto.vendasMlComCustosPendentes > 0 ? ' (parcial)' : ''}
                 </th>
                 {SERIES.map(({ chave }) => (
                   <td key={chave} className="whitespace-nowrap p-2">
@@ -178,7 +179,8 @@ export function EvolucaoFinanceira({ relatorio }: Props) {
       <CardHeader>
         <CardTitle>Evolução financeira</CardTitle>
         <CardDescription>
-          Receita, gastos totais e lucro líquido ao longo do período.
+          Receita, gastos conhecidos e resultado registrado. Pontos com custos ML pendentes são
+          parciais.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -213,8 +215,8 @@ export function EvolucaoFinanceira({ relatorio }: Props) {
               aria-labelledby={tituloId}
             >
               <title id={tituloId}>
-                Evolução da receita, gastos e lucro líquido. Os valores completos estão disponíveis
-                abaixo.
+                Evolução da receita, gastos conhecidos e resultado registrado. Os valores estão
+                disponíveis abaixo.
               </title>
               <GradeFinanceira escala={escala} />
               <line
@@ -267,6 +269,12 @@ function tiposDeGasto(resumo: RelatorioFinanceiro['resumo']) {
       detalhe: 'Taxas dos marketplaces',
       valor: resumo.taxasMarketplaceCentavos,
       cor: '#38bdf8',
+    },
+    {
+      nome: 'Fretes ML',
+      detalhe: 'Custo do vendedor importado das vendas',
+      valor: resumo.fretesCentavos,
+      cor: '#fb923c',
     },
   ];
 }

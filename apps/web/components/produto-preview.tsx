@@ -12,10 +12,11 @@ const CANAL_PREVIEW_LABEL: Record<CanalKey, string> = {
 
 interface CanalPreviewInfo {
   key: CanalKey;
-  liquidoCentavos: number;
-  margem: number;
+  liquidoCentavos: number | null;
+  margem: number | null;
   lucroHCentavos: number | null;
-  taxaCentavos: number;
+  taxaCentavos: number | null;
+  freteCentavos?: number | null;
 }
 
 /**
@@ -47,18 +48,22 @@ export function ProdutoPreview({
         : canal === 'TIKTOK'
           ? preview.margemTikTok
           : preview.margemSite;
-  const variant: 'success' | 'warning' | 'danger' =
-    margemPrincipal >= thresholdVerde
-      ? 'success'
-      : margemPrincipal >= thresholdAmarelo
-        ? 'warning'
-        : 'danger';
+  const variant: 'success' | 'warning' | 'danger' | 'outline' =
+    margemPrincipal === null
+      ? 'outline'
+      : margemPrincipal >= thresholdVerde
+        ? 'success'
+        : margemPrincipal >= thresholdAmarelo
+          ? 'warning'
+          : 'danger';
   const veredito =
-    margemPrincipal >= thresholdVerde
-      ? 'Vale a pena'
-      : margemPrincipal >= thresholdAmarelo
-        ? 'Atenção'
-        : 'Não compensa';
+    margemPrincipal === null
+      ? 'Cotação pendente'
+      : margemPrincipal >= thresholdVerde
+        ? 'Vale a pena'
+        : margemPrincipal >= thresholdAmarelo
+          ? 'Atenção'
+          : 'Não compensa';
 
   const canais: CanalPreviewInfo[] = [
     {
@@ -74,6 +79,7 @@ export function ProdutoPreview({
       margem: preview.margemMl,
       lucroHCentavos: preview.lucroPorHoraMlCentavos,
       taxaCentavos: preview.taxaMlCentavos,
+      freteCentavos: preview.freteMlCentavos,
     },
     {
       key: 'SITE',
@@ -99,7 +105,9 @@ export function ProdutoPreview({
         </Badge>
         <p className="text-sm text-muted-foreground">
           Margem do canal principal ({CANAL_PREVIEW_LABEL[canal]}):{' '}
-          <span className="font-semibold text-foreground">{pct(margemPrincipal)}</span>
+          <span className="font-semibold text-foreground">
+            {margemPrincipal === null ? 'Pendente' : pct(margemPrincipal)}
+          </span>
         </p>
       </div>
 
@@ -122,6 +130,11 @@ export function ProdutoPreview({
             destaque
           />
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {preview.custosMlStatus === 'PENDENTE'
+            ? 'Mercado Livre: consulte tarifa e frete para a categoria, o preço e o pacote antes de avaliar a margem.'
+            : 'Mercado Livre: margem estimada com tarifa e frete informados. Os custos efetivos são apurados nos pedidos.'}
+        </p>
       </section>
 
       <section>
@@ -160,12 +173,14 @@ function CanalPreviewCard({
   thresholdVerde: number;
   thresholdAmarelo: number;
 }) {
-  const v: 'success' | 'warning' | 'danger' =
-    info.margem >= thresholdVerde
-      ? 'success'
-      : info.margem >= thresholdAmarelo
-        ? 'warning'
-        : 'danger';
+  const v: 'success' | 'warning' | 'danger' | 'outline' =
+    info.margem === null
+      ? 'outline'
+      : info.margem >= thresholdVerde
+        ? 'success'
+        : info.margem >= thresholdAmarelo
+          ? 'warning'
+          : 'danger';
   return (
     <div
       className={
@@ -181,29 +196,37 @@ function CanalPreviewCard({
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground">Líquido</div>
           <div className="text-xl font-semibold tabular-nums">
-            {centavosParaReais(info.liquidoCentavos)}
+            {info.liquidoCentavos === null ? 'Pendente' : centavosParaReais(info.liquidoCentavos)}
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
             <div className="text-xs text-muted-foreground">Margem</div>
             <Badge variant={v} className="font-normal">
-              {pct(info.margem)}
+              {info.margem === null ? 'Pendente' : pct(info.margem)}
             </Badge>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">Lucro/h</div>
             <div className="tabular-nums">
-              {info.lucroHCentavos != null ? centavosParaReais(info.lucroHCentavos) : '—'}
+              {info.lucroHCentavos != null ? centavosParaReais(info.lucroHCentavos) : 'Pendente'}
             </div>
           </div>
         </div>
         <div className="border-t border-border pt-2 text-xs text-muted-foreground">
           Taxa:{' '}
           <span className="tabular-nums text-foreground">
-            {info.taxaCentavos > 0 ? centavosParaReais(info.taxaCentavos) : '—'}
+            {info.taxaCentavos === null ? 'Pendente' : centavosParaReais(info.taxaCentavos)}
           </span>
         </div>
+        {info.key === 'ML' && (
+          <div className="text-xs text-muted-foreground">
+            Frete do vendedor:{' '}
+            <span className="tabular-nums text-foreground">
+              {info.freteCentavos == null ? 'Pendente' : centavosParaReais(info.freteCentavos)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

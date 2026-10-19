@@ -34,6 +34,8 @@ type ItemPedido = {
   nomeExterno: string;
   qtd: number;
   precoUnitarioCentavos: number;
+  tarifaMlCentavos: number | null;
+  freteMlCentavos: number | null;
   atendimento: Atendimento;
   variacao: { sku: string; nome: string; estoqueAtual: number } | null;
 };
@@ -128,6 +130,24 @@ export default function PedidosPage() {
     },
   });
 
+  const reconciliar = useMutation({
+    mutationFn: (pedidoId: string) =>
+      apiFetch<{ itensPendentes: number }>(`/pedidos/${pedidoId}/reconciliar-custos`, {
+        method: 'POST',
+      }),
+    onSuccess: (resultado) => {
+      queryClient.invalidateQueries({ queryKey: ['pedidos'] });
+      queryClient.invalidateQueries({ queryKey: ['vendas'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-resumo'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro-relatorio'] });
+      toast.success(
+        resultado.itensPendentes > 0
+          ? `Consulta concluída; ${resultado.itensPendentes} itens ainda com custos pendentes.`
+          : 'Tarifas e frete atualizados.',
+      );
+    },
+  });
+
   const pedidos = data?.itens ?? [];
   const bloqueados = pedidos.filter((p) => p.status === 'BLOQUEADO').length;
 
@@ -137,8 +157,8 @@ export default function PedidosPage() {
         <div>
           <h1 className="text-2xl font-semibold">Pedidos</h1>
           <p className="text-sm text-muted-foreground">
-            Pedidos da Shopee e do Mercado Livre. Quem tem peça pronta baixa do estoque; o
-            resto entra na fila de produção.
+            Pedidos da Shopee e do Mercado Livre. Quem tem peça pronta baixa do estoque; o resto
+            entra na fila de produção.
           </p>
         </div>
         <Button onClick={() => sincronizar.mutate()} disabled={sincronizar.isPending}>
@@ -151,8 +171,8 @@ export default function PedidosPage() {
         <Card className="flex items-center gap-3 border-destructive/40 bg-destructive/5 p-4">
           <AlertTriangle className="size-5 shrink-0 text-destructive" />
           <p className="text-sm">
-            <strong>{bloqueados} pedido(s) bloqueado(s)</strong> — o SKU do marketplace não
-            existe no catálogo. Vincule abaixo para baixar estoque ou gerar o card de produção.
+            <strong>{bloqueados} pedido(s) bloqueado(s)</strong> — o SKU do marketplace não existe
+            no catálogo. Vincule abaixo para baixar estoque ou gerar o card de produção.
           </p>
         </Card>
       )}
@@ -170,17 +190,15 @@ export default function PedidosPage() {
             <SelectItem value="CANCELADO">Cancelados</SelectItem>
           </SelectContent>
         </Select>
-        <span className="ml-auto text-sm text-muted-foreground">
-          {data?.total ?? 0} pedidos
-        </span>
+        <span className="ml-auto text-sm text-muted-foreground">{data?.total ?? 0} pedidos</span>
       </Card>
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
 
       {!isLoading && pedidos.length === 0 && (
         <Card className="p-8 text-center text-sm text-muted-foreground">
-          Nenhum pedido ainda. Clique em <strong>Buscar pedidos</strong> — se nada vier,
-          confira se as credenciais da Shopee e do Mercado Livre estão no <code>.env</code>.
+          Nenhum pedido ainda. Clique em <strong>Buscar pedidos</strong> — se nada vier, confira se
+          as credenciais da Shopee e do Mercado Livre estão no <code>.env</code>.
         </Card>
       )}
 
@@ -188,6 +206,9 @@ export default function PedidosPage() {
         {pedidos.map((pedido) => {
           const prazo = prazoVisual(pedido.prazoEnvio);
           const visual = STATUS_VISUAL[pedido.status];
+          const custosPendentes = pedido.itens.some(
+            (item) => item.tarifaMlCentavos == null || item.freteMlCentavos == null,
+          );
 
           return (
             <Card key={pedido.id} className="overflow-hidden">
@@ -204,7 +225,29 @@ export default function PedidosPage() {
                   {prazo.texto}
                 </span>
                 <span className="font-medium">{centavosParaReais(pedido.totalCentavos)}</span>
+                {pedido.canal === 'ML' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={reconciliar.isPending}
+                    onClick={() => reconciliar.mutate(pedido.id)}
+                  >
+                    <RefreshCw className="size-3.5" /> Reconsultar custos
+                  </Button>
+                )}
               </div>
+
+              {pedido.canal === 'ML' && (
+                <p
+                  className={`px-4 py-2 text-xs ${custosPendentes ? 'text-amber-300' : 'text-muted-foreground'}`}
+                >
+                  {custosPendentes
+                    ? 'Custos parciais: há tarifa ou frete ainda pendente.'
+                    : 'Tarifas e fretes importados.'}{' '}
+                  Valores totais por linha, já incluindo a quantidade. A reconsulta não vincula
+                  itens nem movimenta estoque.
+                </p>
+              )}
 
               <Table>
                 <TableHeader>
@@ -212,6 +255,12 @@ export default function PedidosPage() {
                     <TableHead>Item</TableHead>
                     <TableHead>SKU do marketplace</TableHead>
                     <TableHead className="text-right">Qtd</TableHead>
+                    {pedido.canal === 'ML' && (
+                      <TableHead className="text-right">Tarifa ML</TableHead>
+                    )}
+                    {pedido.canal === 'ML' && (
+                      <TableHead className="text-right">Frete ML</TableHead>
+                    )}
                     <TableHead>Situação</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -221,6 +270,20 @@ export default function PedidosPage() {
                       <TableCell className="max-w-[280px] truncate">{item.nomeExterno}</TableCell>
                       <TableCell className="font-mono text-xs">{item.skuExterno}</TableCell>
                       <TableCell className="text-right">{item.qtd}</TableCell>
+                      {pedido.canal === 'ML' && (
+                        <TableCell className="whitespace-nowrap text-right tabular-nums">
+                          {item.tarifaMlCentavos != null
+                            ? centavosParaReais(item.tarifaMlCentavos)
+                            : 'Pendente'}
+                        </TableCell>
+                      )}
+                      {pedido.canal === 'ML' && (
+                        <TableCell className="whitespace-nowrap text-right tabular-nums">
+                          {item.freteMlCentavos != null
+                            ? centavosParaReais(item.freteMlCentavos)
+                            : 'Pendente'}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {item.atendimento === 'SEM_VINCULO' ? (
                           <div className="flex items-center gap-2">

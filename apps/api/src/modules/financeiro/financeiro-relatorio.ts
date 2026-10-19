@@ -9,6 +9,7 @@ import {
 } from '@mahou-hub/contracts';
 import {
   calcularVendaFinanceira,
+  custosMlDaVenda,
   resumirFinanceiro,
   somarValoresVendas,
   type ContextoFinanceiro,
@@ -59,6 +60,7 @@ function detalharVenda(venda: VendaFinanceira, contexto: ContextoFinanceiro): Li
       precoUnitarioCentavos: venda.precoUnitarioCentavos,
       dataVenda: diaCivil(venda.dataVenda),
       observacao: venda.observacao,
+      custosMl: custosMlDaVenda(venda),
     },
   };
 }

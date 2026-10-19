@@ -261,8 +261,12 @@ export default function CalculadoraPage() {
 
 const VAZIO = '—';
 
-function valorOuVazio(centavos: number | undefined): string {
-  return centavos == null ? VAZIO : centavosParaReais(centavos);
+function valorOuVazio(centavos: number | null | undefined): string {
+  return centavos === null
+    ? 'Pendente'
+    : centavos === undefined
+      ? VAZIO
+      : centavosParaReais(centavos);
 }
 
 function Resultado({
@@ -316,7 +320,9 @@ function Resultado({
           : 'danger';
   const label =
     margem == null
-      ? 'Aguardando dados'
+      ? canal === 'ML' && resultado
+        ? 'Cotação pendente'
+        : 'Aguardando dados'
       : margem >= thresholds.verde
         ? 'Vale a pena'
         : margem >= thresholds.amarelo
@@ -355,15 +361,32 @@ function Resultado({
           <Linha rotulo="Taxa Shopee" valor={valorOuVazio(resultado?.taxaShopeeCentavos)} />
         )}
         {canal === 'ML' && (
-          <Linha rotulo="Taxa ML" valor={valorOuVazio(resultado?.taxaMlCentavos)} />
+          <>
+            <Linha rotulo="Tarifa ML" valor={valorOuVazio(resultado?.taxaMlCentavos)} />
+            <Linha
+              rotulo="Frete do vendedor (ML)"
+              valor={valorOuVazio(resultado?.freteMlCentavos)}
+            />
+          </>
         )}
         {canal === 'TIKTOK' && (
           <Linha rotulo="Taxa TikTok" valor={valorOuVazio(resultado?.taxaTikTokCentavos)} />
         )}
         <Linha rotulo="Líquido" valor={valorOuVazio(liquido)} destaque />
-        <Linha rotulo="Margem" valor={margem == null ? VAZIO : pct(margem)} destaque />
+        <Linha
+          rotulo="Margem"
+          valor={margem === null ? 'Pendente' : margem === undefined ? VAZIO : pct(margem)}
+          destaque
+        />
         <Linha rotulo="Lucro/hora" valor={valorOuVazio(lucroHora)} />
       </dl>
+
+      {canal === 'ML' && resultado?.custosMlStatus === 'PENDENTE' && (
+        <p className="text-sm text-muted-foreground">
+          Salve o produto, defina a categoria e as condições do anúncio e consulte tarifa e frete
+          para calcular a margem prevista do Mercado Livre.
+        </p>
+      )}
 
       <Button onClick={onSalvar} variant="outline" className="w-full" disabled={!resultado}>
         Salvar como produto

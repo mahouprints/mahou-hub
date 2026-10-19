@@ -20,6 +20,7 @@ export * from './usuario';
 export * from './venda';
 export * from './custo';
 export * from './financeiro';
+export * from './mercado-livre';
 export * from './relatorio-financeiro';
 
 export * from './relatorios-configuracao';

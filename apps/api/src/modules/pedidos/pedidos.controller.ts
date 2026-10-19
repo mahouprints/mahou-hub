@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
@@ -70,6 +80,24 @@ export class PedidosController {
   @ApiOperation({ summary: 'Puxa pedidos novos dos marketplaces configurados' })
   sincronizar(@Query(new ZodValidationPipe(PedidoSyncSchema)) query: PedidoSync) {
     return this.sync.sincronizarTudo(query.horas);
+  }
+
+  @Post(':id/reconciliar-custos')
+  @Throttle({ default: { limit: 6, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Reconsulta tarifas e frete ML sem reatender o pedido' })
+  async reconciliarCustos(@Param('id') id: string) {
+    const pedido = await this.prisma.pedidoMarketplace.findUnique({ where: { id } });
+    if (!pedido) throw new NotFoundException(`Pedido ${id} não existe`);
+    if (pedido.canal !== 'ML')
+      throw new BadRequestException('Reconciliação disponível somente para pedidos ML');
+    const resultado = await this.sync.reconciliarCustosMl(id, pedido.externalId);
+    const itens = await this.prisma.pedidoItem.findMany({ where: { pedidoId: id } });
+    return {
+      ...resultado,
+      itensPendentes: itens.filter(
+        (item) => item.tarifaMlCentavos == null || item.freteMlCentavos == null,
+      ).length,
+    };
   }
 
   @Post('itens/:id/vincular')

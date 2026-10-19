@@ -33,6 +33,34 @@ function produtoComInsumos() {
   };
 }
 
+function custosMlDoProduto(precoCentavos: number, tarifaCentavos: number) {
+  const mercadoLivre = {
+    categoriaId: 'MLB1234',
+    tipoAnuncio: 'gold_special',
+    modoEnvio: 'me2',
+    tipoLogistica: 'drop_off',
+    freteGratis: false,
+    condicao: 'new',
+    pesoGramas: 250,
+    alturaCm: 5,
+    larguraCm: 10,
+    comprimentoCm: 15,
+  };
+  return {
+    mercadoLivre,
+    cotacaoMl: {
+      contexto: { ...mercadoLivre, precoCentavos },
+      categoriaNome: 'Categoria de teste',
+      tarifaCentavos,
+      freteCentavos: 450,
+      tarifaFixaCentavos: null,
+      percentualTarifa: null,
+      cotadoEm: new Date().toISOString(),
+      pendencias: [],
+    },
+  };
+}
+
 function prepararCustos(mock: ReturnType<typeof makePrismaMock>['mock']) {
   mock.parametro.findUnique.mockResolvedValue({
     tarifaKwhCentavos: 100,
@@ -124,14 +152,18 @@ describe('PricingService.simular — custo completo por unidade', () => {
   it.each([
     ['SITE', 1017],
     ['SHOPEE', 417],
-    ['ML', 717],
+    ['ML', 267],
     ['TIKTOK', 617],
   ])(
     'desconta insumos e taxas do canal %s em todas as unidades',
     async (canalPrincipal, liquidoUnitario) => {
       const { mock } = makePrismaMock();
       prepararCustos(mock);
-      mock.produto.findUnique.mockResolvedValue({ ...produtoComInsumos(), canalPrincipal });
+      mock.produto.findUnique.mockResolvedValue({
+        ...produtoComInsumos(),
+        canalPrincipal,
+        ...(canalPrincipal === 'ML' ? custosMlDoProduto(2000, 300) : {}),
+      });
       const service = new PricingService(asPrisma(mock));
 
       const resumo = await service.simular({
@@ -148,6 +180,7 @@ describe('PricingService.simular — custo completo por unidade', () => {
       expect(resumo.capacidadeUnidades).toBe(4);
       expect(resumo.faturamentoCentavos).toBe(8000);
       expect(resumo.lucroLiquidoCentavos).toBe(Number(liquidoUnitario) * 4);
+      expect(mock.taxaMercadoLivre.findMany).not.toHaveBeenCalled();
     },
   );
 });
@@ -265,7 +298,7 @@ describe('múltiplos filamentos — cálculo, projeção e financeiro', () => {
   it.each([
     ['SITE', 3307],
     ['SHOPEE', 2107],
-    ['ML', 2707],
+    ['ML', 2257],
     ['TIKTOK', 2307],
   ])('simulador inclui materiais, insumos e taxas do canal %s', async (canalPrincipal, liquido) => {
     const { mock } = makePrismaMock();
@@ -275,6 +308,7 @@ describe('múltiplos filamentos — cálculo, projeção e financeiro', () => {
       filamentos: composicaoCincoFilamentos(),
       precoCentavos: 5000,
       canalPrincipal,
+      ...(canalPrincipal === 'ML' ? custosMlDoProduto(5000, 600) : {}),
     });
 
     const resumo = await new PricingService(asPrisma(mock)).simular({
@@ -290,5 +324,6 @@ describe('múltiplos filamentos — cálculo, projeção e financeiro', () => {
     expect(resumo.lucroLiquidoCentavos).toBe(Number(liquido) * 4);
     expect(mock.filamento.findMany).not.toHaveBeenCalled();
     expect(mock.filamento.findUnique).not.toHaveBeenCalled();
+    expect(mock.taxaMercadoLivre.findMany).not.toHaveBeenCalled();
   });
 });

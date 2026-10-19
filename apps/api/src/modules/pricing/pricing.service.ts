@@ -4,17 +4,16 @@ import {
   calcularPlanoAds,
   calcularProduto,
   simularCenario,
-  taxaMercadoLivreCentavos,
   taxaShopeeCentavos,
   taxaTikTokCentavos,
   type CalculoEntrada,
   type CalculoSaida,
-  type FaixaMercadoLivre as FaixaMlPricing,
   type FaixaShopee as FaixaShopeePricing,
   type Filamento as FilamentoPricing,
   type ParametrosGlobais,
   type ParamsAds,
 } from '@mahou-hub/pricing';
+import { custosMlDaCotacao } from '@mahou-hub/contracts';
 import type {
   AnuncioMarketplace,
   CalcularInput,
@@ -49,6 +48,7 @@ export class PricingService {
       embalagemCentavos: input.embalagemCentavos,
       custoInsumosCentavos: input.custoInsumosCentavos ?? 0,
       precoCentavos: input.precoCentavos,
+      mercadoLivre: input.mercadoLivre,
     });
   }
 
@@ -78,6 +78,7 @@ export class PricingService {
         0,
       ),
       precoCentavos: produto.precoCentavos,
+      mercadoLivre: custosMlDaCotacao(produto),
     });
 
     const liquidoUnitario =
@@ -88,6 +89,12 @@ export class PricingService {
           : produto.canalPrincipal === 'TIKTOK'
             ? calculado.liquidoTikTokCentavos
             : calculado.liquidoSiteCentavos;
+
+    if (liquidoUnitario === null) {
+      throw new BadRequestException(
+        'Atualize a cotação do Mercado Livre com tarifa e frete antes de simular este produto',
+      );
+    }
 
     return simularCenario({
       horasPorDia: input.horasPorDia,
@@ -135,12 +142,11 @@ export class PricingService {
   private async calcularResolvido(
     entrada: Omit<CalculoEntrada, 'parametros' | 'tabelaShopee' | 'tabelaMercadoLivre'>,
   ): Promise<CalculoSaida> {
-    const [parametros, tabelaShopee, tabelaMercadoLivre] = await Promise.all([
+    const [parametros, tabelaShopee] = await Promise.all([
       this.carregarParametros(),
       this.carregarTabelaShopee(),
-      this.carregarTabelaMl(),
     ]);
-    return calcularProduto({ ...entrada, parametros, tabelaShopee, tabelaMercadoLivre });
+    return calcularProduto({ ...entrada, parametros, tabelaShopee });
   }
 
   private async resolverFilamentos(itens: CalcularInput['filamentos']) {
@@ -220,16 +226,31 @@ export class PricingService {
    * parte de peso e filamento pra chegar no custo, e modelo de prospecção não tem
    * filamento nem insumo cadastrado — tem só o custo estimado pelo bot.
    *
-   * Nada disso é persistido: taxa de marketplace e imposto vivem no Parametro e
-   * mudam, então número congelado no banco viraria mentira silenciosa na tela.
+   * Nada disso é persistido. Sem categoria e cotação, os custos do Mercado Livre
+   * ficam pendentes; os outros canais usam os parâmetros configurados.
    */
   async economiaDeCustoPronto(entrada: EconomiaCustoProntoEntrada): Promise<EconomiaModelo> {
     const { precoCentavos: preco, custoCentavos, canal, tempoHoras } = entrada;
     const parametros = await this.carregarParametros();
-    const taxa = await this.taxaDoCanal(preco, canal, parametros);
     const imposto = parametros.impostoAtivo
       ? arredondarCentavos((preco * parametros.impostoPct) / 100)
       : 0;
+
+    if (canal === 'ML') {
+      return {
+        canal,
+        precoCentavos: preco,
+        custoCentavos,
+        taxaMarketplaceCentavos: null,
+        impostoCentavos: imposto,
+        liquidoCentavos: null,
+        margemPct: null,
+        lucroPorHoraCentavos: null,
+        custosMlStatus: 'PENDENTE',
+      };
+    }
+
+    const taxa = await this.taxaDoCanal(preco, canal, parametros);
     const liquido = preco - taxa - imposto - custoCentavos;
 
     return {
@@ -246,28 +267,12 @@ export class PricingService {
 
   private async taxaDoCanal(
     precoCentavos: number,
-    canal: AnuncioMarketplace,
+    canal: Exclude<AnuncioMarketplace, 'ML'>,
     parametros: ParametrosGlobais,
   ): Promise<number> {
     if (canal === 'SHOPEE') {
       return taxaShopeeCentavos(precoCentavos, parametros, await this.carregarTabelaShopee());
     }
-    if (canal === 'ML') {
-      return taxaMercadoLivreCentavos(precoCentavos, parametros, await this.carregarTabelaMl());
-    }
     return taxaTikTokCentavos(precoCentavos, parametros);
-  }
-
-  private async carregarTabelaMl(): Promise<FaixaMlPricing[]> {
-    const rows = await this.prisma.taxaMercadoLivre.findMany({
-      orderBy: { limInferiorCentavos: 'asc' },
-    });
-    return rows.map((r) => ({
-      faixa: r.faixa as 'A' | 'B' | 'C' | 'D' | 'E',
-      limInferiorCentavos: r.limInferiorCentavos,
-      custoFixoCentavos: r.custoFixoCentavos,
-      pctAlternativo: Number(r.pctAlternativo),
-      comissaoCategoriaPct: Number(r.comissaoCategoriaPct),
-    }));
   }
 }

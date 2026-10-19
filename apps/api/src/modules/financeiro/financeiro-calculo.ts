@@ -3,6 +3,7 @@ import { calcularProduto, type CalculoEntrada } from '@mahou-hub/pricing';
 import type { ResumoRelatorioFinanceiro, TotaisVendasRelatorio } from '@mahou-hub/contracts';
 
 export const VENDA_FINANCEIRA_INCLUDE = {
+  pedidoItem: true,
   produto: {
     include: {
       filamento: true,
@@ -50,16 +51,57 @@ export function calcularVendaFinanceira(
   const faturamento = venda.precoUnitarioCentavos * venda.qtd;
   const variaveis = (calculado.custoTotalProducaoCentavos - insumos) * venda.qtd;
   const impostos = calculado.impostoCentavos * venda.qtd;
-  const taxaCanal = taxas[venda.canal] * venda.qtd;
+  const custosMl = custosMlDaVenda(venda);
+  // Importados são totais da linha (já incluem quantidade e eventual rateio de envio).
+  // Sem despesa importada, o ML mostra somente o subtotal conhecido e mantém a pendência.
+  const taxaCanal = custosMl
+    ? (custosMl.tarifaCentavos ?? 0)
+    : (taxas[venda.canal] ?? 0) * venda.qtd;
+  const frete = custosMl?.freteCentavos ?? 0;
+  const custosMlCompletos =
+    custosMl?.tarifaFonte === 'IMPORTADA' && custosMl.freteFonte === 'IMPORTADO';
   return {
     faturamentoCentavos: faturamento,
     custosVariaveisCentavos: variaveis,
     custosInsumosCentavos: insumos * venda.qtd,
     impostosCentavos: impostos,
     taxasMarketplaceCentavos: taxaCanal,
-    lucroContribuicaoCentavos: faturamento - variaveis - insumos * venda.qtd - impostos - taxaCanal,
+    fretesCentavos: frete,
+    vendasMlComCustosReais: custosMlCompletos ? 1 : 0,
+    vendasMlComCustosPendentes: custosMl && !custosMlCompletos ? 1 : 0,
+    lucroContribuicaoCentavos:
+      faturamento - variaveis - insumos * venda.qtd - impostos - taxaCanal - frete,
     qtdVendas: 1,
     qtdItensVendidos: venda.qtd,
+  };
+}
+
+/** Zero importado é conhecido; ausência de frete mantém o resultado sinalizado como parcial. */
+export function custosMlDaVenda(venda: {
+  canal: string;
+  qtd: number;
+  precoUnitarioCentavos: number;
+  pedidoItem?: {
+    qtd: number;
+    precoUnitarioCentavos: number;
+    tarifaMlCentavos: number | null;
+    freteMlCentavos: number | null;
+    custosMlAtualizadosEm: Date | null;
+  } | null;
+}) {
+  if (venda.canal !== 'ML') return null;
+  // Edições antigas podem ter alterado a venda sem alterar o item importado.
+  const item =
+    venda.pedidoItem?.qtd === venda.qtd &&
+    venda.pedidoItem.precoUnitarioCentavos === venda.precoUnitarioCentavos
+      ? venda.pedidoItem
+      : null;
+  return {
+    tarifaCentavos: item?.tarifaMlCentavos ?? null,
+    freteCentavos: item?.freteMlCentavos ?? null,
+    tarifaFonte: item?.tarifaMlCentavos != null ? ('IMPORTADA' as const) : ('PENDENTE' as const),
+    freteFonte: item?.freteMlCentavos != null ? ('IMPORTADO' as const) : ('PENDENTE' as const),
+    atualizadosEm: item?.custosMlAtualizadosEm?.toISOString() ?? null,
   };
 }
 
@@ -71,6 +113,9 @@ export function somarValoresVendas(vendas: TotaisVendasRelatorio[]): TotaisVenda
     custosInsumosCentavos: 0,
     impostosCentavos: 0,
     taxasMarketplaceCentavos: 0,
+    fretesCentavos: 0,
+    vendasMlComCustosReais: 0,
+    vendasMlComCustosPendentes: 0,
     lucroContribuicaoCentavos: 0,
     qtdVendas: 0,
     qtdItensVendidos: 0,
