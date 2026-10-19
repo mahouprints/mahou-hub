@@ -12,6 +12,8 @@ import {
 } from './publicacao-schema';
 import {
   aptoParaFaturar,
+  aptidaoFiscalNoDetalhe,
+  aguardaProcessamentoFotos,
   contemCampos,
   contemVinculo,
   objeto,
@@ -122,7 +124,10 @@ export class PublicacaoService {
         await this.salvarProduto(produto, journal, familiasConfirmadas.has(produto.produtoId));
       throw erro;
     }
-    return { execucaoId: entrada.execucaoId, itens: journal.itens };
+    const pendentes = Object.entries(journal.itens)
+      .filter(([, item]) => item.itemId && !item.verificado)
+      .map(([chave, item]) => ({ chave, itemId: item.itemId, motivo: 'processamento_fotos' }));
+    return { execucaoId: entrada.execucaoId, itens: journal.itens, pendentes };
   }
 
   private async validarItem(item: PublicacaoItem, journal: JournalPublicacao): Promise<void> {
@@ -174,9 +179,9 @@ export class PublicacaoService {
     await this.journal.salvar(journal);
     const final = objeto(await this.http.get(`/items/${salvo.itemId}?include_attributes=all`));
     verificarItem(final, item, this.http.sellerId);
-    if (final.status !== 'active')
+    if (final.status !== 'active' && !aguardaProcessamentoFotos(final))
       throw new PublicacaoErro('Anúncio criado, mas ainda não está ativo.');
-    salvo.verificado = true;
+    salvo.verificado = final.status === 'active';
     await this.journal.salvar(journal);
   }
 
@@ -216,6 +221,7 @@ export class PublicacaoService {
   }
 
   private async concluirFiscal(item: PublicacaoItem, salvo: RegistroItem): Promise<void> {
+    let todosConfirmadosNoDetalhe = true;
     for (const fiscal of item.fiscais) {
       const existente = await this.lerFiscal(fiscal.sku);
       if (existente && !contemCampos(existente, fiscal.cadastro))
@@ -231,16 +237,25 @@ export class PublicacaoService {
           item_id: salvo.itemId,
           ...(variationId ? { variation_id: variationId } : {}),
         });
-      if (
-        !contemVinculo(
-          await this.http.get(`/items/${salvo.itemId}/fiscal_information/detail`),
-          fiscal.sku,
-          variationId,
-        )
-      )
+      const confirmado = await this.http.get(`/items/${salvo.itemId}/fiscal_information/detail`);
+      if (!contemVinculo(confirmado, fiscal.sku, variationId))
         throw new PublicacaoErro('Vínculo fiscal não confirmado.');
+      const aptidao = aptidaoFiscalNoDetalhe(
+        confirmado,
+        salvo.itemId!,
+        this.http.sellerId,
+        fiscal.sku,
+        variationId,
+      );
+      if (
+        aptidao === false ||
+        (aptidao === true && !contemCampos(objeto(confirmado).sku, fiscal.cadastro))
+      )
+        throw new PublicacaoErro('Detalhe fiscal divergente ou sem aptidão para emitir nota.');
+      todosConfirmadosNoDetalhe = todosConfirmadosNoDetalhe && aptidao === true;
     }
     if (
+      !todosConfirmadosNoDetalhe &&
       !aptoParaFaturar(
         await this.http.get(`/can_invoice/items/${salvo.itemId}`),
         salvo.itemId!,
@@ -422,12 +437,17 @@ export class PublicacaoService {
             ],
           )
         : null;
+    const consultaFrete = new URLSearchParams({
+      item_id: id,
+      verbose: 'true',
+      ...(typeof shipping.free_shipping === 'boolean'
+        ? { free_shipping: String(shipping.free_shipping) }
+        : {}),
+    });
     const [fiscal, canInvoice, frete] = await Promise.all([
       this.consultaOpcional(`/items/${id}/fiscal_information/detail`),
       this.consultaOpcional(`/can_invoice/items/${id}`),
-      this.consultaOpcional(
-        `/users/${this.http.sellerId}/shipping_options/free?item_id=${id}&verbose=true`,
-      ),
+      this.consultaOpcional(`/users/${this.http.sellerId}/shipping_options/free?${consultaFrete}`),
     ]);
     return { ...item, shipping, pictures, userProduct, fiscal, canInvoice, frete };
   }

@@ -113,7 +113,7 @@ describe('Inspeção somente leitura da publicação ML', () => {
       contexto.get.mock.calls.filter(([path]) => path === '/items/MLB123?include_attributes=all'),
     ).toHaveLength(1);
     expect(contexto.get).toHaveBeenCalledWith(
-      '/users/42/shipping_options/free?item_id=MLB123&verbose=true',
+      '/users/42/shipping_options/free?item_id=MLB123&verbose=true&free_shipping=true',
     );
     expect(contexto.post).not.toHaveBeenCalled();
     expect(contexto.put).not.toHaveBeenCalled();
