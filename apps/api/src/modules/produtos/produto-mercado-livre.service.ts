@@ -103,6 +103,7 @@ export class ProdutoMercadoLivreService {
       !vinculo ||
       vinculo.skus.length !== 1 ||
       Object.keys(vinculo.variationIds ?? {}).length ||
+      entrada.pesoGramas < Number(produto.pesoG) ||
       (variacao.pesoG !== null && Number(variacao.pesoG) !== Number(produto.pesoG))
     )
       throw new BadRequestException('Vínculo individual ou pacote não confirmado.');

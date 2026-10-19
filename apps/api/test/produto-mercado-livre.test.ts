@@ -307,6 +307,16 @@ describe('consulta e persistência por SKU', () => {
     mock.produto.updateMany.mockResolvedValue({ count: 0 });
     await expect(service.cotar('p1')).rejects.toThrow('mudaram durante a consulta');
   });
+
+  it('não volta a cotar por cor quando o pacote pesa menos que a peça após editar a gramatura', async () => {
+    const { mock, ml, publicado, service } = prepararPublicado();
+    mock.produto.findUnique.mockResolvedValue({ ...publicado, pesoG: 100, cotacaoMl: null });
+    const resultado = await service.cotar('p1');
+    expect(resultado.porSku).toEqual({});
+    expect(resultado.pendencias).toHaveLength(2);
+    expect(ml.anuncio).not.toHaveBeenCalled();
+    expect(ml.cotar.mock.calls.some(([entrada]) => entrada.itemId)).toBe(false);
+  });
 });
 
 describe('ProdutoMercadoLivreService', () => {
