@@ -51,12 +51,49 @@ function atributosConferem(recebidos: unknown, esperados: unknown): boolean {
     const valor = objeto(atributo);
     return recebidos.some((recebido) => {
       const atual = objeto(recebido);
+      const nomeHumano =
+        ['BRAND', 'MANUFACTURER', 'LINE', 'COLLECTION', 'CHARACTER', 'CHARACTER_VERSION'].includes(
+          String(valor.id),
+        ) ||
+        (!valor.id && nomesHumanosIguais(valor.name, 'Cor'));
       return (
-        (valor.id ? atual.id === valor.id : atual.name === valor.name) &&
-        (valor.value_id ? atual.value_id === valor.value_id : atual.value_name === valor.value_name)
+        (valor.id ? atual.id === valor.id : nomesHumanosIguais(atual.name, valor.name)) &&
+        (valor.value_id
+          ? atual.value_id === valor.value_id
+          : nomeHumano
+            ? nomesHumanosIguais(atual.value_name, valor.value_name)
+            : atual.value_name === valor.value_name)
       );
     });
   });
+}
+
+function nomesHumanosIguais(recebido: unknown, esperado: unknown): boolean {
+  if (typeof recebido !== 'string' || typeof esperado !== 'string') return false;
+  const normalizar = (nome: string) =>
+    nome.normalize('NFC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
+  return normalizar(recebido) === normalizar(esperado);
+}
+
+/** Usa a aptidão explícita do detalhe fiscal; null mantém a consulta legada de can_invoice. */
+export function aptidaoFiscalNoDetalhe(
+  recebido: unknown,
+  itemId: string,
+  sellerId: string,
+  sku: string,
+  variationId?: string,
+): boolean | null {
+  const detalhe = objeto(recebido);
+  const cadastro = objeto(detalhe.sku);
+  if (!Object.hasOwn(cadastro, 'can_invoice')) return null;
+  return (
+    detalhe.item_id === itemId &&
+    String(detalhe.seller_id) === sellerId &&
+    cadastro.sku === sku &&
+    cadastro.can_invoice === true &&
+    (!Object.hasOwn(cadastro, 'seller_id') || String(cadastro.seller_id) === sellerId) &&
+    (!variationId || String(detalhe.variation_id) === variationId)
+  );
 }
 
 /** Confere propriedade, preço, estoque, atributos e todas as cores no item remoto. */
@@ -134,5 +171,16 @@ export function aptoParaFaturar(resposta: unknown, itemId: string, sellerId: str
         valor.item_id === itemId && String(valor.seller_id) === sellerId && valor.status === true
       );
     })
+  );
+}
+
+/** Pausa documentada de processamento; revisão de fotos ou outros motivos não são transitórios. */
+export function aguardaProcessamentoFotos(resposta: unknown): boolean {
+  const item = objeto(resposta);
+  return (
+    item.status === 'paused' &&
+    Array.isArray(item.sub_status) &&
+    item.sub_status.length === 1 &&
+    item.sub_status[0] === 'picture_download_pending'
   );
 }

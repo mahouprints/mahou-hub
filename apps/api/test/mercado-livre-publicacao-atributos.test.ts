@@ -31,6 +31,57 @@ const schemaPayload =
   PublicacaoEntradaSchema.shape.produtos.element.shape.itens.element.shape.payload;
 
 describe('Atributos personalizados de User Products', () => {
+  it('aceita somente NFC, caixa e espaços em nomes humanos, preservando SKU e IDs', () => {
+    const esperado = {
+      ...item,
+      payload: {
+        ...item.payload,
+        attributes: [...item.payload.attributes, { id: 'CHARACTER', value_name: 'Mini Dragão' }],
+      },
+    };
+    const remoto = {
+      ...esperado.payload,
+      id: 'MLB123',
+      seller_id: 42,
+      attributes: [
+        ...item.payload.attributes,
+        { id: 'CHARACTER', value_id: '46680506', value_name: ' MINI  draga\u0303o ' },
+      ],
+    };
+    expect(() => verificarItem(remoto, esperado, '42')).not.toThrow();
+    expect(() =>
+      verificarItem(
+        {
+          ...remoto,
+          attributes: [...item.payload.attributes, { id: 'CHARACTER', value_name: 'Mini dragao' }],
+        },
+        esperado,
+        '42',
+      ),
+    ).toThrow('Atributos');
+    expect(() =>
+      verificarItem(
+        {
+          ...remoto,
+          attributes: [{ id: 'SELLER_SKU', value_name: 'drag-br' }, ...remoto.attributes.slice(1)],
+        },
+        esperado,
+        '42',
+      ),
+    ).toThrow('Atributos');
+    const comCodigo = {
+      ...esperado,
+      payload: {
+        ...esperado.payload,
+        attributes: [
+          { id: 'CHARACTER', value_id: '123', value_name: 'Mini Dragão' },
+          ...item.payload.attributes,
+        ],
+      },
+    };
+    expect(() => verificarItem(remoto, comCodigo, '42')).toThrow('Atributos');
+  });
+
   it('aceita nome sem id e exige pelo menos uma identidade do atributo', () => {
     expect(schemaPayload.safeParse(item.payload).success).toBe(true);
     expect(
