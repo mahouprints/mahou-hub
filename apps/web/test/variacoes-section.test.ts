@@ -241,6 +241,28 @@ describe('custos por cor na tabela de variações', () => {
     expect(html).not.toContain('Cotação pendente');
   });
 
+  it('mostra os dois pacotes e o aviso junto da contribuição estimada', () => {
+    consulta.variacoes = [
+      variacao({
+        cotacaoMl: {
+          ...cotacaoMl,
+          pacoteMercadoLivre: { alturaCm: 18, larguraCm: 12, comprimentoCm: 5, pesoGramas: 850 },
+          pendencias: [
+            'Pacote divergente: Mercado Livre 18 × 12 × 5 cm, 850 g; declarado no ERP 2 × 15 × 20 cm, 23 g. Frete e contribuição estimados pelo anúncio; a embalagem física não está confirmada.',
+          ],
+        },
+      }),
+    ];
+    const html = renderizar();
+    expect(html).toContain('Mercado Livre 18 × 12 × 5 cm, 850 g');
+    expect(html).toContain('declarado no ERP 2 × 15 × 20 cm, 23 g');
+    expect(html).toContain('Frete e contribuição estimados pelo anúncio');
+    expect(html).toContain('a embalagem física não está confirmada');
+    expect(html).toContain('Contribuição ML estimada');
+    expect(html).toContain('R$ 4,61');
+    expect(html).not.toContain('Cotação pendente');
+  });
+
   it('mostra a pendência de composição em vez de um custo inventado', () => {
     consulta.variacoes = [
       variacao({ pricing: null, pricingPendencias: ['Revise os filamentos.'] }),

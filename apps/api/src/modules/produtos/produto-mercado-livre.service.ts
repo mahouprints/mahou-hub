@@ -3,9 +3,11 @@ import { Prisma, type Produto, type ProdutoVariacao } from '@prisma/client';
 import {
   MercadoLivreConfiguracaoSchema,
   MercadoLivreCotacaoInputSchema,
+  MercadoLivrePacoteSchema,
   type MercadoLivreCotacao,
   type MercadoLivreCotacaoInput,
   type MercadoLivrePublicacao,
+  type MercadoLivrePacote,
 } from '@mahou-hub/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MercadoLivreService } from '../mercado-livre/mercado-livre.service';
@@ -51,8 +53,10 @@ export class ProdutoMercadoLivreService {
       );
     const configuracao = MercadoLivreConfiguracaoSchema.parse(produto.mercadoLivre);
     const publicados = configuracao.publicacao?.itens ?? [];
-    if (entrada.data.itemId && !publicados.length) await this.conferirAnuncio(entrada.data);
-    const cotacao: MercadoLivreCotacao = await this.mercadoLivre.cotar(entrada.data);
+    const cotacao: MercadoLivreCotacao =
+      entrada.data.itemId && !publicados.length
+        ? await this.cotarAnuncio(entrada.data)
+        : await this.mercadoLivre.cotar(entrada.data);
     if (publicados.length) await this.cotarCores(produto, entrada.data, publicados, cotacao);
     const gravado = await this.prisma.produto.updateMany({
       where: {
@@ -80,8 +84,7 @@ export class ProdutoMercadoLivreService {
     for (const variacao of produto.variacoes) {
       try {
         const contexto = this.contextoDaCor(produto, variacao, entrada, publicados);
-        await this.conferirAnuncio(contexto, variacao.sku);
-        cotacao.porSku[variacao.sku] = await this.mercadoLivre.cotar(contexto);
+        cotacao.porSku[variacao.sku] = await this.cotarAnuncio(contexto, variacao.sku);
       } catch {
         cotacao.pendencias.push(
           `${variacao.sku}: vínculo, anúncio ou cotação não confirmado; consulte novamente.`,
@@ -124,7 +127,31 @@ export class ProdutoMercadoLivreService {
     };
   }
 
-  private async conferirAnuncio(contexto: MercadoLivreCotacaoInput, sku?: string): Promise<void> {
+  private async cotarAnuncio(contexto: MercadoLivreCotacaoInput, sku?: string) {
+    const pacoteMercadoLivre = await this.conferirAnuncio(contexto, sku);
+    const cotacao = await this.mercadoLivre.cotar(contexto);
+    const dimensoes = ['alturaCm', 'larguraCm', 'comprimentoCm'] as const;
+    const recebido = dimensoes.map((campo) => pacoteMercadoLivre[campo]).sort((a, b) => a - b);
+    const esperado = dimensoes.map((campo) => contexto[campo]).sort((a, b) => a - b);
+    if (
+      pacoteMercadoLivre.pesoGramas !== contexto.pesoGramas ||
+      recebido.some((valor, indice) => valor !== esperado[indice])
+    )
+      cotacao.pendencias.push(
+        `Pacote divergente: Mercado Livre ${this.descreverPacote(pacoteMercadoLivre)}; ` +
+          `declarado no ERP ${this.descreverPacote(contexto)}. Frete e contribuição estimados pelo anúncio; a embalagem física não está confirmada.`,
+      );
+    return { ...cotacao, pacoteMercadoLivre };
+  }
+
+  private descreverPacote(pacote: MercadoLivrePacote): string {
+    return `${pacote.alturaCm} × ${pacote.larguraCm} × ${pacote.comprimentoCm} cm, ${pacote.pesoGramas} g`;
+  }
+
+  private async conferirAnuncio(
+    contexto: MercadoLivreCotacaoInput,
+    sku?: string,
+  ): Promise<MercadoLivrePacote> {
     const anuncio = await this.mercadoLivre.anuncio(contexto.itemId!);
     const campos = [
       'itemId',
@@ -146,13 +173,9 @@ export class ProdutoMercadoLivreService {
       throw new BadRequestException(
         'O anúncio deve corresponder ao SKU, preço, categoria e envio cadastrados.',
       );
-    const dimensoes = ['alturaCm', 'larguraCm', 'comprimentoCm'] as const;
-    const recebido = dimensoes.map((campo) => anuncio[campo]).sort((a, b) => Number(a) - Number(b));
-    const esperado = dimensoes.map((campo) => contexto[campo]).sort((a, b) => a - b);
-    if (
-      anuncio.pesoGramas !== contexto.pesoGramas ||
-      recebido.some((valor, indice) => valor !== esperado[indice])
-    )
-      throw new BadRequestException('As medidas do anúncio divergem do pacote cadastrado.');
+    const pacote = MercadoLivrePacoteSchema.safeParse(anuncio);
+    if (!pacote.success)
+      throw new BadRequestException('As medidas do anúncio não estão disponíveis.');
+    return pacote.data;
   }
 }
