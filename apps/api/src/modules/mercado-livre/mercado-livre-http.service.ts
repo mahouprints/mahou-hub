@@ -57,10 +57,19 @@ export class MercadoLivreHttpService {
     const resposta = await this.enviar(method, path, token, body, headers);
     // Diagnósticos de anúncios expõem apenas identificadores, nunca mensagens ou o corpo livre.
     if (!resposta.ok) {
-      const causas =
+      const falha =
         method !== 'GET' && /^\/items(?:[/?]|$)/.test(path)
           ? await this.causasSanitizadas(resposta, token)
           : undefined;
+      const causas = falha?.diagnostico;
+      // Apenas o validador permite HTTP 400 com avisos; criação nunca confirma sucesso assim.
+      if (
+        method === 'POST' &&
+        path === '/items/validate' &&
+        resposta.status === 400 &&
+        falha?.apenasAvisos
+      )
+        return causas as T;
       throw new BadGatewayException({
         statusCode: 502,
         message: `${method === 'GET' ? 'Consulta' : 'Gravação'} Mercado Livre: HTTP ${resposta.status}.`,
@@ -93,6 +102,18 @@ export class MercadoLivreHttpService {
     const conteudo: unknown = await resposta.json().catch(() => null);
     if (!conteudo || typeof conteudo !== 'object' || Array.isArray(conteudo)) return undefined;
     const falha = conteudo as Record<string, unknown>;
+    // A decisão usa a resposta inteira, antes de limitar ou remover causas dos diagnósticos.
+    const apenasAvisos =
+      falha.error === 'validation_error' &&
+      Array.isArray(falha.cause) &&
+      falha.cause.length > 0 &&
+      falha.cause.every(
+        (causa: unknown) =>
+          causa !== null &&
+          typeof causa === 'object' &&
+          !Array.isArray(causa) &&
+          (causa as Record<string, unknown>).type === 'warning',
+      );
     const segredos = [
       token,
       this.config.get<string>('ML_SECRET_KEY'),
@@ -103,7 +124,10 @@ export class MercadoLivreHttpService {
       .slice(0, 20)
       .map((causa: unknown) => causaSanitizada(causa, segredos))
       .filter((causa) => Object.keys(causa).length > 0);
-    return error || cause.length ? { ...(error ? { error } : {}), cause } : undefined;
+    return {
+      apenasAvisos,
+      diagnostico: error || cause.length ? { ...(error ? { error } : {}), cause } : undefined,
+    };
   }
 
   private async enviar(
